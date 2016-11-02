@@ -908,12 +908,12 @@ QString CustomFunctionData::paramToString(const ModelData * model) const
   }
   else if ((func>=FuncAdjustGV1) && (func<FuncCount)) {
     switch (adjustMode) {
-      case 0:
+      case FUNC_ADJUST_GVAR_CONSTANT:
         return QObject::tr("Value ")+QString("%1").arg(param);
-      case 1:
-      case 2:
+      case FUNC_ADJUST_GVAR_SOURCE:
+      case FUNC_ADJUST_GVAR_GVAR:
         return RawSource(param).toString();
-      case 3:
+      case FUNC_ADJUST_GVAR_INCDEC:
         if (param==0) return QObject::tr("Decr:") + " -1";
         else          return QObject::tr("Incr:") + " +1";
     }
@@ -1859,7 +1859,6 @@ SimulatorInterface *GetCurrentFirmwareSimulator()
 unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
   switch (type) {
     case MM_RF_PROTO_HISKY:
-    case MM_RF_PROTO_DSM2:
     case MM_RF_PROTO_SYMAX:
     case MM_RF_PROTO_KN:
       return 2;
@@ -1870,6 +1869,8 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
 
     case MM_RF_PROTO_FRSKY:
     case MM_RF_PROTO_FLYSKY:
+    case MM_RF_PROTO_DSM2:
+    case MM_RF_PROTO_AFHDS2A:
       return 4;
 
     case MM_RF_PROTO_MJXQ:

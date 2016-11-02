@@ -608,6 +608,14 @@ enum AssignFunc {
   FuncReserve = -1
 };
 
+enum GVarAdjustModes
+{
+  FUNC_ADJUST_GVAR_CONSTANT,
+  FUNC_ADJUST_GVAR_SOURCE,
+  FUNC_ADJUST_GVAR_GVAR,
+  FUNC_ADJUST_GVAR_INCDEC
+};
+
 class CustomFunctionData { // Function Switches data
   public:
     CustomFunctionData(AssignFunc func=FuncOverrideCH1) { clear(); this->func = func; }
@@ -873,7 +881,8 @@ enum MultiModuleRFProtocols {
   MM_RF_PROTO_ASSAN,
   MM_RF_PROTO_HONTAI,
   MM_RF_PROTO_OLRS,
-  MM_RF_PROTO_LAST= MM_RF_PROTO_OLRS
+  MM_RF_PROTO_AFHDS2A,
+  MM_RF_PROTO_LAST= MM_RF_PROTO_AFHDS2A
 };
 
 unsigned int getNumSubtypes(MultiModuleRFProtocols type);

@@ -78,18 +78,16 @@ extern void rtcdriver_settime(struct gtm * t);
 #endif
 #define TIME_T_MIDPOINT (SHR (TIME_T_MIN + TIME_T_MAX, 1) + 1)
 
-/* Verify a requirement at compile-time (unlike assert, which is runtime).  */
-#define verify(name, assertion) struct name { char a[(assertion) ? 1 : -1]; }
 
-verify(gtime_t_is_integer, TYPE_IS_INTEGER(gtime_t));
-verify(twos_complement_arithmetic, TYPE_TWOS_COMPLEMENT(int));
+
+static_assert(TYPE_IS_INTEGER(gtime_t), "gtime_t is not integer");
+static_assert(TYPE_TWOS_COMPLEMENT(int), "twos complement arithmetic");
 /* The code also assumes that signed integer overflow silently wraps
    around, but this assumption can't be stated without causing a
    diagnostic on some hosts.  */
 
 #define EPOCH_YEAR 1970
-#define TM_YEAR_BASE 1900
-verify(base_year_is_a_multiple_of_100, TM_YEAR_BASE % 100 == 0);
+static_assert(TM_YEAR_BASE % 100 == 0, "base year is not a multiple of 100");
 
 /* Return 1 if YEAR + TM_YEAR_BASE is a leap year.  */
 static inline int leapyear(long int year)
@@ -149,8 +147,8 @@ int __offtime(const gtime_t * t, long int offset, struct gtm * tp)
     days -= ((yg - y) * 365 + LEAPS_THRU_END_OF(yg - 1) - LEAPS_THRU_END_OF(y - 1));
     y = yg;
   }
-  tp->tm_year = y - 1900;
-  if (tp->tm_year != y - 1900) {
+  tp->tm_year = y - TM_YEAR_BASE;
+  if (tp->tm_year != y - TM_YEAR_BASE) {
     /* The year cannot be represented due to overflow.  */
     // __set_errno (EOVERFLOW);
     return 0;
@@ -188,8 +186,8 @@ struct gtm * __localtime_r(const gtime_t * t, struct gtm * tp)
 static inline gtime_t ydhms_diff(long int year1, long int yday1, int hour1, int min1, int sec1,
                                  int year0, int yday0, int hour0, int min0, int sec0)
 {
-  verify(C99_integer_division, -1 / 2 == 0);
-  verify(long_int_year_and_yday_are_wide_enough, INT_MAX <= LONG_MAX / 2 || TIME_T_MAX <= UINT_MAX);
+  static_assert(-1 / 2 == 0, "no C99 integer division");
+  static_assert(INT_MAX <= LONG_MAX / 2 || TIME_T_MAX <= UINT_MAX, "long int year and yday are not wide enough");
 
   /* Compute intervening leap days correctly even if year is negative.
      Take care to avoid integer overflow here.  */
@@ -466,7 +464,7 @@ uint8_t rtcAdjust(uint16_t year, uint8_t mon, uint8_t day, uint8_t hour, uint8_t
 
     // convert given UTC time to local time (to seconds) and compare it with RTC
     struct gtm t;
-    t.tm_year = year - 1900;
+    t.tm_year = year - TM_YEAR_BASE;
     t.tm_mon  = mon - 1;
     t.tm_mday = day;
     t.tm_hour = hour;
