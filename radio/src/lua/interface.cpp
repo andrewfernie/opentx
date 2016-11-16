@@ -426,7 +426,7 @@ void luaLoadPermanentScripts()
 void displayLuaError(const char * title)
 {
 #if !defined(COLORLCD)
-  drawMessageBox(title);
+  DRAW_MESSAGE_BOX(title);
 #endif
   if (lua_warning_info[0]) {
     char * split = strstr(lua_warning_info, ": ");
@@ -739,9 +739,9 @@ bool luaTask(event_t evt, uint8_t scriptType, bool allowLcdUsage)
 #if !defined(COLORLCD)
       luaInit();
       if (luaState == INTERPRETER_PANIC) return false;
+#endif
       luaLoadPermanentScripts();
       if (luaState == INTERPRETER_PANIC) return false;
-#endif
     }
 
     for (int i=0; i<luaScriptsCount; i++) {

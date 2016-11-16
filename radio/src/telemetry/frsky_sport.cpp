@@ -186,7 +186,18 @@ void sportProcessTelemetryPacket(uint8_t * packet)
           sportProcessTelemetryPacket(id, 1, instance, data >> 16);
         }
         else if (id >= RBOX_STATE_FIRST_ID && id <= RBOX_STATE_LAST_ID) {
-          uint16_t newServosState = data & 0xffff;
+          bool static isRB10 = false;
+          uint16_t newServosState;
+
+          if (servosState == 0 && (data & 0xff00) == 0xff00) {
+            isRB10 = true;
+          }
+          if (isRB10) {
+            newServosState = data & 0x00ff; // 8ch only RB10
+          }
+          else {
+            newServosState = data & 0xffff;
+          }
           if (newServosState != 0 && servosState == 0) {
             audioEvent(AU_SERVO_KO);
           }
@@ -201,13 +212,13 @@ void sportProcessTelemetryPacket(uint8_t * packet)
         }
         else if (id >= DIY_FIRST_ID && id <= DIY_LAST_ID) {
 #if defined(LUA)
-          if (luaInputTelemetryFifo) {
+          if (luaInputTelemetryFifo && luaInputTelemetryFifo->hasSpace(sizeof(SportTelemetryPacket))) {
             SportTelemetryPacket luaPacket;
             luaPacket.physicalId = physicalId;
             luaPacket.primId = primId;
             luaPacket.dataId = id;
             luaPacket.value = data;
-            for (uint8_t i=0; i<sizeof(luaPacket); i++) {
+            for (uint8_t i=0; i<sizeof(SportTelemetryPacket); i++) {
               luaInputTelemetryFifo->push(luaPacket.raw[i]);
             }
           }
@@ -221,13 +232,13 @@ void sportProcessTelemetryPacket(uint8_t * packet)
   }
 #if defined(LUA)
   else if (primId == 0x32) {
-    if (luaInputTelemetryFifo) {
+    if (luaInputTelemetryFifo && luaInputTelemetryFifo->hasSpace(sizeof(SportTelemetryPacket))) {
       SportTelemetryPacket luaPacket;
       luaPacket.physicalId = physicalId;
       luaPacket.primId = primId;
       luaPacket.dataId = id;
       luaPacket.value = data;
-      for (uint8_t i=0; i<sizeof(luaPacket); i++) {
+      for (uint8_t i=0; i<sizeof(SportTelemetryPacket); i++) {
         luaInputTelemetryFifo->push(luaPacket.raw[i]);
       }
     }

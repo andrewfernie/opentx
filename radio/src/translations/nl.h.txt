@@ -112,12 +112,15 @@
 #define TR_DSM_PROTOCOLS       "LP45""DSM2""DSMX"
 
 #define LEN_MULTI_PROTOCOLS    "\006"
-#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 "
+#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0"
 
 #define TR_MULTI_CUSTOM        "Custom"
 
-#define LEN_SUBTYPE_FLYSKY     "\004"
-#define TR_SUBTYPE_FLYSKY      "Std\0""V9x9""V6x6""V912"
+#define LEN_SUBTYPE_FLYSKY     "\007"
+#define TR_SUBTYPE_FLYSKY      "Std\0   ""V9x9   ""V6x6   ""V912   "
+
+#define LEN_SUBTYPE_AFHDS2A    "\010"
+#define TR_SUBTYPE_AFHDS2A     "PWM,IBUS""PPM,IBUS""PWM,SBUS""PPM,SBUS"
 
 #define LEN_SUBTYPE_FRSKY      "\007"
 #define TR_SUBTYPE_FRSKY       "D16\0   ""D8\0    ""D16 8ch""V8\0    "
@@ -653,11 +656,11 @@
 #define TR_ELIMITS             TR("E.Limits", "Extended Limits")
 #define TR_ETRIMS              TR("E.Trims", "Extended Trims")
 #define TR_TRIMINC             "Trim Step"
-#define TR_DISPLAY_TRIMS       TR("Show Trims", "Display Trims")
+#define TR_DISPLAY_TRIMS       "Toon Trims"
 #define TR_TTRACE              TR("T-Source", INDENT "Source")
 #define TR_TTRIM               TR("T-Trim", INDENT "Trim Idle Only")
 #define TR_BEEPCTR             TR("Ctr Beep", "Center Beep")
-#define TR_USE_GLOBAL_FUNCS    TR("Glob.Funcs", "Use Global Funcs")
+#define TR_USE_GLOBAL_FUNCS    TR("Glob.Funcs", "Globale Functies")
 #if defined(PCBSKY9X) && defined(REVX)
   #define TR_OUTPUT_TYPE       INDENT "Output"
 #endif
@@ -688,10 +691,10 @@
 #define TR_NOFREEEXPO          "Geen vrije expo!"
 #define TR_NOFREEMIXER         "Geen vrije mixer!"
 #define TR_SOURCE              INDENT "Source"
-#define TR_WEIGHT              "Weight"
+#define TR_WEIGHT              "Gewicht"
 #define TR_EXPO                TR("Expo", "Exponentieel")
 #define TR_SIDE                "Side"
-#define TR_DIFFERENTIAL        "Differ"
+#define TR_DIFFERENTIAL        "Diff"
 #define TR_OFFSET              INDENT "Offset"
 #define TR_TRIM                "Trim"
 #define TR_DREX                "DRex"
@@ -846,8 +849,8 @@
 
 #define TR_MENUCURVES          "CURVEN"
 #define TR_MENUCURVE           "CURVE"
-#define TR_MENULOGICALSWITCH   "LOGISCHE SCHAKELAAR"
-#define TR_MENULOGICALSWITCHES "LOGISCHE SCHAKELAARS"
+#define TR_MENULOGICALSWITCH   "LOGISCHE SCHAK."
+#define TR_MENULOGICALSWITCHES "LOGISCHE SCHAKELRS"
 #define TR_MENUCUSTOMFUNC      TR("SPEC.-FUNKTIES", "SPECIALE-FUNKTIES")
 #define TR_MENUCUSTOMSCRIPTS   "LUA-SCRIPTS"
 #define TR_MENUTELEMETRY       "TELEMETRIE"
@@ -874,6 +877,7 @@
 #define TR_MULTI_AUTOBIND      TR(INDENT "Autobind",INDENT "Bind on powerup")
 #define TR_MULTI_DSM_AUTODTECT TR(INDENT "Autodetect", INDENT "Autodetect format")
 #define TR_MULTI_LOWPOWER      TR(INDENT "Low power", INDENT "Low power mode")
+#define TR_MULTI_SERVOFREQ     TR(INDENT "Servo rate", INDENT "Servo update rate")
 #define TR_SYNCMENU            "Sync [MENU]"
 #define TR_LIMIT               INDENT "Grenzen"
 #define TR_MINRSSI             "Min. RSSI"
@@ -902,8 +906,8 @@
 #define TR_BACKUP_MODEL        "Backup Model"
 #define TR_DELETE_MODEL        "Wis Model"
 #define TR_RESTORE_MODEL       "Model Terugzetten"
-#define TR_DELETE_ERROR        "Delete error"
-#define TR_CAT_NOT_EMPTY       "Category is not empty"
+#define TR_DELETE_ERROR        "Fout bij verwijderen"
+#define TR_CAT_NOT_EMPTY       "Categorie is niet leeg"
 #define TR_SDCARD_ERROR        "SD-Kaart fout"
 #define TR_NO_SDCARD           "Geen SD-Kaart"
 #define TR_SDCARD_FULL         "SD-Kaart vol"
@@ -916,7 +920,7 @@
 #define TR_ALARMSWARN          "ALARM"
 #define TR_SWITCHWARN          "SCHAKELAAR"
 #define TR_FAILSAFEWARN        "FAILSAFE"
-#define TR_WRONG_SDCARDVERSION TR("Expected ver: ","Expected version: ")
+#define TR_WRONG_SDCARDVERSION TR("Verwachte ver: ","Verwachte versie: ")
 #define TR_WRONG_PCBREV        "Verkeerde PCB gedetecteerd"
 #define TR_EMERGENCY_MODE      "EMERGENCY MODE"
 #define TR_PCBREV_ERROR        "PCB fout"
@@ -992,7 +996,7 @@
 #define TR_FAILSAFESET         "Failsafe instellen"
 #define TR_HOLD                "HOLD"
 #define TR_NONE                "NONE"
-#define TR_MENUSENSOR          "SENSORS"
+#define TR_MENUSENSOR          "SENSOR"
 #define TR_SENSOR              "SENSOR"
 #define TR_COUNTRYCODE         "Landcode"
 #define TR_VOICELANG           "Taal"
@@ -1063,7 +1067,7 @@
 #define TR_CONSTANT            "Constant"
 #define TR_PERSISTENT_MAH      TR(INDENT "Str mAh", INDENT "Vasthouden mAh")
 #define TR_PREFLIGHT           "Preflight Checks"
-#define TR_CHECKLIST           TR(INDENT "Checklist", INDENT "Display Checklist")
+#define TR_CHECKLIST           TR(INDENT "Checklist", INDENT "Toon Checklist")
 #define TR_FAS_OFFSET          TR(INDENT "FAS Ofs", INDENT "FAS Offset")
 #define TR_UART3MODE           "Seriele poort"
 #define TR_SCRIPT              "Script"
@@ -1073,7 +1077,7 @@
 #define TR_EEBACKUP            "EEPROM backup"
 #define TR_FACTORYRESET        "Factory reset"
 #else
-#define TR_EEBACKUP            TR("\001[ENTER Lang]: Backup", "\012[ENTER Lang]: EEPROM backup naar SD-CARD")
+#define TR_EEBACKUP            TR("\001[ENTER Lang]: Backup", "\012[ENTER Lang]: EEPROM backup => SD")
 #define TR_FACTORYRESET        TR("\001[MENU Lang]: Fact. reset", "\012[MENU Lang]: Factory reset")
 
 #endif

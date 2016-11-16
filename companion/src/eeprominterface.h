@@ -46,8 +46,6 @@
 #define FSIZE_HORUS            (2048*1024)
 #define FSIZE_MAX              FSIZE_HORUS
 
-QString getBoardName(BoardEnum board);
-
 #define IS_9X(board)           (board==BOARD_STOCK || board==BOARD_M128)
 #define IS_STOCK(board)        (board==BOARD_STOCK)
 #define IS_2560(board)         (board==BOARD_GRUVIN9X || board==BOARD_MEGA2560)
@@ -608,6 +606,14 @@ enum AssignFunc {
   FuncReserve = -1
 };
 
+enum GVarAdjustModes
+{
+  FUNC_ADJUST_GVAR_CONSTANT,
+  FUNC_ADJUST_GVAR_SOURCE,
+  FUNC_ADJUST_GVAR_GVAR,
+  FUNC_ADJUST_GVAR_INCDEC
+};
+
 class CustomFunctionData { // Function Switches data
   public:
     CustomFunctionData(AssignFunc func=FuncOverrideCH1) { clear(); this->func = func; }
@@ -873,7 +879,8 @@ enum MultiModuleRFProtocols {
   MM_RF_PROTO_ASSAN,
   MM_RF_PROTO_HONTAI,
   MM_RF_PROTO_OLRS,
-  MM_RF_PROTO_LAST= MM_RF_PROTO_OLRS
+  MM_RF_PROTO_AFHDS2A,
+  MM_RF_PROTO_LAST= MM_RF_PROTO_AFHDS2A
 };
 
 unsigned int getNumSubtypes(MultiModuleRFProtocols type);

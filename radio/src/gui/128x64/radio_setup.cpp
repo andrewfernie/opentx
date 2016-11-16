@@ -163,7 +163,7 @@ void menuRadioSetup(event_t event)
           uint8_t rowattr = (menuHorizontalPosition==j ? attr : 0);
           switch (j) {
             case 0:
-              lcdDrawNumber(RADIO_SETUP_DATE_COLUMN, y, t.tm_year+1900, rowattr|RIGHT);
+              lcdDrawNumber(RADIO_SETUP_DATE_COLUMN, y, t.tm_year+TM_YEAR_BASE, rowattr|RIGHT);
               if (rowattr && (s_editMode>0 || p1valdiff)) t.tm_year = checkIncDec(event, t.tm_year, 112, 200, 0);
               break;
             case 1:
@@ -172,7 +172,7 @@ void menuRadioSetup(event_t event)
               break;
             case 2:
             {
-              int16_t year = 1900 + t.tm_year;
+              int16_t year = TM_YEAR_BASE + t.tm_year;
               int8_t dlim = (((((year%4==0) && (year%100!=0)) || (year%400==0)) && (t.tm_mon==1)) ? 1 : 0);
               static const pm_uint8_t dmon[] PROGMEM = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
               dlim += pgm_read_byte(&dmon[t.tm_mon]);
@@ -546,10 +546,10 @@ void menuRadioSetup(event_t event)
       case ITEM_SETUP_STICK_MODE_LABELS:
         lcdDrawTextAlignedLeft(y, NO_INDENT(STR_MODE));
         for (uint8_t i=0; i<4; i++) {
-          lcd_img((6+4*i)*FW, y, sticks, i, 0);
+          lcd_img(5*FW+i*(4*FW+2), y, sticks, i, 0);
 #if defined(FRSKY_STICKS)
           if (g_eeGeneral.stickReverse & (1<<i)) {
-            lcdDrawFilledRect((6+4*i)*FW, y, 3*FW, FH-1);
+            lcdDrawFilledRect(5*FW+i*(4*FW+2), y, 3*FW, FH-1);
           }
 #endif
         }
@@ -557,15 +557,15 @@ void menuRadioSetup(event_t event)
         if (attr) {
           s_editMode = 0;
           CHECK_INCDEC_GENVAR(event, g_eeGeneral.stickReverse, 0, 15);
-          lcdDrawRect(6*FW-1, y-1, 15*FW+2, 9);
+          lcdDrawRect(5*FW-1, y-1, 16*FW+2, 9);
         }
 #endif
         break;
 
       case ITEM_SETUP_STICK_MODE:
         lcdDrawChar(2*FW, y, '1'+reusableBuffer.generalSettings.stickMode, attr);
-        for (uint8_t i=0; i<4; i++) {
-          drawSource((6+4*i)*FW, y, MIXSRC_Rud + pgm_read_byte(modn12x3 + 4*reusableBuffer.generalSettings.stickMode + i), 0);
+        for (uint8_t i=0; i<NUM_STICKS; i++) {
+          drawSource(5*FW+i*(4*FW+2), y, MIXSRC_Rud + pgm_read_byte(modn12x3 + 4*reusableBuffer.generalSettings.stickMode + i), 0);
         }
         if (attr && s_editMode>0) {
           CHECK_INCDEC_GENVAR(event, reusableBuffer.generalSettings.stickMode, 0, 3);

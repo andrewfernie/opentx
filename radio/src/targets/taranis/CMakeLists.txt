@@ -7,7 +7,7 @@ if(PCB STREQUAL X9E)
   set(CPU_TYPE STM32F4)
   set(LINKER_SCRIPT targets/taranis/stm32f4_flash.ld)
   set(HAPTIC YES)
-  set(LUA_EXPORT lua_export_taranis_x9e)
+  set(LUA_EXPORT lua_export_x9e)
   set(FLAVOUR x9e)
   add_definitions(-DSTM32F40_41xxx -DPCBX9E)
   add_definitions(-DEEPROM_VARIANT=32768)
@@ -29,7 +29,7 @@ elseif(PCB STREQUAL X9D+)
   set(CPU_TYPE STM32F2)
   set(LINKER_SCRIPT targets/taranis/stm32f2_flash.ld)
   set(HAPTIC YES)
-  set(LUA_EXPORT lua_export_taranis)
+  set(LUA_EXPORT lua_export_x9d)
   set(FLAVOUR x9d+)
   add_definitions(-DPCBX9DP)
   add_definitions(-DEEPROM_VARIANT=0)
@@ -41,8 +41,8 @@ elseif(PCB STREQUAL X9D+)
 elseif(PCB STREQUAL X9D)
   set(CPU_TYPE STM32F2)
   set(LINKER_SCRIPT targets/taranis/stm32f2_flash.ld)
-  set(HAPTIC NO)
-  set(LUA_EXPORT lua_export_taranis)
+  option(HAPTIC "Haptic support" OFF)
+  set(LUA_EXPORT lua_export_x9d)
   set(FLAVOUR x9d)
   add_definitions(-DPCBX9D)
   add_definitions(-DEEPROM_VARIANT=0)
@@ -55,7 +55,7 @@ elseif(PCB STREQUAL X7D)
   set(CPU_TYPE STM32F2)
   set(LINKER_SCRIPT targets/taranis/stm32f2_flash.ld)
   set(HAPTIC YES)
-  set(LUA_EXPORT lua_export_taranis)
+  set(LUA_EXPORT lua_export_x7d)
   set(FLAVOUR x7d)
   add_definitions(-DPCBX7D -DSOFTWARE_VOLUME)
   add_definitions(-DEEPROM_VARIANT=0)
@@ -77,8 +77,8 @@ add_definitions(-DPCBTARANIS -DPPM_PIN_TIMER)
 add_definitions(-DAUDIO -DVOICE -DRTCLOCK)
 
 set(GUI_SRC ${GUI_SRC}
-  model_inputs.cpp
-  model_mixes.cpp
+  model_input_edit.cpp
+  model_mix_edit.cpp
   model_display.cpp
   radio_diagkeys.cpp
   radio_diaganas.cpp

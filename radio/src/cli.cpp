@@ -388,7 +388,7 @@ int cliSet(const char ** argv)
     struct gtm t;
     int year, month, day, hour, minute, second;
     if (toInt(argv, 2, &year) > 0 && toInt(argv, 3, &month) > 0 && toInt(argv, 4, &day) > 0 && toInt(argv, 5, &hour) > 0 && toInt(argv, 6, &minute) > 0 && toInt(argv, 7, &second) > 0) {
-      t.tm_year = year-1900;
+      t.tm_year = year-TM_YEAR_BASE;
       t.tm_mon = month-1;
       t.tm_mday = day;
       t.tm_hour = hour;
@@ -401,6 +401,7 @@ int cliSet(const char ** argv)
       serialPrint("%s: Invalid arguments \"%s\" \"%s\"", argv[0], argv[1], argv[2]);
     }
   }
+#if !defined(SOFTWARE_VOLUME)
   else if (!strcmp(argv[1], "volume")) {
     int level = 0;
     if (toInt(argv, 2, &level) > 0) {
@@ -411,6 +412,7 @@ int cliSet(const char ** argv)
     }
     return 0;
   }
+#endif
   return 0;
 }
 
@@ -587,11 +589,13 @@ int cliDisplay(const char ** argv)
   else if (!strcmp(argv[1], "rtc")) {
     struct gtm utm;
     gettime(&utm);
-    serialPrint("rtc = %4d-%02d-%02d %02d:%02d:%02d.%02d0", utm.tm_year+1900, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
+    serialPrint("rtc = %4d-%02d-%02d %02d:%02d:%02d.%02d0", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
   }
+#if !defined(SOFTWARE_VOLUME)
   else if (!strcmp(argv[1], "volume")) {
     serialPrint("volume = %d", getVolume());
   }
+#endif
 #if defined(STM32)
   else if (!strcmp(argv[1], "uid")) {
     char str[LEN_CPU_UID+1];
@@ -789,6 +793,45 @@ int cliGps(const char ** argv)
 }
 #endif
 
+#if defined(PCBX9E) || defined(PCBHORUS)
+int cliBlueTooth(const char ** argv)
+{
+  int baudrate = 0;
+  if (argv[1][0] == '$') {
+    // send command to GPS
+    bluetoothWriteString(argv[1] + 1);
+    bluetoothWriteString("\r\n");
+    serialPrint("bt sent: %s", argv[1] + 1);
+    CoTickDelay(100); // 200ms
+    char buff[100];
+    int len = bluetoothRead(buff, 100);
+    buff[len] = 0;
+    serialPrint("bt read: %s", buff);
+
+  }
+  else if (!strcmp(argv[1], "read")) {
+    char buff[100];
+    int len = bluetoothRead(buff, 100);
+    buff[len] = 0;
+    serialPrint("bt read: %s", buff);
+  }
+  else if (toInt(argv, 1, &baudrate) > 0) {
+    if (baudrate > 0) {
+      bluetoothInit(baudrate);
+      serialPrint("BT baudrate set to %d", baudrate);
+    }
+    else {
+      bluetoothDone();
+      serialPrint("BT turned off");
+    }
+  }
+  else {
+    serialPrint("%s: Invalid arguments", argv[0]);
+  }
+  return 0;
+}
+#endif  // #if defined(PCBX9E) || defined(PCBHORUS)
+
 const CliCommand cliCommands[] = {
   { "beep", cliBeep, "[<frequency>] [<duration>]" },
   { "ls", cliLs, "<directory>" },
@@ -814,7 +857,10 @@ const CliCommand cliCommands[] = {
   { "jitter", cliShowJitter, "" },
 #endif
 #if defined(INTERNAL_GPS)
-  { "gps", cliGps, "<baudrate>" },
+  { "gps", cliGps, "<baudrate>|$<command>|trace" },
+#endif
+#if defined(PCBX9E) || defined(PCBHORUS)
+  { "bt", cliBlueTooth, "<baudrate>|$<command>|read" },
 #endif
   { NULL, NULL, NULL }  /* sentinel */
 };

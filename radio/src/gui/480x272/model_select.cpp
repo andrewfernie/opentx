@@ -105,10 +105,11 @@ void onModelSelectMenu(const char * result)
     storageFlushCurrentModel();
     storageCheck(true);
     memcpy(g_eeGeneral.currModelFilename, currentModel->name, LEN_MODEL_FILENAME);
-    loadModel(g_eeGeneral.currModelFilename);
+    loadModel(g_eeGeneral.currModelFilename, false);
     storageDirty(EE_GENERAL);
     storageCheck(true);
     chainMenu(menuMainView);
+    postModelLoad(true);
   }
   else if (result == STR_DELETE_MODEL) {
     POPUP_CONFIRMATION(STR_DELETEMODEL);
@@ -345,7 +346,8 @@ bool menuModelSelect(event_t event)
         drawModel(MODELS_LEFT, y, *it, current, selected);
       }
       if (selected) {
-        // lcdDrawText(MODELS_LEFT, LCD_H-FH-1, (*it)->name, TEXT_COLOR);
+        lcd->drawBitmap(5, LCD_H-FH, modelselModelNameBitmap);
+        lcdDrawText(22, LCD_H-FH-1, (*it)->name, TEXT_COLOR);
       }
     }
   }
@@ -370,11 +372,11 @@ bool menuModelSelect(event_t event)
   drawVerticalScrollbar(DEFAULT_SCROLLBAR_X, 7, LCD_H - 15, menuVerticalOffset, (index + 1) / 2, 4);
 
   // Footer
-  lcd->drawBitmap(5, LCD_H-FH, modelselSdFreeBitmap);
+  lcd->drawBitmap(5, LCD_H-FH-20, modelselSdFreeBitmap);
   uint32_t size = sdGetSize() / 100;
-  lcdDrawNumber(22, LCD_H-FH-1, size, PREC1, 0, NULL, "GB");
-  lcd->drawBitmap(80, LCD_H-FH, modelselModelQtyBitmap);
-  lcdDrawNumber(105, LCD_H-FH-1, modelslist.modelsCount);
+  lcdDrawNumber(22, LCD_H-FH-21, size, PREC1, 0, NULL, "GB");
+  lcd->drawBitmap(80, LCD_H-FH-20, modelselModelQtyBitmap);
+  lcdDrawNumber(105, LCD_H-FH-21, modelslist.modelsCount);
 
   return true;
 }

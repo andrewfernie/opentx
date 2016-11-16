@@ -237,7 +237,16 @@ char * getSwitchString(char * dest, swsrc_t idx)
     }
     else {
       *s++ = 'S';
+#if defined(PCBX7D)
+      if (swinfo.quot == 5)
+        *s++ = 'H';
+      else if (swinfo.quot == 4)
+        *s++ = 'F';
+      else
+        *s++ = 'A'+swinfo.quot;
+#else
       *s++ = 'A'+swinfo.quot;
+#endif
     }
     *s++ = "\300-\301"[swinfo.rem];
     *s = '\0';
@@ -425,7 +434,7 @@ char * strAppendDate(char * str, bool time)
   str[0] = '-';
   struct gtm utm;
   gettime(&utm);
-  div_t qr = div(utm.tm_year+1900, 10);
+  div_t qr = div(utm.tm_year+TM_YEAR_BASE, 10);
   str[4] = '0' + qr.rem;
   qr = div(qr.quot, 10);
   str[3] = '0' + qr.rem;

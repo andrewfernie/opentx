@@ -671,6 +671,9 @@ bool menuModelSetup(event_t event)
             case MM_RF_PROTO_HONTAI:
               lcdDrawTextAtIndex(MODEL_SETUP_4TH_COLUMN, y, STR_SUBTYPE_HONTAI, g_model.moduleData[EXTERNAL_MODULE].subType, menuHorizontalPosition==2 ? attr : 0);
               break;
+            case MM_RF_PROTO_FS_AFHDS2A:
+              lcdDrawTextAtIndex(MODEL_SETUP_4TH_COLUMN, y, STR_SUBTYPE_AFHDS2A , g_model.moduleData[EXTERNAL_MODULE].subType, menuHorizontalPosition==2 ? attr : 0);
+              break;
             case MM_RF_CUSTOM_SELECTED:
               lcdDrawNumber(MODEL_SETUP_4TH_COLUMN, y, g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(false), menuHorizontalPosition==2 ? attr : 0, 2);
               lcdDrawNumber(MODEL_SETUP_4TH_COLUMN + MODEL_SETUP_BIND_OFS, y, g_model.moduleData[EXTERNAL_MODULE].subType, menuHorizontalPosition==3 ? attr : 0, 2);
@@ -738,6 +741,7 @@ bool menuModelSetup(event_t event)
                   case MM_RF_PROTO_MT99XX:
                   case MM_RF_PROTO_FRSKY:
                   case MM_RF_PROTO_DSM2:
+                  case MM_RF_PROTO_FS_AFHDS2A:
                     CHECK_INCDEC_MODELVAR(event, g_model.moduleData[EXTERNAL_MODULE].subType, 0, 3);
                     break;
                   case MM_RF_PROTO_MJXQ:
@@ -845,6 +849,12 @@ bool menuModelSetup(event_t event)
             drawButton(MODEL_SETUP_2ND_COLUMN+xOffsetBind, y, STR_MODULE_BIND, (moduleFlag[moduleIdx] == MODULE_BIND ? BUTTON_ON : BUTTON_OFF) | (l_posHorz==1 ? attr : 0));
             drawButton(MODEL_SETUP_2ND_COLUMN+MODEL_SETUP_RANGE_OFS+xOffsetBind, y, STR_MODULE_RANGE, (moduleFlag[moduleIdx] == MODULE_RANGECHECK ? BUTTON_ON : BUTTON_OFF) | (l_posHorz==2 ? attr : 0));
             uint8_t newFlag = 0;
+#if defined(MULTIMODULE)
+            if (spektrumBindFinished) {
+              spektrumBindFinished = false;
+              s_editMode=0;
+            }
+#endif
             if (attr && l_posHorz>0 && s_editMode>0) {
               if (l_posHorz == 1)
                 newFlag = MODULE_BIND;
@@ -892,6 +902,8 @@ bool menuModelSetup(event_t event)
         }
 #if defined(MULTIMODULE)
         else if (IS_MODULE_MULTIMODULE(moduleIdx)) {
+          int optionValue =  g_model.moduleData[moduleIdx].multi.optionValue;
+
           switch (g_model.moduleData[moduleIdx].getMultiProtocol(true))
           {
             case MM_RF_PROTO_FRSKY:
@@ -901,13 +913,22 @@ bool menuModelSetup(event_t event)
             case MM_RF_PROTO_HUBSAN:
               lcdDrawText(MENUS_MARGIN_LEFT, y, STR_MULTI_VIDFREQ);
               break;
+            case MM_RF_PROTO_FS_AFHDS2A:
+              lcdDrawText(MENUS_MARGIN_LEFT, y, STR_MULTI_SERVOFREQ);
+              optionValue = 50 + 5 * optionValue;
+              break;
             default:
               lcdDrawText(MENUS_MARGIN_LEFT, y, STR_MULTI_OPTION);
               break;
           }
-          lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, g_model.moduleData[moduleIdx].multi.optionValue, LEFT | attr);
-          if (attr)
-            CHECK_INCDEC_MODELVAR(event, g_model.moduleData[moduleIdx].multi.optionValue, -128, 127);
+          lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, optionValue, LEFT | attr);
+          if (attr) {
+            if (g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(true) == MM_RF_PROTO_FS_AFHDS2A) {
+              CHECK_INCDEC_MODELVAR(event, g_model.moduleData[moduleIdx].multi.optionValue, 0, 70);
+            } else {
+              CHECK_INCDEC_MODELVAR(event, g_model.moduleData[moduleIdx].multi.optionValue, -128, 127);
+            }
+          }
         }
 #endif
         break;

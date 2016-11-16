@@ -75,6 +75,10 @@ void processTelemetryData(uint8_t data)
     processSpektrumTelemetryData(data);
     return;
   }
+  else if (telemetryProtocol == PROTOCOL_FLYSKY_IBUS) {
+    processFlySkyTelemetryData(data);
+    return;
+  }
 #endif
   processFrskyTelemetryData(data);
 }
@@ -470,7 +474,7 @@ void logTelemetryWriteStart()
   if (lastTime != newTime) {
     struct gtm utm;
     gettime(&utm);
-    f_printf(&g_telemetryFile, "\r\n%4d-%02d-%02d,%02d:%02d:%02d.%02d0:", utm.tm_year+1900, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
+    f_printf(&g_telemetryFile, "\r\n%4d-%02d-%02d,%02d:%02d:%02d.%02d0:", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
     lastTime = newTime;
   }
 }

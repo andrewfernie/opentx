@@ -83,11 +83,17 @@ bool checkScreenshot(const QString & test)
   QImage buffer(LCD_W, LCD_H, QImage::Format_RGB32);
   QPainter p(&buffer);
   doPaint(p);
-
   QString filename(QString("%1_%2x%3.png").arg(test).arg(LCD_W).arg(LCD_H));
   QImage reference(TESTS_PATH "/tests/" + filename);
 
-  return buffer == reference;
+  if (buffer == reference) {
+    return true;
+  }
+  else {
+    QString filename(QString("%1_%2x%3.png").arg(test).arg(LCD_W).arg(LCD_H));
+    buffer.save("/tmp/" + filename);
+    return false;
+  }
 }
 
 #if defined(COLORLCD)
@@ -204,7 +210,7 @@ TEST(Lcd, Smlsize)
   lcdClear();
   lcdDrawText(0, 0, "TESTgy,", SMLSIZE);
   lcdDrawText(10, 22, "TESTgy,", SMLSIZE|INVERS);
-  lcdDrawFilledRect(8, 40, 100, 20);
+  lcdDrawSolidFilledRect(8, 40, 100, 20);
   lcdDrawText(10, 42, "TESTgy,", SMLSIZE);
 
   bool invert = false;
@@ -221,7 +227,7 @@ TEST(Lcd, Stdsize)
   lcdClear();
   lcdDrawText(0, 0, "TEST", 0);
   lcdDrawText(10, 22, "TEST", INVERS);
-  lcdDrawFilledRect(8, 40, 100, 20);
+  lcdDrawSolidFilledRect(8, 40, 100, 20);
   lcdDrawText(10, 42, "TEST", 0);
 
   bool invert = false;
@@ -238,7 +244,7 @@ TEST(Lcd, Midsize)
   lcdClear();
   lcdDrawText(0, 0, "TEST", MIDSIZE);
   lcdDrawText(10, 22, "TEST", MIDSIZE|INVERS);
-  lcdDrawFilledRect(8, 40, 100, 20);
+  lcdDrawSolidFilledRect(8, 40, 100, 20);
   lcdDrawText(10, 42, "TEST", MIDSIZE);
 
   bool invert = false;
@@ -255,7 +261,7 @@ TEST(Lcd, Dblsize)
   lcdClear();
   lcdDrawText(2, 10, "TST", DBLSIZE);
   lcdDrawText(42, 10, "TST", DBLSIZE|INVERS);
-  lcdDrawFilledRect(80, 8, 46, 24);
+  lcdDrawSolidFilledRect(80, 8, 46, 24);
   lcdDrawText(82, 10, "TST", DBLSIZE);
 
   bool invert = false;
