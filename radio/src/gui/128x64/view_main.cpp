@@ -33,9 +33,7 @@
 #define VBATTUNIT_X   (VBATT_X-1)
 #define VBATTUNIT_Y   (3*FH)
 #define REBOOT_X      (20*FW-3)
-#define VSWITCH_X(i)  (16 + 3*i)
-#define VSWITCH_Y     (LCD_H-8)
-#define BAR_HEIGHT    (BOX_WIDTH-1l)
+#define BAR_HEIGHT    (BOX_WIDTH-1)
 #define TRIM_LH_X     (LCD_W*1/4+2)
 #define TRIM_LV_X     3
 #define TRIM_RV_X     (LCD_W-4)
@@ -166,7 +164,7 @@ void displayTimers()
   // Main timer
   if (g_model.timers[0].mode) {
     TimerState & timerState = timersStates[0];
-    LcdFlags att = DBLSIZE | (timerState.val<0 ? BLINK|INVERS : 0);
+    LcdFlags att = RIGHT | DBLSIZE | (timerState.val<0 ? BLINK|INVERS : 0);
     drawTimer(12*FW+2+10*FWNUM-4, FH*2, timerState.val, att, att);
     uint8_t xLabel = (timerState.val >= 0 ? MAINTMR_LBL_COL : MAINTMR_LBL_COL-7);
 #if defined(CPUARM)
@@ -188,13 +186,13 @@ void displayBattVoltage()
 {
 #if defined(BATTGRAPH)
   putsVBat(VBATT_X-8, VBATT_Y+1, RIGHT);
-  lcdDrawFilledRect(VBATT_X-25, VBATT_Y+9, 21, 5);
+  lcdDrawSolidFilledRect(VBATT_X-25, VBATT_Y+9, 21, 5);
   lcdDrawSolidVerticalLine(VBATT_X-4, VBATT_Y+10, 3);
   uint8_t count = GET_TXBATT_BARS();
   for (uint8_t i=0; i<count; i+=2)
     lcdDrawSolidVerticalLine(VBATT_X-24+i, VBATT_Y+10, 3);
   if (!IS_TXBATT_WARNING() || BLINK_ON_PHASE)
-    lcdDrawFilledRect(VBATT_X-26, VBATT_Y, 24, 15);
+    lcdDrawSolidFilledRect(VBATT_X-26, VBATT_Y, 24, 15);
 #else
   LcdFlags att = (IS_TXBATT_WARNING() ? BLINK|INVERS : 0) | BIGSIZE;
   putsVBat(VBATT_X-1, VBATT_Y, att|NO_UNIT);
@@ -222,6 +220,8 @@ void displayVoltageOrAlarm()
 #if defined(PCBX7D)
 #define EVT_KEY_CONTEXT_MENU           EVT_KEY_LONG(KEY_ENTER)
 #define EVT_KEY_NEXT_VIEW              EVT_KEY_BREAK(KEY_PAGE)
+#define EVT_KEY_NEXT_PAGE              EVT_ROTARY_RIGHT
+#define EVT_KEY_PREVIOUS_PAGE          EVT_ROTARY_LEFT
 #define EVT_KEY_MODEL_MENU             EVT_KEY_BREAK(KEY_MENU)
 #define EVT_KEY_GENERAL_MENU           EVT_KEY_LONG(KEY_MENU)
 #define EVT_KEY_TELEMETRY              EVT_KEY_LONG(KEY_PAGE)
@@ -229,6 +229,8 @@ void displayVoltageOrAlarm()
 #define EVT_KEY_CONTEXT_MENU           EVT_KEY_BREAK(KEY_MENU)
 #define EVT_KEY_PREVIOUS_VIEW          EVT_KEY_BREAK(KEY_UP)
 #define EVT_KEY_NEXT_VIEW              EVT_KEY_BREAK(KEY_DOWN)
+#define EVT_KEY_NEXT_PAGE              EVT_KEY_BREAK(KEY_RIGHT)
+#define EVT_KEY_PREVIOUS_PAGE          EVT_KEY_BREAK(KEY_LEFT)
 #define EVT_KEY_MODEL_MENU             EVT_KEY_LONG(KEY_RIGHT)
 #define EVT_KEY_GENERAL_MENU           EVT_KEY_LONG(KEY_LEFT)
 #define EVT_KEY_LAST_MENU              EVT_KEY_LONG(KEY_MENU)
@@ -306,14 +308,14 @@ void menuMainView(event_t event)
     break;
     */
 
-    case EVT_KEY_BREAK(KEY_RIGHT):
-    case EVT_KEY_BREAK(KEY_LEFT):
+    case EVT_KEY_NEXT_PAGE:
+    case EVT_KEY_PREVIOUS_PAGE:
       if (view_base <= VIEW_INPUTS) {
 #if defined(CPUARM)
         if (view_base == VIEW_INPUTS)
           g_eeGeneral.view ^= ALTERNATE_VIEW;
         else
-          g_eeGeneral.view = (g_eeGeneral.view + (4*ALTERNATE_VIEW) + ((event==EVT_KEY_BREAK(KEY_LEFT)) ? -ALTERNATE_VIEW : ALTERNATE_VIEW)) % (4*ALTERNATE_VIEW);
+          g_eeGeneral.view = (g_eeGeneral.view + (4*ALTERNATE_VIEW) + ((event==EVT_KEY_PREVIOUS_PAGE) ? -ALTERNATE_VIEW : ALTERNATE_VIEW)) % (4*ALTERNATE_VIEW);
 #else
         g_eeGeneral.view ^= ALTERNATE_VIEW;
 #endif
@@ -510,7 +512,21 @@ void menuMainView(event_t event)
       doMainScreenGraphics();
 
       // Switches
-#if !defined(PCBX7D)
+#if defined(PCBX7D)
+      for (int i=0; i<NUM_SWITCHES; ++i) {
+        if (SWITCH_EXISTS(i)) {
+          uint8_t x = 2*FW-2, y = 4*FH+i*FH+1;
+          if (i >= NUM_SWITCHES/2) {
+            x = 17*FW-1;
+            y -= 3*FH;
+          }
+          getvalue_t val = getValue(MIXSRC_FIRST_SWITCH+i);
+          getvalue_t sw = ((val < 0) ? 3*i+1 : ((val == 0) ? 3*i+2 : 3*i+3));
+          drawSwitch(x, y, sw, 0);
+        }
+      }
+#else
+      // The ID0 3-POS switch is merged with the TRN switch
       for (uint8_t i=SWSRC_THR; i<=SWSRC_TRN; i++) {
         int8_t sw = (i == SWSRC_TRN ? (switchState(SW_ID0) ? SWSRC_ID0 : (switchState(SW_ID1) ? SWSRC_ID1 : SWSRC_ID2)) : i);
         uint8_t x = 2*FW-2, y = i*FH+1;
@@ -539,21 +555,30 @@ void menuMainView(event_t event)
 
       // Logical Switches
 #if defined(CPUARM)
-      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++) {
-        int8_t len = getSwitch(SWSRC_SW1+i) ? BAR_HEIGHT : 1;
-        uint8_t x = VSWITCH_X(i);
-        lcdDrawSolidVerticalLine(x-1, VSWITCH_Y-len, len);
-        lcdDrawSolidVerticalLine(x,   VSWITCH_Y-len, len);
+      uint8_t index = 0;
+      uint8_t y = LCD_H-20;
+      for (uint8_t line=0; line<2; line++) {
+        for (uint8_t column=0; column<MAX_LOGICAL_SWITCHES/2; column++) {
+          int8_t len = getSwitch(SWSRC_SW1+index) ? 10 : 1;
+          uint8_t x = (16 + 3*column);
+          lcdDrawSolidVerticalLine(x-1, y-len, len);
+          lcdDrawSolidVerticalLine(x,   y-len, len);
+          index++;
+        }
+        y += 12;
       }
 #elif defined(CPUM2560)
-      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++)
+      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++) {
         drawSwitch(2*FW-3 + (i/3)*(i/3>2 ? 3*FW+2 : (3*FW-1)) + (i/3>2 ? 2*FW : 0), 4*FH+1 + (i%3)*FH, SWSRC_SW1+i, getSwitch(SWSRC_SW1+i) ? INVERS : 0);
+      }
 #elif !defined(PCBSTD)
-      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++)
+      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++) {
         drawSwitch(2*FW-2 + (i/3)*(4*FW-1), 4*FH+1 + (i%3)*FH, SWSRC_SW1+i, getSwitch(SWSRC_SW1+i) ? INVERS : 0);
+      }
 #else
-      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++)
+      for (uint8_t i=0; i<MAX_LOGICAL_SWITCHES; i++) {
         drawSwitch(2*FW-3 + (i/3)*(4*FW), 4*FH+1 + (i%3)*FH, SWSRC_SW1+i, getSwitch(SWSRC_SW1+i) ? INVERS : 0);
+      }
 #endif
     }
   }

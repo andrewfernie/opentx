@@ -240,7 +240,6 @@ if(SDCARD)
   add_definitions(-DSDCARD)
   include_directories(${FATFS_DIR} ${FATFS_DIR}/option)
   set(SRC ${SRC} sdcard.cpp rtc.cpp logs.cpp)
-  set(GUI_SRC ${GUI_SRC} radio_sdmanager.cpp)
   set(FIRMWARE_SRC ${FIRMWARE_SRC} ${FATFS_SRC})
 endif()
 
@@ -375,9 +374,15 @@ if(NOT MSVC)
       add_subdirectory(targets/${TARGET_DIR}/bootloader)
       include_directories(${CMAKE_CURRENT_BINARY_DIR}/targets/${TARGET_DIR}/bootloader)
       set(FIRMWARE_DEPENDENCIES ${FIRMWARE_DEPENDENCIES} bootloader)
-    else()
+    elseif(OPENRC_BOOTLOADER)
       # We fetch Mike's bootloader as it is not included inside OpenTX
-      file(DOWNLOAD https://github.com/MikeBland/OpenRcBootloader/releases/download/V1.9/${BOOTLOADER} ${CMAKE_CURRENT_BINARY_DIR}/bootloader.lbm)
+      message(STATUS "Downloading Mike's bootloader: https://github.com/MikeBland/OpenRcBootloader/releases/download/V1.9/${OPENRC_BOOTLOADER}")
+      file(DOWNLOAD https://github.com/MikeBland/OpenRcBootloader/releases/download/V1.9/${OPENRC_BOOTLOADER} ${CMAKE_CURRENT_BINARY_DIR}/bootloader.lbm STATUS status)
+      list(GET status 0 error_code)
+      if(error_code)
+        list(GET status 1 error_message)
+        message(FATAL_ERROR "Download failed: ${error_message}")
+      endif()
     endif()
 
     add_executable(firmware ${SRC} ${FIRMWARE_HEADERS})
@@ -389,6 +394,12 @@ if(NOT MSVC)
       COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
+
+    add_custom_target(firmware-size
+      COMMAND arm-none-eabi-size firmware.elf
+      DEPENDS firmware
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      )
   else()
     set(CMAKE_C_COMPILER avr-gcc)
     set(CMAKE_CXX_COMPILER avr-gcc)

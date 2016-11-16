@@ -162,9 +162,11 @@ void writeHeader()
     if (sensor.logs) {
       memset(label, 0, sizeof(label));
       zchar2str(label, sensor.label, TELEM_LABEL_LEN);
-      if (sensor.unit != UNIT_RAW && sensor.unit != UNIT_GPS && sensor.unit != UNIT_DATETIME) {
+      uint8_t unit = sensor.unit;
+      if (unit == UNIT_CELLS ) unit = UNIT_VOLTS;
+      if (UNIT_RAW < unit && unit < UNIT_FIRST_VIRTUAL) {
         strcat(label, "(");
-        strncat(label, STR_VTELEMUNIT+1+3*sensor.unit, 3);
+        strncat(label, STR_VTELEMUNIT+1+3*unit, 3);
         strcat(label, ")");
       }
       strcat(label, ",");
@@ -234,7 +236,7 @@ void logsWrite()
           lastRtcTime = g_rtcTime;
           gettime(&utm);
         }
-        f_printf(&g_oLogFile, "%4d-%02d-%02d,%02d:%02d:%02d.%02d0,", utm.tm_year+1900, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
+        f_printf(&g_oLogFile, "%4d-%02d-%02d,%02d:%02d:%02d.%02d0,", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
       }
 #else
       f_printf(&g_oLogFile, "%d,", tmr10ms);
@@ -310,10 +312,7 @@ void logsWrite()
             }
           }
           else if (sensor.unit == UNIT_DATETIME) {
-            if (telemetryItem.datetime.datestate)
-              f_printf(&g_oLogFile, "%4d-%02d-%02d %02d:%02d:%02d,", telemetryItem.datetime.year, telemetryItem.datetime.month, telemetryItem.datetime.day, telemetryItem.datetime.hour, telemetryItem.datetime.min, telemetryItem.datetime.sec);
-            else
-              f_printf(&g_oLogFile, ",");
+            f_printf(&g_oLogFile, "%4d-%02d-%02d %02d:%02d:%02d,", telemetryItem.datetime.year, telemetryItem.datetime.month, telemetryItem.datetime.day, telemetryItem.datetime.hour, telemetryItem.datetime.min, telemetryItem.datetime.sec);
           }
           else if (sensor.prec == 2) {
             div_t qr = div(telemetryItem.value, 100);

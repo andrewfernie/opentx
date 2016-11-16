@@ -213,7 +213,11 @@ int8_t checkIncDecGen(event_t event, int8_t i_val, int8_t i_min, int8_t i_max);
 #define CHECK_INCDEC_GENVAR(event, var, min, max) \
   var = checkIncDecGen(event, var, min, max)
 
-#define CURSOR_ON_LINE()         (0)
+#if defined(PCBTARANIS)
+#define CURSOR_ON_LINE()               (menuHorizontalPosition < 0)
+#else
+#define CURSOR_ON_LINE()               (0)
+#endif
 
 void check(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, uint8_t menuTabSize, const pm_uint8_t *horTab, uint8_t horTabMax, vertpos_t maxrow);
 void check_simple(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, uint8_t menuTabSize, vertpos_t maxrow);
@@ -308,13 +312,19 @@ int16_t editGVarFieldValue(coord_t x, coord_t y, int16_t value, int16_t min, int
 int16_t editGVarFieldValue(coord_t x, coord_t y, int16_t value, int16_t min, int16_t max, LcdFlags attr, event_t event);
 #endif
 
+void gvarWeightItem(coord_t x, coord_t y, MixData * md, LcdFlags attr, event_t event);
+  
 #if defined(GVARS)
 #define displayGVar(x, y, v, min, max) GVAR_MENU_ITEM(x, y, v, min, max, 0, 0, 0)
 #else
 #define displayGVar(x, y, v, min, max) lcdDraw8bitsNumber(x, y, v)
 #endif
 
+#if defined(CPUARM)
+void editName(coord_t x, coord_t y, char * name, uint8_t size, event_t event, uint8_t active, LcdFlags attr=ZCHAR);
+#else
 void editName(coord_t x, coord_t y, char * name, uint8_t size, event_t event, uint8_t active);
+#endif
 
 #if defined(CPUM64)
 #define editSingleName(x, y, label, name, size, event, active) editName(x, y, name, size, event, active)
@@ -404,6 +414,21 @@ void drawStatusLine();
 #define EDIT_MODE_INIT                 -1
 #endif
 
+#if defined(CPUM64)
+  #define editNameCursorPos menuHorizontalPosition
+#else
+  extern uint8_t editNameCursorPos;
+#endif
+
+#if defined(VIRTUAL_INPUTS)
+uint8_t getExposCount();
+void insertExpo(uint8_t idx);
+void deleteExpo(uint8_t idx);
+uint8_t getMixesCount();
+void insertMix(uint8_t idx);
+void deleteMix(uint8_t idx);
+#endif
+  
 typedef int (*FnFuncP) (int x);
 void drawFunction(FnFuncP fn, uint8_t offset=0);
 

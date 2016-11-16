@@ -908,12 +908,12 @@ QString CustomFunctionData::paramToString(const ModelData * model) const
   }
   else if ((func>=FuncAdjustGV1) && (func<FuncCount)) {
     switch (adjustMode) {
-      case 0:
+      case FUNC_ADJUST_GVAR_CONSTANT:
         return QObject::tr("Value ")+QString("%1").arg(param);
-      case 1:
-      case 2:
+      case FUNC_ADJUST_GVAR_SOURCE:
+      case FUNC_ADJUST_GVAR_GVAR:
         return RawSource(param).toString();
-      case 3:
+      case FUNC_ADJUST_GVAR_INCDEC:
         if (param==0) return QObject::tr("Decr:") + " -1";
         else          return QObject::tr("Incr:") + " +1";
     }
@@ -1723,7 +1723,7 @@ unsigned long LoadEepromXml(RadioData & radioData, QDomDocument & doc)
 {
   std::bitset<NUM_ERRORS> errors;
 
-  foreach(EEPROMInterface *eepromInterface, eepromInterfaces) {
+  foreach(EEPROMInterface * eepromInterface, eepromInterfaces) {
     std::bitset<NUM_ERRORS> result((unsigned long long)eepromInterface->loadxml(radioData, doc));
     if (result.test(ALL_OK)) {
       return result.to_ulong();
@@ -1737,32 +1737,6 @@ unsigned long LoadEepromXml(RadioData & radioData, QDomDocument & doc)
     errors.set(UNKNOWN_ERROR);
   }
   return errors.to_ulong();
-}
-
-QString getBoardName(BoardEnum board)
-{
-  switch (board) {
-    case BOARD_STOCK:
-      return "9X";
-    case BOARD_M128:
-      return "9X128";
-    case BOARD_GRUVIN9X:
-      return "Gruvin9x";
-    case BOARD_MEGA2560:
-      return "MEGA2560";
-    case BOARD_TARANIS:
-      return "Taranis";
-    case BOARD_TARANIS_PLUS:
-      return "Taranis Plus";
-    case BOARD_SKY9X:
-      return "Sky9x";
-    case BOARD_9XRPRO:
-      return "9XR-PRO";
-    case BOARD_AR9X:
-      return "AR9X";
-    default:
-      return "Unknown";
-  }
 }
 
 const int Firmware::getFlashSize()
@@ -1859,7 +1833,6 @@ SimulatorInterface *GetCurrentFirmwareSimulator()
 unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
   switch (type) {
     case MM_RF_PROTO_HISKY:
-    case MM_RF_PROTO_DSM2:
     case MM_RF_PROTO_SYMAX:
     case MM_RF_PROTO_KN:
       return 2;
@@ -1870,6 +1843,8 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
 
     case MM_RF_PROTO_FRSKY:
     case MM_RF_PROTO_FLYSKY:
+    case MM_RF_PROTO_DSM2:
+    case MM_RF_PROTO_AFHDS2A:
       return 4;
 
     case MM_RF_PROTO_MJXQ:

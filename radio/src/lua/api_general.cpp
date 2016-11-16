@@ -30,9 +30,11 @@
 #elif defined(PCBFLAMENCO)
   #include "lua/lua_exports_flamenco.inc"
 #elif defined(PCBX9E)
-  #include "lua/lua_exports_taranis_x9e.inc"
+  #include "lua/lua_exports_x9e.inc"
+#elif defined(PCBX7D)
+  #include "lua/lua_exports_x7d.inc"
 #elif defined(PCBTARANIS)
-  #include "lua/lua_exports_taranis.inc"
+  #include "lua/lua_exports_x9d.inc"
 #endif
 
 #if defined(SIMU)
@@ -141,7 +143,7 @@ static int luaGetDateTime(lua_State * L)
 {
   struct gtm utm;
   gettime(&utm);
-  luaPushDateTime(L, utm.tm_year + 1900, utm.tm_mon + 1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec);
+  luaPushDateTime(L, utm.tm_year + TM_YEAR_BASE, utm.tm_mon + 1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec);
   return 1;
 }
 
@@ -157,7 +159,7 @@ static void luaPushLatLon(TelemetrySensor & telemetrySensor, TelemetryItem & tel
 
 static void luaPushTelemetryDateTime(TelemetrySensor & telemetrySensor, TelemetryItem & telemetryItem)
 {
-  luaPushDateTime(L, telemetryItem.datetime.year + 2000, telemetryItem.datetime.month, telemetryItem.datetime.day,
+  luaPushDateTime(L, telemetryItem.datetime.year, telemetryItem.datetime.month, telemetryItem.datetime.day,
                   telemetryItem.datetime.hour, telemetryItem.datetime.min, telemetryItem.datetime.sec);
 }
 
@@ -297,6 +299,19 @@ bool luaFindFieldByName(const char * name, LuaField & field, unsigned int flags)
   return false;  // not found
 }
 
+/*luadoc
+@function sportTelemetryPop()
+
+Pops a received SPORT packet from the queue. Please note that only packets using a data ID within 0x5000 to 0x50FF (frame ID == 0x10), as well as packets with a frame ID equal 0x32 (regardless of the data ID) will be passed to the LUA telemetry receive queue.
+
+@retval SPORT paket as a quadruple:
+ * sensor ID (number)
+ * frame ID (number)
+ * data ID (number)
+ * value (number)
+
+@status current Introduced in 2.2.0
+*/
 static int luaSportTelemetryPop(lua_State * L)
 {
   if (!luaInputTelemetryFifo) {
@@ -331,9 +346,32 @@ uint8_t getDataId(uint8_t physicalId)
   return result;
 }
 
+/*luadoc
+@function sportTelemetryPush()
+
+This functions allows for sending SPORT telemetry data toward the receiver,
+and more generally, to anything connected SPORT bus on the receiver or transmitter.
+
+When called without parameters, it will only return the status of the ouput buffer without sending anything.
+
+@param sensorId  physical sensor ID
+
+@param frameId   frame ID
+
+@param dataId    data ID
+
+@param value     value
+
+@retval boolean  data queued in output buffer or not.
+
+@status current Introduced in 2.2.0
+*/
 static int luaSportTelemetryPush(lua_State * L)
 {
-  if (isSportOutputBufferAvailable()) {
+  if (lua_gettop(L) == 0) {
+    lua_pushboolean(L, isSportOutputBufferAvailable());
+  }
+  else if (isSportOutputBufferAvailable()) {
     SportTelemetryPacket packet;
     packet.physicalId = getDataId(luaL_checkunsigned(L, 1));
     packet.primId = luaL_checkunsigned(L, 2);
@@ -348,6 +386,17 @@ static int luaSportTelemetryPush(lua_State * L)
   return 1;
 }
 
+/*luadoc
+@function crossfireTelemetryPop()
+
+@retval SPORT paket as a quadruple:
+ * sensor ID (number)
+ * frame ID (number)
+ * data ID (number)
+ * value (number)
+
+@status current Introduced in 2.2.0
+*/
 static int luaCrossfireTelemetryPop(lua_State * L)
 {
   if (!luaInputTelemetryFifo) {
@@ -376,9 +425,31 @@ static int luaCrossfireTelemetryPop(lua_State * L)
   return 0;
 }
 
+/*luadoc
+@function crossfireTelemetryPush()
+
+This functions allows for sending telemetry data toward the TBS Crossfire link.
+
+When called without parameters, it will only return the status of the ouput buffer without sending anything.
+
+@param sensorId  physical sensor ID
+
+@param frameId   frame ID
+
+@param dataId    data ID
+
+@param value     value
+
+@retval boolean  data queued in output buffer or not.
+
+@status current Introduced in 2.2.0
+*/
 static int luaCrossfireTelemetryPush(lua_State * L)
 {
-  if (isCrossfireOutputBufferAvailable()) {
+  if (lua_gettop(L) == 0) {
+    lua_pushboolean(L, isCrossfireOutputBufferAvailable());
+  }
+  else if (isCrossfireOutputBufferAvailable()) {
     uint8_t command = luaL_checkunsigned(L, 1);
     luaL_checktype(L, 2, LUA_TTABLE);
     uint8_t length = luaL_len(L, 2);
@@ -763,7 +834,7 @@ static int luaKillEvents(lua_State * L)
   return 0;
 }
 
-#if !defined(COLORLCD)
+#if LCD_DEPTH > 1 && !defined(COLORLCD)
 /*luadoc
 @function GREY()
 
@@ -858,6 +929,70 @@ static int luaPopupInput(lua_State * L)
 }
 
 /*luadoc
+@function popupWarning(title, event)
+
+Raises a pop-up on screen that shows a warning
+
+@param title (string) text to display
+
+@param event (number) the event variable that is passed in from the
+Run function (key pressed)
+
+@retval "CANCEL" user pushed EXIT key
+
+@notice Use only from stand-alone and telemetry scripts.
+
+@status current Introduced in 2.2.0
+*/
+static int luaPopupWarning(lua_State * L)
+{
+  event_t event = luaL_checkinteger(L, 2);
+  warningText = luaL_checkstring(L, 1);
+  warningType = WARNING_TYPE_ASTERISK;
+  runPopupWarning(event);
+  if (!warningText) {
+    lua_pushstring(L, "CANCEL");
+  }
+  else {
+    warningText = NULL;
+    lua_pushnil(L);
+  }
+  return 1;
+}
+
+/*luadoc
+@function popupConfirmation(title, event)
+
+Raises a pop-up on screen that asks for confirmation
+
+@param title (string) text to display
+
+@param event (number) the event variable that is passed in from the
+Run function (key pressed)
+
+@retval "CANCEL" user pushed EXIT key
+
+@notice Use only from stand-alone and telemetry scripts.
+
+@status current Introduced in 2.2.0
+*/
+static int luaPopupConfirmation(lua_State * L)
+{
+  event_t event = luaL_checkinteger(L, 2);
+  warningText = luaL_checkstring(L, 1);
+  warningType = WARNING_TYPE_CONFIRM;
+  runPopupWarning(event);
+  if (!warningText) {
+    lua_pushstring(L, warningResult ? "OK" : "CANCEL");
+  }
+  else {
+    warningText = NULL;
+    lua_pushnil(L);
+  }
+  return 1;
+}
+
+/*luadoc
 @function defaultStick(channel)
 
 Get stick that is assigned to a channel. See Default Channel Order in General Settings.
@@ -872,6 +1007,70 @@ static int luaDefaultStick(lua_State * L)
 {
   uint8_t channel = luaL_checkinteger(L, 1);
   lua_pushinteger(L, channel_order(channel+1)-1);
+  return 1;
+}
+
+/* luadoc
+@function setTelemetryValue(id, subID, instance, value [, unit] [, precision [, name])
+
+@param id Id of the sensor
+
+@param subID subID of the sensor, usually 0
+
+@param instance instance of the sensor (SensorID)
+
+@param value fed to the sensor
+
+@param unit unit of the sensor.
+ * `0 or not present` UNIT_RAW.
+ * `!= 0` Valid values are 1 (UNIT_VOLTS), 2 (UNIT_AMPS), 3 (UNIT_MILLIAMPS),
+ 4 (UNIT_KTS), 5 (UNIT_METERS_PER_SECOND), 6 (UNIT_FEET_PER_SECOND), 7 (UNIT_KMH), 8 (UNIT_MPH), 9 (UNIT_METERS),
+ 10 (UNIT_FEET), 11 (UNIT_CELSIUS), 12 (UNIT_FAHRENHEIT), 13 (UNIT_PERCENT), 14 (UNIT_MAH), 15 (UNIT_WATTS),
+ 16 (UNIT_MILLIWATTS), 17 (UNIT_DB), 18 (UNIT_RPMS), 19 (UNIT_G), 20 (UNIT_DEGREE), 21 (UNIT_RADIANS),
+ 22 (UNIT_MILLILITERS), 23 (UNIT_FLOZ), 24 (UNIT_HOURS), 25 (UNIT_MINUTES), 26 (UNIT_SECONDS), 27 (UNIT_CELLS),
+ 28 (UNIT_DATETIME), 29 (UNIT_GPS), 30 (UNIT_BITFIELD), 31 (UNIT_TEXT)
+
+@param precision the precision of the sensor
+ * `0 or not present` no decimal precision.
+ * `!= 0` value is divided by 10^precision, e.g. value=1000, prec=2 => 10.00.
+ 
+@param name (string) Name of the sensor if it does not yet exist (4 chars).
+ * `not present` Name defaults to the Id.
+ * `present` Sensor takes name of the argument. Argument must have name surrounded by quotes: e.g., "Name"
+ 
+@retval true, if the sensor was just added. In this case the value is ignored (subsequent call will set the value)
+*/
+static int luaSetTelemetryValue(lua_State * L)
+{
+  uint16_t id = luaL_checkinteger(L, 1);
+  uint8_t subId = luaL_checkinteger(L, 2);
+  uint8_t instance = luaL_checkinteger(L, 3);
+  int32_t value = luaL_checkinteger(L, 4);
+  uint32_t unit = luaL_optinteger(L, 5, 0);
+  uint32_t prec = luaL_optinteger(L, 6, 0);
+
+  char zname[4];
+  const char* name = luaL_optstring(L, 7, NULL);
+  if (name != NULL) {
+    str2zchar(zname, name, 4);
+  } else {
+    zname[0] = hex2zchar((id & 0xf000) >> 12);
+    zname[1] = hex2zchar((id & 0x0f00) >> 8);
+    zname[2] = hex2zchar((id & 0x00f0) >> 4);
+    zname[3] = hex2zchar((id & 0x000f) >> 0);
+  }
+  
+  int index = setTelemetryValue(TELEM_PROTO_LUA, id, subId, instance, value, unit, prec);
+  if (index >= 0) {
+    TelemetrySensor &telemetrySensor = g_model.telemetrySensors[index];
+    telemetrySensor.id = id;
+    telemetrySensor.subId = subId;
+    telemetrySensor.instance = instance;
+    telemetrySensor.init(zname, unit, prec);
+    lua_pushboolean(L, true);
+  } else {
+    lua_pushboolean(L, false);
+  }
   return 1;
 }
 
@@ -902,6 +1101,27 @@ static int luaDefaultChannel(lua_State * L)
   return 1;
 }
 
+/*luadoc
+@function getRSSI()
+
+Get RSSI value as well as low and critical RSSI alarm levels (in dB)
+
+@retval rssi RSSI value (0 if no link)
+
+@retval alarm_low Configured low RSSI alarm level
+
+@retval alarm_crit Configured critical RSSI alarm level
+
+@status current Introduced in 2.2.0
+*/
+static int luaGetRSSI(lua_State * L)
+{
+  lua_pushunsigned(L, min((uint8_t)99, TELEMETRY_RSSI()));
+  lua_pushunsigned(L, getRssiAlarmValue(0));
+  lua_pushunsigned(L, getRssiAlarmValue(1));
+  return 3;
+}
+
 const luaL_Reg opentxLib[] = {
   { "getTime", luaGetTime },
   { "getDateTime", luaGetDateTime },
@@ -917,14 +1137,18 @@ const luaL_Reg opentxLib[] = {
   { "playTone", luaPlayTone },
   { "playHaptic", luaPlayHaptic },
   { "popupInput", luaPopupInput },
+  { "popupWarning", luaPopupWarning },
+  { "popupConfirmation", luaPopupConfirmation },
   { "defaultStick", luaDefaultStick },
   { "defaultChannel", luaDefaultChannel },
+  { "getRSSI", luaGetRSSI },
   { "killEvents", luaKillEvents },
-#if !defined(COLORLCD)
+#if LCD_DEPTH > 1 && !defined(COLORLCD)
   { "GREY", luaGrey },
 #endif
   { "sportTelemetryPop", luaSportTelemetryPop },
   { "sportTelemetryPush", luaSportTelemetryPush },
+  { "setTelemetryValue", luaSetTelemetryValue },
 #if defined(CROSSFIRE)
   { "crossfireTelemetryPop", luaCrossfireTelemetryPop },
   { "crossfireTelemetryPush", luaCrossfireTelemetryPush },
@@ -1021,8 +1245,10 @@ const luaR_value_entry opentxConstants[] = {
   { "EVT_MINUS_FIRST", EVT_KEY_FIRST(KEY_MINUS) },
   { "EVT_PLUS_REPT", EVT_KEY_REPT(KEY_PLUS) },
   { "EVT_MINUS_REPT", EVT_KEY_REPT(KEY_MINUS) },
+#if LCD_DEPTH > 1
   { "FILL_WHITE", FILL_WHITE },
   { "GREY_DEFAULT", GREY_DEFAULT },
+#endif
   { "FORCE", FORCE },
   { "ERASE", ERASE },
   { "ROUND", ROUND },
@@ -1043,5 +1269,41 @@ const luaR_value_entry opentxConstants[] = {
   { "PLAY_NOW", PLAY_NOW },
   { "PLAY_BACKGROUND", PLAY_BACKGROUND },
   { "TIMEHOUR", TIMEHOUR },
+
+#if defined(PCBHORUS)
+  // Adding the unit consts for the set Telemetry function adds about 1k of flash usage
+  {"UNIT_RAW", UNIT_RAW },
+  {"UNIT_VOLTS", UNIT_VOLTS },
+  {"UNIT_AMPS", UNIT_AMPS },
+  {"UNIT_MILLIAMPS", UNIT_MILLIAMPS },
+  {"UNIT_KTS", UNIT_KTS },
+  {"UNIT_METERS_PER_SECOND", UNIT_METERS_PER_SECOND },
+  {"UNIT_FEET_PER_SECOND", UNIT_FEET_PER_SECOND },
+  {"UNIT_KMH", UNIT_KMH },
+  {"UNIT_MPH", UNIT_MPH },
+  {"UNIT_METERS", UNIT_METERS },
+  {"UNIT_FEET", UNIT_FEET },
+  {"UNIT_CELSIUS", UNIT_CELSIUS },
+  {"UNIT_FAHRENHEIT", UNIT_FAHRENHEIT },
+  {"UNIT_PERCENT", UNIT_PERCENT },
+  {"UNIT_MAH", UNIT_MAH },
+  {"UNIT_WATTS", UNIT_WATTS },
+  {"UNIT_MILLIWATTS", UNIT_MILLIWATTS },
+  {"UNIT_DB", UNIT_DB },
+  {"UNIT_RPMS", UNIT_RPMS },
+  {"UNIT_G", UNIT_G },
+  {"UNIT_DEGREE", UNIT_DEGREE },
+  {"UNIT_RADIANS", UNIT_RADIANS },
+  {"UNIT_MILLILITERS", UNIT_MILLILITERS },
+  {"UNIT_FLOZ", UNIT_FLOZ },
+  {"UNIT_HOURS", UNIT_HOURS },
+  {"UNIT_MINUTES", UNIT_MINUTES },
+  {"UNIT_SECONDS", UNIT_SECONDS },
+  {"UNIT_CELLS", UNIT_CELLS},
+  {"UNIT_DATETIME", UNIT_DATETIME},
+  {"UNIT_GPS", UNIT_GPS},
+  {"UNIT_BITFIELD", UNIT_BITFIELD},
+  {"UNIT_TEXT", UNIT_TEXT},
+#endif  
   { NULL, 0 }  /* sentinel */
 };

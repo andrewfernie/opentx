@@ -38,7 +38,7 @@ void drawCheckBox(coord_t x, coord_t y, uint8_t value, LcdFlags attr)
   if (value)
     lcdDrawChar(x+1, y, '#');
   if (attr)
-    lcdDrawFilledRect(x, y, 7, 7);
+    lcdDrawSolidFilledRect(x, y, 7, 7);
   else
     lcdDrawSquare(x, y, 7);
 #else
@@ -103,14 +103,14 @@ void drawSlider(coord_t x, coord_t y, uint8_t value, uint8_t max, uint8_t attr)
 {
   lcdDrawChar(x+(value*4*FW)/max, y, '$');
   lcdDrawSolidHorizontalLine(x, y+3, 5*FW-1, FORCE);
-  if (attr && (!(attr & BLINK) || !BLINK_ON_PHASE)) lcdDrawFilledRect(x, y, 5*FW-1, FH-1);
+  if (attr && (!(attr & BLINK) || !BLINK_ON_PHASE)) lcdDrawSolidFilledRect(x, y, 5*FW-1, FH-1);
 }
 #elif defined(GRAPHICS)
 void display5posSlider(coord_t x, coord_t y, uint8_t value, uint8_t attr)
 {
   lcdDrawChar(x+2*FW+(value*FW), y, '$');
   lcdDrawSolidHorizontalLine(x, y+3, 5*FW-1, SOLID);
-  if (attr && (!(attr & BLINK) || !BLINK_ON_PHASE)) lcdDrawFilledRect(x, y, 5*FW-1, FH-1);
+  if (attr && (!(attr & BLINK) || !BLINK_ON_PHASE)) lcdDrawSolidFilledRect(x, y, 5*FW-1, FH-1);
 }
 #endif
 
@@ -248,12 +248,20 @@ void drawStatusLine()
 
 void drawProgressBar(const char * label)
 {
-  // TODO
+  lcdDrawTextAlignedLeft(4*FH, label);
+  lcdDrawRect(4, 6*FH+4, LCD_W-8, 7);
+  lcdRefresh();
 }
 
 void updateProgressBar(int num, int den)
 {
-  // TODO
+  if (num > 0 && den > 0) {
+    int width = ((LCD_W-12)*num)/den;
+    lcdDrawSolidHorizontalLine(6, 6*FH+6, width, FORCE);
+    lcdDrawSolidHorizontalLine(6, 6*FH+7, width, FORCE);
+    lcdDrawSolidHorizontalLine(6, 6*FH+8, width, FORCE);
+    lcdRefresh();
+  }
 }
 
 #if defined(CPUARM) || defined(CPUM2560)
