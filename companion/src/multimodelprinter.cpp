@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "helpers.h"
 #include "helpers_html.h"
 #include "multimodelprinter.h"
@@ -247,7 +267,7 @@ QString MultiModelPrinter::printFlightModes()
     columns.append("<td><b>" + tr("Switch") + "</b></td>");
     columns.append("<td><b>" + tr("Fade IN") + "</b></td>");
     columns.append("<td><b>" + tr("Fade OUT") + "</b></td>");
-    for (int i=0; i<NUM_STICKS; i++) {
+    for (int i=0; i<CPN_MAX_STICKS; i++) {
       columns.append("<td><b>" + AnalogString(i) + " trim</b></td>");
     }
     columns.append("</tr>");
@@ -262,7 +282,7 @@ QString MultiModelPrinter::printFlightModes()
       columns.append("</td><td>");
       COMPARE(model->flightModeData[i].fadeOut);
       columns.append("</td>");
-      for (int k=0; k<NUM_STICKS; k++) {
+      for (int k=0; k<CPN_MAX_STICKS; k++) {
         columns.append("<td>");
         COMPARE(modelPrinter->printTrim(i, k));
         columns.append("</td>");

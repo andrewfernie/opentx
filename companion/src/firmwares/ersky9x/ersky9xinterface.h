@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
- * 
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,13 +16,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
-#ifndef ersky9x_interface_h
-#define ersky9x_interface_h
+
+#ifndef _ERSKY9XINTERFACE_H_
+#define _ERSKY9XINTERFACE_H_
+
 #include <QtXml>
 #include "eeprominterface.h"
 #include "ersky9xeeprom.h"
+
 class RleFile;
 
 class Ersky9xInterface : public EEPROMInterface
@@ -40,7 +47,10 @@ class Ersky9xInterface : public EEPROMInterface
 
     virtual unsigned long loadxml(RadioData &radioData, QDomDocument &doc);
 
-    virtual int save(uint8_t * eeprom, RadioData & radioData, uint32_t variant=0, uint8_t version=0);
+    virtual int save(uint8_t * eeprom, RadioData & radioData, uint8_t version=0, uint32_t variant=0)
+    {
+      return 0;
+    }
 
     virtual int getSize(const ModelData &);
     
@@ -50,7 +60,7 @@ class Ersky9xInterface : public EEPROMInterface
 
   protected:
 
-    RleFile *efile;
+    RleFile * efile;
 
   private:
     void appendTextElement(QDomDocument * qdoc, QDomElement * pe, QString name, QString value);
@@ -63,11 +73,11 @@ class Ersky9xInterface : public EEPROMInterface
     
     QDomElement getModelDataXML(QDomDocument * qdoc, Ersky9xModelData_v11 * tmod, int modelNum, int mdver); //parse out data to XML format
     
-    bool loadGeneralDataXML(QDomDocument * qdoc, Ersky9xGeneral * tgen); // get data from XML
+    bool loadRadioSettingsDataXML(QDomDocument * qdoc, Ersky9xGeneral * tgen); // get data from XML
     
     template <class T>
     bool loadModelDataXML(QDomDocument * qdoc, ModelData * model, int modelNum, int stickMode); // get data from XML
 
 };
 
-#endif
+#endif // _ERSKY9XINTERFACE_H_

@@ -117,53 +117,66 @@ class DarkblueTheme: public Theme
       loadMenuIcon(ICON_MONITOR_CHANNELS4, "mask_monitor_channels4.png");
       loadMenuIcon(ICON_MONITOR_LOGICAL_SWITCHES, "/mask_monitor_logsw.png");
     }
-    
+
     void loadThemeBitmaps() const
-    {          
+    {
+      // Calibration screen
+      delete calibStick;
+      calibStick = BitmapBuffer::load(getThemePath("stick_pointer.png"));
+
+      delete calibStickBackground;
+      calibStickBackground = BitmapBuffer::load(getThemePath("stick_background.png"));
+
+      delete calibTrackpBackground;
+      calibTrackpBackground = BitmapBuffer::load(getThemePath("trackp_background.png"));
+
+      delete calibHorus;
+      calibHorus = BitmapBuffer::load(getThemePath("horus.bmp"));
+
       // Channels monitor screen
       delete chanMonLockedBitmap;
       chanMonLockedBitmap = BitmapBuffer::loadMaskOnBackground("mask_monitor_lockch.png", TEXT_COLOR, TEXT_BGCOLOR);
-      
+
       delete chanMonInvertedBitmap;
       chanMonInvertedBitmap = BitmapBuffer::loadMaskOnBackground("mask_monitor_inver.png", TEXT_COLOR, TEXT_BGCOLOR);
 
       // Mixer setup screen
       delete mixerSetupMixerBitmap;
       mixerSetupMixerBitmap = BitmapBuffer::loadMaskOnBackground("mask_sbar_mixer.png", MENU_TITLE_COLOR, HEADER_BGCOLOR);
-      
+
       delete mixerSetupToBitmap;
-      mixerSetupToBitmap = BitmapBuffer::loadMaskOnBackground("mask_sbar_to.png", TEXT_BGCOLOR, HEADER_BGCOLOR); 
+      mixerSetupToBitmap = BitmapBuffer::loadMaskOnBackground("mask_sbar_to.png", TEXT_BGCOLOR, HEADER_BGCOLOR);
 
       delete mixerSetupOutputBitmap;
-      mixerSetupOutputBitmap = BitmapBuffer::loadMaskOnBackground("mask_sbar_output.png", MENU_TITLE_COLOR, HEADER_BGCOLOR);      
+      mixerSetupOutputBitmap = BitmapBuffer::loadMaskOnBackground("mask_sbar_output.png", MENU_TITLE_COLOR, HEADER_BGCOLOR);
 
       delete mixerSetupAddBitmap;
       mixerSetupAddBitmap = BitmapBuffer::loadMaskOnBackground("mask_mplex_add.png", TEXT_COLOR, TEXT_BGCOLOR);
-      
+
       delete mixerSetupMultiBitmap;
       mixerSetupMultiBitmap = BitmapBuffer::loadMaskOnBackground("mask_mplex_multi.png", TEXT_COLOR, TEXT_BGCOLOR);
-      
+
       delete mixerSetupReplaceBitmap;
-      mixerSetupReplaceBitmap = BitmapBuffer::loadMaskOnBackground("mask_mplex_replace.png", TEXT_COLOR, TEXT_BGCOLOR); 
-      
+      mixerSetupReplaceBitmap = BitmapBuffer::loadMaskOnBackground("mask_mplex_replace.png", TEXT_COLOR, TEXT_BGCOLOR);
+
       delete mixerSetupLabelBitmap;
-      mixerSetupLabelBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_label.png", TEXT_COLOR, TEXT_BGCOLOR); 
-      
+      mixerSetupLabelBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_label.png", TEXT_COLOR, TEXT_BGCOLOR);
+
       delete mixerSetupCurveBitmap;
-      mixerSetupCurveBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_curve.png", TEXT_COLOR, TEXT_BGCOLOR); 
-      
+      mixerSetupCurveBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_curve.png", TEXT_COLOR, TEXT_BGCOLOR);
+
       delete mixerSetupSwitchBitmap;
-      mixerSetupSwitchBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_switch.png", TEXT_COLOR, TEXT_BGCOLOR); 
-      
+      mixerSetupSwitchBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_switch.png", TEXT_COLOR, TEXT_BGCOLOR);
+
       delete mixerSetupSlowBitmap;
       mixerSetupSlowBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_slow.png", TEXT_COLOR, TEXT_BGCOLOR);
-      
+
       delete mixerSetupDelayBitmap;
-      mixerSetupDelayBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_delay.png", TEXT_COLOR, TEXT_BGCOLOR);  
-      
+      mixerSetupDelayBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_delay.png", TEXT_COLOR, TEXT_BGCOLOR);
+
       delete mixerSetupDelaySlowBitmap;
       mixerSetupDelaySlowBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_delayslow.png", TEXT_COLOR, TEXT_BGCOLOR);
-      
+
       delete mixerSetupFlightmodeBitmap;
       mixerSetupFlightmodeBitmap = BitmapBuffer::loadMaskOnBackground("mask_textline_fm.png", TEXT_COLOR, TEXT_BGCOLOR);
     }

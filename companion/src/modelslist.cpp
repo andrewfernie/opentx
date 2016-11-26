@@ -1,43 +1,22 @@
-/****************************************************************************
-**
-** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
-**
-** This file is part of the examples of the Qt Toolkit.
-**
-** $QT_BEGIN_LICENSE:LGPL$
-** Commercial Usage
-** Licensees holding valid Qt Commercial licenses may use this file in
-** accordance with the Qt Commercial License Agreement provided with the
-** Software or, alternatively, in accordance with the terms contained in
-** a written agreement between you and Nokia.
-**
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-**
-** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU
-** General Public License version 3.0 as published by the Free Software
-** Foundation and appearing in the file LICENSE.GPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU General Public License version 3.0 requirements will be
-** met: http://www.gnu.org/copyleft/gpl.html.
-**
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
-** $QT_END_LICENSE$
-**
-****************************************************************************/
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 
 #include "modelslist.h"
 #include "mdichild.h"
@@ -52,7 +31,7 @@ class DragDropHeader {
     }
     bool general_settings;
     uint8_t models_count;
-    uint8_t models[C9X_MAX_MODELS];
+    uint8_t models[CPN_MAX_MODELS];
 };
 
 ModelsListWidget::ModelsListWidget(QWidget *parent):
@@ -280,69 +259,52 @@ void ModelsListWidget::focusOutEvent ( QFocusEvent * event )
 
 void ModelsListWidget::refreshList()
 {
-    clear();
-    int msize;
-    div_t divresult;
-    addItem(tr("General Settings"));
+  clear();
+  addItem(tr("General Settings"));
 
-    EEPROMInterface *eepromInterface = GetEepromInterface();
-    int availableEEpromSize = eepromInterface->getEEpromSize()-64; //let's consider fat
-    divresult=div(eepromInterface->getSize(radioData->generalSettings),15);
-    divresult.quot+=(divresult.rem!=0 ? 1:0);
-    availableEEpromSize -= divresult.quot*16;
-    
-    for(uint8_t i=0; i<GetEepromInterface()->getMaxModels(); i++)
-    {
-      QString item = QString().sprintf("%02d: ", i+1);
-       
-      if (!radioData->models[i].isEmpty()) {
-        if (eepromInterface && IS_SKY9X(eepromInterface->getBoard())) {
-          if (radioData->models[i].name[0]==0) {
-            QString modelname="Model";
-            modelname.append(QString().sprintf("%02d", i+1));
-            item += modelname;
-          } else {
-            item += radioData->models[i].name;
-          }
-        }
-        else {
-          char modelname[256];
-          if (radioData->models[i].name[0]==0) {
-            sprintf(modelname, "Model%02d", i+1);
-          } else {
-            if (IS_TARANIS(eepromInterface->getBoard())) {
-              sprintf(modelname,"%12s",radioData->models[i].name);
-            } else {
-              sprintf(modelname,"%10s",radioData->models[i].name);
-            }            
-          }
-          if (IS_TARANIS(eepromInterface->getBoard())) {
-            item += QString().sprintf("%12s", modelname);
-          } else {
-            item += QString().sprintf("%10s", modelname);
-          }            
-          msize = eepromInterface->getSize(radioData->models[i]);
-          item += QString().sprintf("%5d", msize);
-          divresult=div(msize,15);
-          divresult.quot+=(divresult.rem!=0 ? 1:0);
+  EEPROMInterface * eepromInterface = GetEepromInterface();
+  BoardEnum board = eepromInterface->getBoard();
+
+  // TODO here we calculate the size used by the RLE format, this is clearly not the right place to do that...
+  int availableEEpromSize = eepromInterface->getEEpromSize() - 64; // let's consider fat
+  div_t divresult = div(eepromInterface->getSize(radioData->generalSettings), 15);
+  divresult.quot += (divresult.rem != 0 ? 1 : 0);
+  availableEEpromSize -= divresult.quot*16;
+  
+  for (uint8_t i=0; i<GetEepromInterface()->getMaxModels(); i++) {
+    QString item = QString().sprintf("%02d: ", i+1);
+    if (!radioData->models[i].isEmpty()) {
+      QString modelName;
+      if (strlen(radioData->models[i].name) > 0)
+        modelName = radioData->models[i].name;
+      else
+        modelName = QString().sprintf("Model%02d", i+1);
+      item += modelName;
+      if (!IS_SKY9X(board) && !IS_HORUS(board)) {
+        item += QString(GetCurrentFirmware()->getCapability(ModelName)-modelName.size(), ' ');
+        int size = eepromInterface->getSize(radioData->models[i]);
+        item += QString().sprintf("%5d", size);
+        divresult = div(size, 15);
+        divresult.quot += (divresult.rem != 0 ? 1 : 0);
+        availableEEpromSize -= divresult.quot*16;
+        if (i == radioData->generalSettings.currModel) {
+          // TODO why?
           availableEEpromSize -= divresult.quot*16;
-
-          if (i==radioData->generalSettings.currModel) {
-            availableEEpromSize -= divresult.quot*16;
-          }
         }
-       }
-      addItem(item);
+      }
     }
-    if (radioData->generalSettings.currModel < (unsigned int)GetEepromInterface()->getMaxModels()) {
-        QFont f = QFont("Courier New", 12);
-        f.setBold(true);
-        this->item(radioData->generalSettings.currModel+1)->setFont(f);
-    }
+    addItem(item);
+  }
+  
+  if (radioData->generalSettings.currModel < (unsigned int)eepromInterface->getMaxModels()) {
+    QFont f = QFont("Courier New", 12);
+    f.setBold(true);
+    this->item(radioData->generalSettings.currModel+1)->setFont(f);
+  }
 
-    if (eepromInterface && !IS_SKY9X(eepromInterface->getBoard())) {
-      ((MdiChild*)parent())->setEEpromAvail((availableEEpromSize/16)*15);
-    }
+  if (!IS_SKY9X(board) && !IS_HORUS(board)) {
+    ((MdiChild*)parent())->setEEpromAvail((availableEEpromSize/16)*15);
+  }
 }
 
 void ModelsListWidget::cut()

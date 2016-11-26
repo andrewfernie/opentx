@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "setup.h"
 #include "ui_setup.h"
 #include "ui_setup_timer.h"
@@ -181,8 +201,7 @@ ModulePanel::ModulePanel(QWidget *parent, ModelData & model, ModuleData & module
     }
   }
 
-  for (int i=0; i<=MM_RF_PROTO_LAST; i++)
-  {
+  for (int i=0; i<=MM_RF_PROTO_LAST; i++) {
     ui->multiProtocol->addItem(ModelPrinter::printMultiRfProtocol(i, false), (QVariant) i);
   }
 
@@ -531,7 +550,7 @@ void ModulePanel::updateFailsafe(int channel)
 
 /******************************************************************************/
 
-SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & generalSettings, Firmware * firmware):
+SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & generalSettings, Firmware * firmware):
   ModelPanel(parent, model, generalSettings, firmware),
   ui(new Ui::Setup)
 {
@@ -545,13 +564,13 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
 
   QRegExp rx(CHAR_FOR_NAMES_REGEX);
   ui->name->setValidator(new QRegExpValidator(rx, this));
-  ui->name->setMaxLength(IS_TARANIS(board) ? 12 : 10);
+  ui->name->setMaxLength(firmware->getCapability(ModelName));
 
   if (firmware->getCapability(ModelImage)) {
     QStringList items;
     items.append("");
     QString path = g.profile[g.id()].sdPath();
-    path.append("/BMP/");
+    path.append("/IMAGES/");
     QDir qd(path);
     if (qd.exists()) {
       QStringList filters;
@@ -594,8 +613,8 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
     ui->imagePreview->hide();
   }
 
-  QWidget *prevFocus = ui->image;
-  for (int i=0; i<C9X_MAX_TIMERS; i++) {
+  QWidget * prevFocus = ui->image;
+  for (int i=0; i<CPN_MAX_TIMERS; i++) {
     if (i<firmware->getCapability(Timers)) {
       timers[i] = new TimerPanel(this, model, model.timers[i], generalSettings, firmware, prevFocus);
       ui->gridLayout->addWidget(timers[i], 1+i, 1);
@@ -611,7 +630,7 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
 
   if (firmware->getCapability(HasTopLcd)) {
     ui->toplcdTimer->setField(model.toplcdTimer, this);
-    for (int i=0; i<C9X_MAX_TIMERS; i++) {
+    for (int i=0; i<CPN_MAX_TIMERS; i++) {
       if (i<firmware->getCapability(Timers)) {
         ui->toplcdTimer->addItem(tr("Timer %1").arg(i+1), i);
       }
@@ -632,7 +651,7 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
 
   // Beep Center checkboxes
   prevFocus = ui->trimsDisplay;
-  int analogs = NUM_STICKS + firmware->getCapability(Pots) + firmware->getCapability(Sliders);
+  int analogs = CPN_MAX_STICKS + firmware->getCapability(Pots) + firmware->getCapability(Sliders);
   for (int i=0; i<analogs+firmware->getCapability(RotaryEncoders); i++) {
     QCheckBox * checkbox = new QCheckBox(this);
     checkbox->setProperty("index", i);
@@ -642,10 +661,10 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
     centerBeepCheckboxes << checkbox;
     if (IS_TARANIS(board)) {
       RawSource src(SOURCE_TYPE_STICK, i);
-      if (src.isPot() && !generalSettings.isPotAvailable(i-NUM_STICKS)) {
+      if (src.isPot() && !generalSettings.isPotAvailable(i-CPN_MAX_STICKS)) {
         checkbox->hide();
       }
-      else if (src.isSlider() && !generalSettings.isSliderAvailable(i-NUM_STICKS-firmware->getCapability(Pots))) {
+      else if (src.isSlider() && !generalSettings.isSliderAvailable(i-CPN_MAX_STICKS-firmware->getCapability(Pots))) {
         checkbox->hide();
       }
     }
@@ -655,15 +674,12 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
 
   // Startup switches warnings
   for (int i=0; i<firmware->getCapability(Switches); i++) {
+    Firmware::Switch sw = firmware->getSwitch(i);
     if (IS_TARANIS(firmware->getBoard())) {
-      if (generalSettings.switchConfig[i] == GeneralSettings::SWITCH_NONE || generalSettings.switchConfig[i] == GeneralSettings::SWITCH_TOGGLE) {
-        continue;
-      }
+      sw.type = Firmware::SwitchType(generalSettings.switchConfig[i]);
     }
-    else {
-      if (i==firmware->getCapability(Switches)-1) {
-        continue;
-      }
+    if (sw.type == Firmware::SWITCH_NONE || sw.type == Firmware::SWITCH_TOGGLE) {
+      continue;
     }
     QLabel * label = new QLabel(this);
     QSlider * slider = new QSlider(this);
@@ -678,14 +694,8 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
     slider->setSingleStep(1);
     slider->setPageStep(1);
     slider->setTickInterval(1);
-    if (IS_TARANIS(board)) {
-      label->setText(switchesX9D[i]);
-      slider->setMaximum(generalSettings.switchConfig[i] == GeneralSettings::SWITCH_3POS ? 2 : 1);
-    }
-    else {
-      label->setText(switches9X[i]);
-      slider->setMaximum(i==0 ? 2 : 1);
-    }
+    label->setText(sw.name);
+    slider->setMaximum(sw.type == Firmware::SWITCH_3POS ? 2 : 1);
     cb->setProperty("index", i);
     ui->switchesStartupLayout->addWidget(label, 0, i+1);
     ui->switchesStartupLayout->setAlignment(label, Qt::AlignCenter);
@@ -701,8 +711,7 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
     QWidget::setTabOrder(slider, cb);
     prevFocus = cb;
   }
-  ui->switchesStartupLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum), 0, firmware->getCapability(Switches));
-
+  
   // Pot warnings
   prevFocus = ui->potWarningMode;
   if (IS_TARANIS(board)) {
@@ -713,7 +722,7 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
       ui->potWarningLayout->addWidget(cb, 0, i+1);
       connect(cb, SIGNAL(toggled(bool)), this, SLOT(potWarningToggled(bool)));
       potWarningCheckboxes << cb;
-      if (RawSource(SOURCE_TYPE_STICK, NUM_STICKS+i).isPot()) {
+      if (RawSource(SOURCE_TYPE_STICK, CPN_MAX_STICKS+i).isPot()) {
         if (!generalSettings.isPotAvailable(i)) {
           cb->hide();
         }
@@ -747,9 +756,9 @@ SetupPanel::SetupPanel(QWidget *parent, ModelData & model, GeneralSettings & gen
   }
 
   if (firmware->getCapability(ModelTrainerEnable)) {
-    modules[C9X_NUM_MODULES] = new ModulePanel(this, model, model.moduleData[C9X_NUM_MODULES], generalSettings, firmware, -1);
-    ui->modulesLayout->addWidget(modules[C9X_NUM_MODULES]);
-    connect(modules[C9X_NUM_MODULES], SIGNAL(modified()), this, SLOT(onChildModified()));
+    modules[CPN_MAX_MODULES] = new ModulePanel(this, model, model.moduleData[CPN_MAX_MODULES], generalSettings, firmware, -1);
+    ui->modulesLayout->addWidget(modules[CPN_MAX_MODULES]);
+    connect(modules[CPN_MAX_MODULES], SIGNAL(modified()), this, SLOT(onChildModified()));
   }
 
   disableMouseScrolling();
@@ -813,7 +822,7 @@ void SetupPanel::on_image_currentIndexChanged(int index)
   if (!lock) {
     strncpy(model->bitmap, ui->image->currentText().toLatin1(), 10);
     QString path = g.profile[g.id()].sdPath();
-    path.append("/BMP/");
+    path.append("/IMAGES/");
     QDir qd(path);
     if (qd.exists()) {
       QString fileName=path;
@@ -905,7 +914,7 @@ void SetupPanel::update()
   for (int i=0; i<firmware->getCapability(Timers); i++)
     timers[i]->update();
 
-  for (int i=0; i<C9X_NUM_MODULES+1; i++)
+  for (int i=0; i<CPN_MAX_MODULES+1; i++)
     if (modules[i])
       modules[i]->update();
 }
@@ -921,18 +930,19 @@ void SetupPanel::updateStartupSwitches()
 {
   lock = true;
   
-  unsigned int switchStates = model->switchWarningStates;
-  unsigned int value;
+  uint64_t switchStates = model->switchWarningStates;
+  uint64_t value;
 
   for (int i=0; i<startupSwitchesSliders.size(); i++) {
-    QSlider *slider = startupSwitchesSliders[i];
+    QSlider * slider = startupSwitchesSliders[i];
     QCheckBox * cb = startupSwitchesCheckboxes[i];
     int index = slider->property("index").toInt();
     bool enabled = !(model->switchWarningEnable & (1 << index));
     if (IS_TARANIS(GetEepromInterface()->getBoard())) {
       value = (switchStates >> 2*index) & 0x03;
-      if (generalSettings.switchConfig[index] != GeneralSettings::SWITCH_3POS && value == 2)
+      if (generalSettings.switchConfig[index] != Firmware::SWITCH_3POS && value == 2) {
         value = 1;
+      }
     }
     else {
       value = (i==0 ? switchStates & 0x3 : switchStates & 0x1);
@@ -950,12 +960,12 @@ void SetupPanel::startupSwitchEdited(int value)
 {
   if (!lock) {
     int shift = 0;
-    unsigned int mask;
+    uint64_t mask;
     int index = sender()->property("index").toInt();
 
     if (IS_TARANIS(GetEepromInterface()->getBoard())) {
       shift = index * 2;
-      mask = 0x03 << shift;
+      mask = 0x03ul << shift;
     }
     else {
       if (index == 0) {
@@ -963,18 +973,20 @@ void SetupPanel::startupSwitchEdited(int value)
       }
       else {
         shift = index+1;
-        mask = 0x01 << shift;
+        mask = 0x01ul << shift;
       }
     }
 
     model->switchWarningStates &= ~mask;
     
-    if (IS_TARANIS(GetEepromInterface()->getBoard()) && generalSettings.switchConfig[index] != GeneralSettings::SWITCH_3POS) {
-      if (value == 1) value = 2;
+    if (IS_TARANIS(GetEepromInterface()->getBoard()) && generalSettings.switchConfig[index] != Firmware::SWITCH_3POS) {
+      if (value == 1) {
+        value = 2;
+      }
     }
 
     if (value) {
-      model->switchWarningStates |= (value << shift);
+      model->switchWarningStates |= ((uint64_t)value << shift);
     }
 
     updateStartupSwitches();

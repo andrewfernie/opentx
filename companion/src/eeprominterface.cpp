@@ -1,14 +1,33 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include <stdio.h>
 #include <list>
 #include <float.h>
 #include <QtWidgets>
+#include <stdlib.h>
 #include "eeprominterface.h"
 #include "firmwares/er9x/er9xinterface.h"
-#include "firmwares/th9x/th9xinterface.h"
-#include "firmwares/gruvin9x/gruvin9xinterface.h"
+#include "firmwares/ersky9x/ersky9xinterface.h"
 #include "firmwares/opentx/opentxinterface.h"
 #include "firmwares/opentx/opentxeeprom.h"
-#include "firmwares/ersky9x/ersky9xinterface.h"
 #include "appdata.h"
 #include "helpers.h"
 #include "wizarddata.h"
@@ -16,19 +35,14 @@
 
 std::list<QString> EEPROMWarnings;
 
-const char * switches9X[] = { "3POS", "THR", "RUD", "ELE", "AIL", "GEA", "TRN" };
-const char * switchesX9D[] = { "SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SP", "SQ", "SR" };
-const char leftArrow[] = {(char)0xE2, (char)0x86, (char)0x90, 0};
-const char rightArrow[] = {(char)0xE2, (char)0x86, (char)0x92, 0};
-const char upArrow[] = {(char)0xE2, (char)0x86, (char)0x91, 0};
-const char downArrow[] = {(char)0xE2, (char)0x86, (char)0x93, 0};
-
 const uint8_t chout_ar[] = { // First number is 0..23 -> template setup,  Second is relevant channel out
   1,2,3,4 , 1,2,4,3 , 1,3,2,4 , 1,3,4,2 , 1,4,2,3 , 1,4,3,2,
   2,1,3,4 , 2,1,4,3 , 2,3,1,4 , 2,3,4,1 , 2,4,1,3 , 2,4,3,1,
   3,1,2,4 , 3,1,4,2 , 3,2,1,4 , 3,2,4,1 , 3,4,1,2 , 3,4,2,1,
   4,1,2,3 , 4,1,3,2 , 4,2,1,3 , 4,2,3,1 , 4,3,1,2 , 4,3,2,1
 };
+
+static const char specialCharsTab[] = "_-.,";
 
 void setEEPROMString(char *dst, const char *src, int size)
 {
@@ -44,6 +58,52 @@ void setEEPROMString(char *dst, const char *src, int size)
 void getEEPROMString(char *dst, const char *src, int size)
 {
   memcpy(dst, src, size);
+  dst[size] = '\0';
+  for (int i=size-1; i>=0; i--) {
+    if (dst[i] == ' ')
+      dst[i] = '\0';
+    else
+      break;
+  }
+}
+
+int8_t char2idx(char c)
+{
+  if (c==' ') return 0;
+  if (c>='A' && c<='Z') return 1+c-'A';
+  if (c>='a' && c<='z') return -1-c+'a';
+  if (c>='0' && c<='9') return 27+c-'0';
+  for (int8_t i=0;;i++) {
+    char cc = specialCharsTab[i];
+    if (cc==0) return 0;
+    if (cc==c) return 37+i;
+  }
+}
+
+#define ZCHAR_MAX 40
+char idx2char(int8_t idx)
+{
+  if (idx == 0) return ' ';
+  if (idx < 0) {
+    if (idx > -27) return 'a' - idx - 1;
+    idx = -idx;
+  }
+  if (idx < 27) return 'A' + idx - 1;
+  if (idx < 37) return '0' + idx - 27;
+  if (idx <= ZCHAR_MAX) return specialCharsTab[idx-37];
+  return ' ';
+}
+
+void setEEPROMZString(char *dst, const char *src, int size)
+{
+  for (int i=size-1; i>=0; i--)
+    dst[i] = char2idx(src[i]);
+}
+
+void getEEPROMZString(char *dst, const char *src, int size)
+{
+  for (int i=size-1; i>=0; i--)
+    dst[i] = idx2char(src[i]);
   dst[size] = '\0';
   for (int i=size-1; i>=0; i--) {
     if (dst[i] == ' ')
@@ -500,7 +560,7 @@ QString RawSource::toString(const ModelData * model) const
     case SOURCE_TYPE_MAX:
       return QObject::tr("MAX");
     case SOURCE_TYPE_SWITCH:
-      return (IS_TARANIS(GetEepromInterface()->getBoard()) ? CHECK_IN_ARRAY(switchesX9D, index) : CHECK_IN_ARRAY(switches9X, index));
+      return GetCurrentFirmware()->getSwitch(index).name;
     case SOURCE_TYPE_CUSTOM_SWITCH:
       return QObject::tr("L%1").arg(index+1);
     case SOURCE_TYPE_CYC:
@@ -531,28 +591,15 @@ QString RawSource::toString(const ModelData * model) const
 bool RawSource::isPot() const
 {
   return (type == SOURCE_TYPE_STICK &&
-          index >= NUM_STICKS &&
-          index < NUM_STICKS+GetCurrentFirmware()->getCapability(Pots));
+          index >= CPN_MAX_STICKS &&
+          index < CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots));
 }
 
 bool RawSource::isSlider() const
 {
   return (type == SOURCE_TYPE_STICK &&
-          index >= NUM_STICKS+GetCurrentFirmware()->getCapability(Pots) &&
-          index < NUM_STICKS+GetCurrentFirmware()->getCapability(Pots)+GetCurrentFirmware()->getCapability(Sliders));
-}
-
-
-QString SwitchUp(const char sw)
-{
-  const char result[] = {'S', sw, upArrow[0], upArrow[1], upArrow[2], 0};
-  return QString::fromUtf8(result);
-}
-
-QString SwitchDn(const char sw)
-{
-  const char result[] = {'S', sw, downArrow[0], downArrow[1], downArrow[2], 0};
-  return QString::fromUtf8(result);
+          index >= CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots) &&
+          index < CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots)+GetCurrentFirmware()->getCapability(Sliders));
 }
 
 QString RawSwitch::toString() const
@@ -561,27 +608,6 @@ QString RawSwitch::toString() const
     QString("THR"), QString("RUD"), QString("ELE"),
     QString("ID0"), QString("ID1"), QString("ID2"),
     QString("AIL"), QString("GEA"), QString("TRN")
-  };
-
-  static const QString switchesX9D[] = {
-    SwitchUp('A'), QString::fromUtf8("SA-"), SwitchDn('A'),
-    SwitchUp('B'), QString::fromUtf8("SB-"), SwitchDn('B'),
-    SwitchUp('C'), QString::fromUtf8("SC-"), SwitchDn('C'),
-    SwitchUp('D'), QString::fromUtf8("SD-"), SwitchDn('D'),
-    SwitchUp('E'), QString::fromUtf8("SE-"), SwitchDn('E'),
-    SwitchUp('F'), QString::fromUtf8("SF-"), SwitchDn('F'),
-    SwitchUp('G'), QString::fromUtf8("SG-"), SwitchDn('G'),
-    SwitchUp('H'), QString::fromUtf8("SH-"), SwitchDn('H'),
-    SwitchUp('I'), QString::fromUtf8("SI-"), SwitchDn('I'),
-    SwitchUp('J'), QString::fromUtf8("SJ-"), SwitchDn('J'),
-    SwitchUp('K'), QString::fromUtf8("SK-"), SwitchDn('K'),
-    SwitchUp('L'), QString::fromUtf8("SL-"), SwitchDn('L'),
-    SwitchUp('M'), QString::fromUtf8("SM-"), SwitchDn('M'),
-    SwitchUp('N'), QString::fromUtf8("SN-"), SwitchDn('N'),
-    SwitchUp('O'), QString::fromUtf8("SO-"), SwitchDn('O'),
-    SwitchUp('P'), QString::fromUtf8("SP-"), SwitchDn('P'),
-    SwitchUp('Q'), QString::fromUtf8("SQ-"), SwitchDn('Q'),
-    SwitchUp('R'), QString::fromUtf8("SR-"), SwitchDn('R'),
   };
 
   static const QString flightModes[] = {
@@ -616,10 +642,15 @@ QString RawSwitch::toString() const
   else {
     switch(type) {
       case SWITCH_TYPE_SWITCH:
-        if (IS_TARANIS(GetEepromInterface()->getBoard()))
-          return CHECK_IN_ARRAY(switchesX9D, index-1);
-        else
-          return CHECK_IN_ARRAY(switches9X, index-1);
+        if (IS_TARANIS(GetEepromInterface()->getBoard())) {
+          div_t qr = div(index-1, 3);
+          Firmware::Switch sw = GetCurrentFirmware()->getSwitch(qr.quot);
+          const char * positions[] = { ARROW_UP, "-", ARROW_DOWN };
+          return QString(sw.name) + QString(positions[qr.rem]);
+        }
+        else {
+          return CHECK_IN_ARRAY(switches9X, index - 1);
+        }
       case SWITCH_TYPE_VIRTUAL:
         return QObject::tr("L%1").arg(index);
       case SWITCH_TYPE_MULTIPOS_POT:
@@ -839,7 +870,7 @@ void CustomFunctionData::populateResetParams(const ModelData * model, QComboBox 
     b->setCurrentIndex(value);
   }
   if (model && IS_ARM(board)) {
-    for (int i=0; i<C9X_MAX_SENSORS; ++i) {
+    for (int i=0; i<CPN_MAX_SENSORS; ++i) {
       if (model->sensorData[i].isAvailable()) {
         RawSource item = RawSource(SOURCE_TYPE_TELEMETRY, 3*i);
         b->addItem(item.toString(model), val+i);
@@ -1008,17 +1039,17 @@ bool GeneralSettings::switchPositionAllowedTaranis(int index) const
   if (index == 0)
     return true;
   SwitchInfo info = switchInfoFromSwitchPositionTaranis(abs(index));
-  if (index < 0 && switchConfig[info.index] != SWITCH_3POS)
+  if (index < 0 && switchConfig[info.index] != Firmware::SWITCH_3POS)
     return false;
   else if (info.position == 1)
-    return switchConfig[info.index] == SWITCH_3POS;
+    return switchConfig[info.index] == Firmware::SWITCH_3POS;
   else
-    return switchConfig[info.index] != SWITCH_NONE;
+    return switchConfig[info.index] != Firmware::SWITCH_NONE;
 }
 
 bool GeneralSettings::switchSourceAllowedTaranis(int index) const
 {
-  return switchConfig[index] != SWITCH_NONE;
+  return switchConfig[index] != Firmware::SWITCH_NONE;
 }
 
 bool GeneralSettings::isPotAvailable(int index) const
@@ -1040,26 +1071,22 @@ GeneralSettings::GeneralSettings()
   contrast  = 25;
   vBatWarn  = 90;
 
-  for (int i=0; i<NUM_STICKS+C9X_NUM_POTS; ++i) {
+  for (int i=0; i<CPN_MAX_STICKS+CPN_MAX_POTS; ++i) {
     calibMid[i]     = 0x200;
     calibSpanNeg[i] = 0x180;
     calibSpanPos[i] = 0x180;
   }
-
+  
+  for (int i=0; i<GetCurrentFirmware()->getCapability(Switches); i++) {
+    switchConfig[i] = GetCurrentFirmware()->getSwitch(i).type;
+  }
+  
   BoardEnum board = GetEepromInterface()->getBoard();
   if (IS_TARANIS(board)) {
     potConfig[0] = POT_WITH_DETENT;
     potConfig[1] = POT_WITH_DETENT;
     sliderConfig[0] = SLIDER_WITH_DETENT;
     sliderConfig[1] = SLIDER_WITH_DETENT;
-    switchConfig[0] = SWITCH_3POS;
-    switchConfig[1] = SWITCH_3POS;
-    switchConfig[2] = SWITCH_3POS;
-    switchConfig[3] = SWITCH_3POS;
-    switchConfig[4] = SWITCH_3POS;
-    switchConfig[5] = SWITCH_2POS;
-    switchConfig[6] = SWITCH_3POS;
-    switchConfig[7] = SWITCH_TOGGLE;
   }
   else {
     for (int i=0; i<3; i++) {
@@ -1096,11 +1123,11 @@ GeneralSettings::GeneralSettings()
     QString t_SpeakerSet=g.profile[g.id()].speaker();
     QString t_CountrySet=g.profile[g.id()].countryCode();
 
-    if ((t_calib.length()==(NUM_STICKS+potsnum)*12) && (t_trainercalib.length()==16)) {
+    if ((t_calib.length()==(CPN_MAX_STICKS+potsnum)*12) && (t_trainercalib.length()==16)) {
       QString Byte;
       int16_t byte16;
       bool ok;
-      for (int i=0; i<(NUM_STICKS+potsnum); i++) {
+      for (int i=0; i<(CPN_MAX_STICKS+potsnum); i++) {
         Byte=t_calib.mid(i*12,4);
         byte16=(int16_t)Byte.toInt(&ok,16);
         if (ok)
@@ -1180,7 +1207,7 @@ GeneralSettings::GeneralSettings()
 
 int GeneralSettings::getDefaultStick(unsigned int channel) const
 {
-  if (channel >= NUM_STICKS)
+  if (channel >= CPN_MAX_STICKS)
     return -1;
   else
     return chout_ar[4*templateSetup + channel] - 1;
@@ -1274,14 +1301,14 @@ ModelData & ModelData::operator = (const ModelData & src)
 
 ExpoData * ModelData::insertInput(const int idx)
 {
-  memmove(&expoData[idx+1], &expoData[idx], (C9X_MAX_EXPOS-(idx+1))*sizeof(ExpoData));
+  memmove(&expoData[idx+1], &expoData[idx], (CPN_MAX_EXPOS-(idx+1))*sizeof(ExpoData));
   expoData[idx].clear();
   return &expoData[idx];
 }
 
 bool ModelData::isInputValid(const unsigned int idx) const
 {
-  for (int i=0; i<C9X_MAX_EXPOS; i++) {
+  for (int i=0; i<CPN_MAX_EXPOS; i++) {
     const ExpoData * expo = &expoData[i];
     if (expo->mode == 0) break;
     if (expo->chn == idx)
@@ -1292,7 +1319,7 @@ bool ModelData::isInputValid(const unsigned int idx) const
 
 bool ModelData::hasExpos(uint8_t inputIdx) const
 {
-  for (int i=0; i<C9X_MAX_EXPOS; i++) {
+  for (int i=0; i<CPN_MAX_EXPOS; i++) {
     const ExpoData & expo = expoData[i];
     if (expo.chn==inputIdx && expo.mode!=0) {
       return true;
@@ -1304,7 +1331,7 @@ bool ModelData::hasExpos(uint8_t inputIdx) const
 bool ModelData::hasMixes(uint8_t channelIdx) const
 {
   channelIdx += 1;
-  for (int i=0; i<C9X_MAX_MIXERS; i++) {
+  for (int i=0; i<CPN_MAX_MIXERS; i++) {
     if (mixData[i].destCh == channelIdx) {
       return true;
     }
@@ -1315,7 +1342,7 @@ bool ModelData::hasMixes(uint8_t channelIdx) const
 QVector<const ExpoData *> ModelData::expos(int input) const
 {
   QVector<const ExpoData *> result;
-  for (int i=0; i<C9X_MAX_EXPOS; i++) {
+  for (int i=0; i<CPN_MAX_EXPOS; i++) {
     const ExpoData * ed = &expoData[i];
     if ((int)ed->chn==input && ed->mode!=0) {
       result << ed;
@@ -1327,7 +1354,7 @@ QVector<const ExpoData *> ModelData::expos(int input) const
 QVector<const MixData *> ModelData::mixes(int channel) const
 {
   QVector<const MixData *> result;
-  for (int i=0; i<C9X_MAX_MIXERS; i++) {
+  for (int i=0; i<CPN_MAX_MIXERS; i++) {
     const MixData * md = &mixData[i];
     if ((int)md->destCh == channel+1) {
       result << md;
@@ -1340,12 +1367,12 @@ void ModelData::removeInput(const int idx)
 {
   unsigned int chn = expoData[idx].chn;
 
-  memmove(&expoData[idx], &expoData[idx+1], (C9X_MAX_EXPOS-(idx+1))*sizeof(ExpoData));
-  expoData[C9X_MAX_EXPOS-1].clear();
+  memmove(&expoData[idx], &expoData[idx+1], (CPN_MAX_EXPOS-(idx+1))*sizeof(ExpoData));
+  expoData[CPN_MAX_EXPOS-1].clear();
 
   //also remove input name if removing last line for this input
   bool found = false;
-  for (int i=0; i<C9X_MAX_EXPOS; i++) {
+  for (int i=0; i<CPN_MAX_EXPOS; i++) {
     if (expoData[i].mode==0) continue;
     if (expoData[i].chn==chn) {
       found = true;
@@ -1357,12 +1384,12 @@ void ModelData::removeInput(const int idx)
 
 void ModelData::clearInputs()
 {
-  for (int i=0; i<C9X_MAX_EXPOS; i++)
+  for (int i=0; i<CPN_MAX_EXPOS; i++)
     expoData[i].clear();
 
   //clear all input names
   if (GetCurrentFirmware()->getCapability(VirtualInputs)) {
-    for (int i=0; i<C9X_MAX_INPUTS; i++) {
+    for (int i=0; i<CPN_MAX_INPUTS; i++) {
       inputNames[i][0] = 0;
     }
   }
@@ -1370,7 +1397,7 @@ void ModelData::clearInputs()
 
 void ModelData::clearMixes()
 {
-  for (int i=0; i<C9X_MAX_MIXERS; i++)
+  for (int i=0; i<CPN_MAX_MIXERS; i++)
     mixData[i].clear();
 }
 
@@ -1396,26 +1423,26 @@ void ModelData::clear()
     moduleData[0].protocol = PULSES_PPM;
     moduleData[1].protocol = PULSES_OFF;
   }
-  for (int i=0; i<C9X_MAX_FLIGHT_MODES; i++) {
+  for (int i=0; i<CPN_MAX_FLIGHT_MODES; i++) {
     flightModeData[i].clear(i);
   }
   clearInputs();
   clearMixes();
-  for (int i=0; i<C9X_NUM_CHNOUT; i++)
+  for (int i=0; i<CPN_MAX_CHNOUT; i++)
     limitData[i].clear();
-  for (int i=0; i<NUM_STICKS; i++)
+  for (int i=0; i<CPN_MAX_STICKS; i++)
     expoData[i].clear();
-  for (int i=0; i<C9X_NUM_CSW; i++)
+  for (int i=0; i<CPN_MAX_CSW; i++)
     logicalSw[i].clear();
-  for (int i=0; i<C9X_MAX_CUSTOM_FUNCTIONS; i++)
+  for (int i=0; i<CPN_MAX_CUSTOM_FUNCTIONS; i++)
     customFn[i].clear();
-  for (int i=0; i<C9X_MAX_CURVES; i++)
+  for (int i=0; i<CPN_MAX_CURVES; i++)
     curves[i].clear(5);
-  for (int i=0; i<C9X_MAX_TIMERS; i++)
+  for (int i=0; i<CPN_MAX_TIMERS; i++)
     timers[i].clear();
   swashRingData.clear();
   frsky.clear();
-  for (int i=0; i<C9X_MAX_SENSORS; i++)
+  for (int i=0; i<CPN_MAX_SENSORS; i++)
     sensorData[i].clear();
 }
 
@@ -1455,7 +1482,7 @@ QString removeAccents(const QString & str)
 void ModelData::setDefaultInputs(const GeneralSettings & settings)
 {
   if (IS_TARANIS(GetEepromInterface()->getBoard())) {
-    for (int i=0; i<NUM_STICKS; i++) {
+    for (int i=0; i<CPN_MAX_STICKS; i++) {
       ExpoData * expo = &expoData[i];
       expo->chn = i;
       expo->mode = INPUT_MODE_BOTH;
@@ -1472,7 +1499,7 @@ void ModelData::setDefaultMixes(const GeneralSettings & settings)
     setDefaultInputs(settings);
   }
 
-  for (int i=0; i<NUM_STICKS; i++) {
+  for (int i=0; i<CPN_MAX_STICKS; i++) {
     MixData * mix = &mixData[i];
     mix->destCh = i+1;
     mix->weight = 100;
@@ -1490,7 +1517,7 @@ void ModelData::setDefaultValues(unsigned int id, const GeneralSettings & settin
   clear();
   used = true;
   sprintf(name, "MODEL%02d", id+1);
-  for (int i=0; i<C9X_NUM_MODULES; i++) {
+  for (int i=0; i<CPN_MAX_MODULES; i++) {
     moduleData[i].modelId = id+1;
   }
   setDefaultMixes(settings);
@@ -1499,7 +1526,7 @@ void ModelData::setDefaultValues(unsigned int id, const GeneralSettings & settin
 int ModelData::getTrimValue(int phaseIdx, int trimIdx)
 {
   int result = 0;
-  for (int i=0; i<C9X_MAX_FLIGHT_MODES; i++) {
+  for (int i=0; i<CPN_MAX_FLIGHT_MODES; i++) {
     FlightModeData & phase = flightModeData[phaseIdx];
     if (phase.trimMode[trimIdx] < 0) {
       return result;
@@ -1526,7 +1553,7 @@ bool ModelData::isGVarLinked(int phaseIdx, int gvarIdx)
 int ModelData::getGVarFieldValue(int phaseIdx, int gvarIdx)
 {
   int idx = flightModeData[phaseIdx].gvars[gvarIdx];
-  for (int i=0; idx>1024 && i<C9X_MAX_FLIGHT_MODES; i++) {
+  for (int i=0; idx>1024 && i<CPN_MAX_FLIGHT_MODES; i++) {
     int nextPhase = idx - 1025;
     if (nextPhase >= phaseIdx) nextPhase += 1;
     phaseIdx = nextPhase;
@@ -1537,7 +1564,7 @@ int ModelData::getGVarFieldValue(int phaseIdx, int gvarIdx)
 
 void ModelData::setTrimValue(int phaseIdx, int trimIdx, int value)
 {
-  for (uint8_t i=0; i<C9X_MAX_FLIGHT_MODES; i++) {
+  for (uint8_t i=0; i<CPN_MAX_FLIGHT_MODES; i++) {
     FlightModeData & phase = flightModeData[phaseIdx];
     int mode = phase.trimMode[trimIdx];
     int p = phase.trimRef[trimIdx];
@@ -1574,13 +1601,13 @@ ModelData ModelData::removeGlobalVars()
 {
   ModelData result = *this;
 
-  for (int i=0; i<C9X_MAX_MIXERS; i++) {
+  for (int i=0; i<CPN_MAX_MIXERS; i++) {
     removeGlobalVar(mixData[i].weight);
     removeGlobalVar(mixData[i].curve.value);
     removeGlobalVar(mixData[i].sOffset);
   }
 
-  for (int i=0; i<C9X_MAX_EXPOS; i++) {
+  for (int i=0; i<CPN_MAX_EXPOS; i++) {
     removeGlobalVar(expoData[i].weight);
     removeGlobalVar(expoData[i].curve.value);
   }
@@ -1604,13 +1631,10 @@ void registerEEpromInterfaces()
   eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_GRUVIN9X));
   eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_SKY9X));
   eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_9XRPRO));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_PLUS));
+  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_X9D));
+  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_X9DP));
   eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_X9E));
-  eepromInterfaces.push_back(new Gruvin9xInterface(BOARD_STOCK));
-  eepromInterfaces.push_back(new Gruvin9xInterface(BOARD_GRUVIN9X));
   eepromInterfaces.push_back(new Ersky9xInterface());
-  eepromInterfaces.push_back(new Th9xInterface());
   eepromInterfaces.push_back(new Er9xInterface());
 }
 
@@ -1678,65 +1702,36 @@ void ShowEepromWarnings(QWidget *parent, const QString &title, unsigned long err
   msgBox.exec();
 }
 
-unsigned long LoadEeprom(RadioData &radioData, const uint8_t *eeprom, const int size)
+QString getBoardName(BoardEnum board)
 {
-  std::bitset<NUM_ERRORS> errors;
-
-  foreach(EEPROMInterface *eepromInterface, eepromInterfaces) {
-    std::bitset<NUM_ERRORS> result((unsigned long long)eepromInterface->load(radioData, eeprom, size));
-    if (result.test(ALL_OK)) {
-      return result.to_ulong();
-    }
-    else {
-      errors |= result;
-    }
+  switch (board) {
+    case BOARD_STOCK:
+      return "9X";
+    case BOARD_M128:
+      return "9X128";
+    case BOARD_GRUVIN9X:
+      return "Gruvin9x";
+    case BOARD_MEGA2560:
+      return "MEGA2560";
+    case BOARD_X7D:
+      return "X7D";  
+    case BOARD_TARANIS_X9D:
+      return "Taranis X9D";
+    case BOARD_TARANIS_X9DP:
+      return "Taranis X9D+";
+    case BOARD_TARANIS_X9E:
+      return "Taranis X9E";  
+    case BOARD_SKY9X:
+      return "Sky9x";
+    case BOARD_9XRPRO:
+      return "9XR-PRO";
+    case BOARD_AR9X:
+      return "AR9X";
+    case BOARD_HORUS:
+      return "Horus";  
+    default:
+      return "Unknown";
   }
-
-  if (errors.none()) {
-    errors.set(UNKNOWN_ERROR);
-  }
-  return errors.to_ulong();
-}
-
-unsigned long LoadBackup(RadioData & radioData, uint8_t * eeprom, int size, int index)
-{
-  std::bitset<NUM_ERRORS> errors;
-
-  foreach(EEPROMInterface *eepromInterface, eepromInterfaces) {
-    std::bitset<NUM_ERRORS> result((unsigned long long)eepromInterface->loadBackup(radioData, eeprom, size, index));
-    if (result.test(ALL_OK)) {
-      return result.to_ulong();
-    }
-    else {
-      errors |= result;
-    }
-  }
-
-  if (errors.none()) {
-    errors.set(UNKNOWN_ERROR);
-  }
-  return errors.to_ulong();
-}
-
-
-unsigned long LoadEepromXml(RadioData & radioData, QDomDocument & doc)
-{
-  std::bitset<NUM_ERRORS> errors;
-
-  foreach(EEPROMInterface * eepromInterface, eepromInterfaces) {
-    std::bitset<NUM_ERRORS> result((unsigned long long)eepromInterface->loadxml(radioData, doc));
-    if (result.test(ALL_OK)) {
-      return result.to_ulong();
-    }
-    else {
-      errors |= result;
-    }
-  }
-
-  if (errors.none()) {
-    errors.set(UNKNOWN_ERROR);
-  }
-  return errors.to_ulong();
 }
 
 const int Firmware::getFlashSize()
@@ -1754,8 +1749,8 @@ const int Firmware::getFlashSize()
     case BOARD_9XRPRO:
     case BOARD_AR9X:
       return FSIZE_9XRPRO;
-    case BOARD_TARANIS:
-    case BOARD_TARANIS_PLUS:
+    case BOARD_TARANIS_X9D:
+    case BOARD_TARANIS_X9DP:
     case BOARD_TARANIS_X9E:
     case BOARD_FLAMENCO:
       return FSIZE_TARANIS;
@@ -1863,10 +1858,10 @@ void FlightModeData::clear(const int phase)
 {
   memset(this, 0, sizeof(FlightModeData));
   if (phase != 0) {
-    for (int idx=0; idx<C9X_MAX_GVARS; idx++) {
+    for (int idx=0; idx<CPN_MAX_GVARS; idx++) {
       gvars[idx] = 1025;
     }
-    for (int idx=0; idx<C9X_MAX_ENCODERS; idx++) {
+    for (int idx=0; idx<CPN_MAX_ENCODERS; idx++) {
       rotaryEncoders[idx] = 1025;
     }
   }

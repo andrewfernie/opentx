@@ -21,9 +21,9 @@
 #include "opentx.h"
 #include "storage/modelslist.h"
 
-#define CATEGORIES_WIDTH               127
-#define MODELS_LEFT                    147
-#define MODELS_COLUMN_WIDTH            162
+#define CATEGORIES_WIDTH               120
+#define MODELS_LEFT                    123
+#define MODELS_COLUMN_WIDTH            174
 
 enum ModelSelectMode {
   MODE_SELECT_MODEL,
@@ -46,11 +46,11 @@ ModelCell * currentModel;
 void drawCategory(coord_t y, const char * name, bool selected)
 {
   if (selected) {
-    lcdDrawSolidFilledRect(5, y-INVERT_VERT_MARGIN, CATEGORIES_WIDTH-10, INVERT_LINE_HEIGHT+2, TEXT_INVERTED_BGCOLOR);
-    lcdDrawText(10, y, name, TEXT_COLOR | INVERS);
+    lcdDrawSolidFilledRect(1, y-INVERT_VERT_MARGIN, CATEGORIES_WIDTH-10, INVERT_LINE_HEIGHT+2, TEXT_INVERTED_BGCOLOR);
+    lcdDrawText(6, y, name, SMLSIZE | TEXT_COLOR | INVERS);
   }
   else {
-    lcdDrawText(10, y, name, TEXT_COLOR);
+    lcdDrawText(6, y, name, TEXT_COLOR);
   }
 }
 
@@ -98,6 +98,127 @@ void setCurrentCategory(unsigned int index)
     currentModel = NULL;
 }
 
+#if defined(LUA)
+
+#define MAX_WIZARD_NAME_LEN            (sizeof(WIZARD_PATH)+20)
+#define WIZARD_SPACING                 40
+#define WIZARD_LEFT_SPACING            30
+#define WIZARD_ICON_X                  80
+#define WIZARD_ICON_Y                  110
+#define WIZARD_TEXT_Y                  195
+
+uint8_t getWizardNumber()
+{
+  uint8_t wizNbr=0;
+  DIR dir;
+  static FILINFO fno;
+
+  FRESULT res = f_opendir(&dir, WIZARD_PATH);
+  if (res == FR_OK) {
+    for (;;) {
+      res = f_readdir(&dir, &fno);
+      if (res != FR_OK || fno.fname[0] == 0) {
+        break;
+      }
+      if (fno.fattrib & AM_DIR) {
+        wizNbr++;
+      }
+    }
+  }
+  return wizNbr;
+}
+
+bool menuModelWizard(event_t event)
+{
+  static uint8_t wizardSelected;
+  static uint8_t wizardNumber;
+  bool executeMe = false;
+  uint8_t first = 0;
+  DIR dir;
+  static FILINFO fno;
+  char wizpath[MAX_WIZARD_NAME_LEN];
+
+  if(wizardNumber == 0) {
+    wizardNumber = getWizardNumber();
+  }
+
+  switch(event) {
+   case 0:
+     // no need to refresh the screen
+     return false;
+
+  case EVT_KEY_FIRST(KEY_EXIT):
+    chainMenu(menuModelSelect);
+    return false;
+
+  case EVT_KEY_BREAK(KEY_ENTER):
+    executeMe = true;
+    break;
+
+  case EVT_ROTARY_RIGHT:
+    if (wizardSelected < wizardNumber-1) {
+      wizardSelected++;
+    }
+    if (wizardSelected > 3) {
+      first = wizardSelected - 3;
+    }
+    break;
+
+  case EVT_ROTARY_LEFT:
+    if (wizardSelected != 0) {
+      wizardSelected--;
+    }
+    if(wizardSelected < first)
+    {
+      first = wizardSelected;
+    }
+    break;
+  }
+  strncpy(wizpath, WIZARD_PATH, sizeof(WIZARD_PATH));
+  strcpy(&wizpath[sizeof(WIZARD_PATH)-1], "/");
+  lcdDrawSolidFilledRect(0, 0, LCD_W, LCD_H, TEXT_BGCOLOR);
+  lcd->drawBitmap(0, 0, BitmapBuffer::load(getThemePath("wizard/background.png")));
+  FRESULT res = f_opendir(&dir, WIZARD_PATH);
+  if (res == FR_OK) {
+    for (uint8_t wizidx=0;;wizidx++) {
+      res = f_readdir(&dir, &fno);
+      if (res != FR_OK || fno.fname[0] == 0) {
+        break;
+      }
+      if (fno.fattrib & AM_DIR) {
+        if((wizidx >= first) && (wizidx < (first+4))) {
+          uint16_t x = WIZARD_LEFT_SPACING + (wizidx - first) * (WIZARD_SPACING + WIZARD_ICON_X);
+          strcpy(&wizpath[sizeof(WIZARD_PATH)], fno.fname);
+          strcpy(&wizpath[sizeof(WIZARD_PATH) + strlen(fno.fname)], "/icon.png");
+          lcdDrawText(x + 10, WIZARD_TEXT_Y, fno.fname);
+          lcd->drawBitmap(x, WIZARD_ICON_Y, BitmapBuffer::load(wizpath));
+          if(wizidx == wizardSelected ) {
+            if (wizardSelected < 5) {
+              lcdDrawRect(x, WIZARD_ICON_Y, 85, 130, 2, SOLID, MAINVIEW_GRAPHICS_COLOR_INDEX);
+              lcdDrawRect(x+5, WIZARD_TEXT_Y, 75, 4, 2, SOLID, MAINVIEW_GRAPHICS_COLOR_INDEX);
+            }
+            if (executeMe) {
+              strcpy(&wizpath[sizeof(WIZARD_PATH)+strlen(fno.fname)], "/wizard.lua");
+              if (isFileAvailable(wizpath)) {
+                wizpath[sizeof(WIZARD_PATH) + strlen(fno.fname)] = 0;
+                f_chdir(wizpath);
+                luaExec(WIZARD_NAME);
+              }
+            }
+          }
+        }
+      }
+    }
+    f_closedir(&dir);
+    if(wizardNumber == 0) {
+      lcdDrawText(40, LCD_H / 2, STR_SDCARD_NOWIZ);
+      return true;
+    }
+  }
+  return true;
+}
+#endif
+
 void onModelSelectMenu(const char * result)
 {
   if (result == STR_SELECT_MODEL) {
@@ -121,6 +242,9 @@ void onModelSelectMenu(const char * result)
     currentModel = modelslist.currentModel = modelslist.addModel(currentCategory, createModel());
     selectMode = MODE_SELECT_MODEL;
     setCurrentModel(currentCategory->size() - 1);
+#if defined(LUA)
+    chainMenu(menuModelWizard);
+#endif
   }
   else if (result == STR_DUPLICATE_MODEL) {
     char duplicatedFilename[LEN_MODEL_FILENAME+1];
@@ -313,7 +437,7 @@ bool menuModelSelect(event_t event)
   for (std::list<ModelsCategory *>::iterator it = modelslist.categories.begin(); it != modelslist.categories.end(); ++it, ++index) {
     if (index >= categoriesVerticalOffset && index < categoriesVerticalOffset+5) {
       if (index != categoriesVerticalOffset) {
-        lcdDrawSolidHorizontalLine(5, y-4, CATEGORIES_WIDTH-10, LINE_COLOR);
+        lcdDrawSolidHorizontalLine(1, y-4, CATEGORIES_WIDTH-10, LINE_COLOR);
       }
       if (selectMode == MODE_RENAME_CATEGORY && currentCategory == *it) {
         lcdDrawSolidFilledRect(0, y-INVERT_VERT_MARGIN+1, CATEGORIES_WIDTH-2, INVERT_LINE_HEIGHT, TEXT_BGCOLOR);
@@ -347,7 +471,7 @@ bool menuModelSelect(event_t event)
       }
       if (selected) {
         lcd->drawBitmap(5, LCD_H-FH, modelselModelNameBitmap);
-        lcdDrawText(22, LCD_H-FH-1, (*it)->name, TEXT_COLOR);
+        lcdDrawText(22, LCD_H-FH-1, (*it)->name, SMLSIZE|TEXT_COLOR);
       }
     }
   }
@@ -369,14 +493,14 @@ bool menuModelSelect(event_t event)
       }
     }
   }
-  drawVerticalScrollbar(DEFAULT_SCROLLBAR_X, 7, LCD_H - 15, menuVerticalOffset, (index + 1) / 2, 4);
+  drawVerticalScrollbar(DEFAULT_SCROLLBAR_X + 4, 7, LCD_H - 15, menuVerticalOffset, (index + 1) / 2, 4);
 
   // Footer
   lcd->drawBitmap(5, LCD_H-FH-20, modelselSdFreeBitmap);
   uint32_t size = sdGetSize() / 100;
-  lcdDrawNumber(22, LCD_H-FH-21, size, PREC1, 0, NULL, "GB");
-  lcd->drawBitmap(80, LCD_H-FH-20, modelselModelQtyBitmap);
-  lcdDrawNumber(105, LCD_H-FH-21, modelslist.modelsCount);
+  lcdDrawNumber(22, LCD_H-FH-21, size, PREC1|SMLSIZE, 0, NULL, "GB");
+  lcd->drawBitmap(70, LCD_H-FH-20, modelselModelQtyBitmap);
+  lcdDrawNumber(92, LCD_H-FH-21, modelslist.modelsCount,SMLSIZE);
 
   return true;
 }

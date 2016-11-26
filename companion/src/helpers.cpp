@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include <QtGui>
 #if defined WIN32
   #include <io.h>
@@ -11,10 +31,11 @@
 #include "simulatordialog.h"
 #include "simulatorinterface.h"
 #include "firmwareinterface.h"
+#include "storage/storage_sdcard.h"
 
 Stopwatch gStopwatch("global");
 
-const QColor colors[C9X_MAX_CURVES] = {
+const QColor colors[CPN_MAX_CURVES] = {
   QColor(0,0,127),
   QColor(0,127,0),
   QColor(127,0,0),
@@ -551,11 +572,11 @@ void populateSourceCB(QComboBox *b, const RawSource & source, const GeneralSetti
   }
 
   if (flags & POPULATE_SOURCES) {
-    for (int i=0; i<NUM_STICKS+GetCurrentFirmware()->getCapability(Pots)+GetCurrentFirmware()->getCapability(Sliders); i++) {
+    for (int i=0; i<CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots)+GetCurrentFirmware()->getCapability(Sliders); i++) {
       item = RawSource(SOURCE_TYPE_STICK, i);
       // skip unavailable pots and sliders
-      if (item.isPot() && !generalSettings.isPotAvailable(i-NUM_STICKS)) continue;
-      if (item.isSlider() && !generalSettings.isSliderAvailable(i-NUM_STICKS-GetCurrentFirmware()->getCapability(Pots))) continue;
+      if (item.isPot() && !generalSettings.isPotAvailable(i-CPN_MAX_STICKS)) continue;
+      if (item.isSlider() && !generalSettings.isSliderAvailable(i-CPN_MAX_STICKS-GetCurrentFirmware()->getCapability(Pots))) continue;
       b->addItem(item.toString(model), item.toValue());
       if (item == source) b->setCurrentIndex(b->count()-1);
     }
@@ -600,7 +621,7 @@ void populateSourceCB(QComboBox *b, const RawSource & source, const GeneralSetti
   }
 
   if (flags & POPULATE_SOURCES) {
-    for (int i=0; i<NUM_CYC; i++) {
+    for (int i=0; i<CPN_MAX_CYC; i++) {
       item = RawSource(SOURCE_TYPE_CYC, i);
       b->addItem(item.toString(model), item.toValue());
       if (item == source) b->setCurrentIndex(b->count()-1);
@@ -626,7 +647,7 @@ void populateSourceCB(QComboBox *b, const RawSource & source, const GeneralSetti
         b->addItem(item.toString(model), item.toValue());
         if (item == source) b->setCurrentIndex(b->count()-1);
       }
-      for (int i=0; i<C9X_MAX_SENSORS; ++i) {
+      for (int i=0; i<CPN_MAX_SENSORS; ++i) {
         if (model && model->sensorData[i].isAvailable()) {    //this conditon must be false if we populate Global Functions where model = 0
           for (int j=0; j<3; ++j) {
             item = RawSource(SOURCE_TYPE_TELEMETRY, 3*i+j);
@@ -785,8 +806,9 @@ CompanionIcon::CompanionIcon(const QString &baseimage)
 
 void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
 {
-  SimulatorInterface * si = GetCurrentFirmwareSimulator();
-  if (si) {
+  Firmware * firmware = GetCurrentFirmware();
+  SimulatorInterface * simulator = GetCurrentFirmwareSimulator();
+  if (simulator) {
     RadioData * simuData = new RadioData(radioData);
     unsigned int flags = 0;
     if (modelIdx >= 0) {
@@ -797,14 +819,21 @@ void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
       flags |= SIMULATOR_FLAGS_STICK_MODE_LEFT;
     }
     BoardEnum board = GetCurrentFirmware()->getBoard();
-    SimulatorDialog * sd;
+    SimulatorDialog * dialog;
     if (board == BOARD_HORUS) {
-      sd = new SimulatorDialogHorus(parent, si, flags);
+      dialog = new SimulatorDialogHorus(parent, simulator, flags);
+      StorageSdcard storage;
+      QString sdPath = g.profile[g.id()].sdPath();
+      storage.write(sdPath);
+      dialog->start(NULL);
     }
     else if (board == BOARD_FLAMENCO) {
-      sd = new SimulatorDialogFlamenco(parent, si, flags);
+      dialog = new SimulatorDialogFlamenco(parent, simulator, flags);
+      QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
+      firmware->saveEEPROM((uint8_t *)eeprom.data(), *simuData);
+      dialog->start(eeprom);
     }
-    else if (IS_TARANIS(board)) {
+    else if (board == BOARD_TARANIS_X9D || board == BOARD_TARANIS_X9DP || board == BOARD_TARANIS_X9E) {
       for (int i=0; i<GetCurrentFirmware()->getCapability(Pots); i++) {
         if (radioData.generalSettings.isPotAvailable(i)) {
           flags |= (SIMULATOR_FLAGS_S1 << i);
@@ -813,17 +842,21 @@ void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
           }
         }
       }
-      sd = new SimulatorDialogTaranis(parent, si, flags);
+      dialog = new SimulatorDialogTaranis(parent, simulator, flags);
+      QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
+      firmware->saveEEPROM((uint8_t *)eeprom.data(), *simuData);
+      dialog->start(eeprom);
     }
     else {
-      sd = new SimulatorDialog9X(parent, si, flags);
+      dialog = new SimulatorDialog9X(parent, simulator, flags);
+      QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
+      firmware->saveEEPROM((uint8_t *)eeprom.data(), *simuData, 0, firmware->getCapability(SimulatorVariant));
+      dialog->start(eeprom);
     }
-    QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
-    GetEepromInterface()->save((uint8_t *)eeprom.data(), *simuData, GetCurrentFirmware()->getCapability(SimulatorVariant));
+    
+    dialog->exec();
+    delete dialog;
     delete simuData;
-    sd->start(eeprom);
-    sd->exec();
-    delete sd;
   }
   else {
     QMessageBox::warning(NULL,
@@ -832,25 +865,25 @@ void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
   }
 }
 
-QPixmap makePixMap( QImage image, QString firmwareType )
+QPixmap makePixMap(const QImage & image)
 {
-  if (firmwareType.contains( "taranis" )) {
-    image = image.convertToFormat(QImage::Format_RGB32);
-    QRgb col;
-    int gray;
+  Firmware * firmware = GetCurrentFirmware();
+  QImage result = image.scaled(firmware->getCapability(LcdWidth), firmware->getCapability(LcdHeight));
+  if (firmware->getCapability(LcdDepth) == 4) {
+    result = result.convertToFormat(QImage::Format_RGB32);
     for (int i = 0; i < image.width(); ++i) {
       for (int j = 0; j < image.height(); ++j) {
-        col = image.pixel(i, j);
-        gray = qGray(col);
-        image.setPixel(i, j, qRgb(gray, gray, gray));
+        QRgb col = result.pixel(i, j);
+        int gray = qGray(col);
+        result.setPixel(i, j, qRgb(gray, gray, gray));
       }
     }
-    image = image.scaled(SPLASHX9D_WIDTH, SPLASHX9D_HEIGHT); 
-  } 
-  else {
-    image = image.scaled(SPLASH_WIDTH, SPLASH_HEIGHT).convertToFormat(QImage::Format_Mono);
   }
-  return(QPixmap::fromImage(image));
+  else {
+    result = result.convertToFormat(QImage::Format_Mono);
+  }
+  
+  return QPixmap::fromImage(result);
 }
 
 int version2index(const QString & version)

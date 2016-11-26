@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "ui_simulatordialog-taranis.h"
 
 uint32_t SimulatorDialogTaranis::switchstatus = 0;
@@ -50,14 +70,14 @@ SimulatorDialogTaranis::SimulatorDialogTaranis(QWidget * parent, SimulatorInterf
     }
   }
 
-  ui->trimHR_L->setText(QString::fromUtf8(leftArrow));
-  ui->trimHR_R->setText(QString::fromUtf8(rightArrow));
-  ui->trimVR_U->setText(QString::fromUtf8(upArrow));
-  ui->trimVR_D->setText(QString::fromUtf8(downArrow));
-  ui->trimHL_L->setText(QString::fromUtf8(leftArrow));
-  ui->trimHL_R->setText(QString::fromUtf8(rightArrow));
-  ui->trimVL_U->setText(QString::fromUtf8(upArrow));
-  ui->trimVL_D->setText(QString::fromUtf8(downArrow));
+  ui->trimHR_L->setText(QString::fromUtf8(ARROW_LEFT));
+  ui->trimHR_R->setText(QString::fromUtf8(ARROW_RIGHT));
+  ui->trimVR_U->setText(QString::fromUtf8(ARROW_UP));
+  ui->trimVR_D->setText(QString::fromUtf8(ARROW_DOWN));
+  ui->trimHL_L->setText(QString::fromUtf8(ARROW_LEFT));
+  ui->trimHL_R->setText(QString::fromUtf8(ARROW_RIGHT));
+  ui->trimVL_U->setText(QString::fromUtf8(ARROW_UP));
+  ui->trimVL_D->setText(QString::fromUtf8(ARROW_DOWN));
 
   connect(ui->leftbuttons, SIGNAL(buttonPressed(int)), this, SLOT(onButtonPressed(int)));
   connect(ui->rightbuttons, SIGNAL(buttonPressed(int)), this, SLOT(onButtonPressed(int)));

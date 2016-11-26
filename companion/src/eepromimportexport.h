@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
+ * Copyright (C) OpenTX
  *
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +16,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#ifndef eeprom_importexport_h
-#define eeprom_importexport_h
+#ifndef _EEPROMIMPORTEXPORT_H_
+#define _EEPROMIMPORTEXPORT_H_
 
 #include "customdebug.h"
 
@@ -30,7 +34,7 @@ class DataField {
     virtual const char *getName() { return name; }
     virtual ~DataField() { }
     virtual void ExportBits(QBitArray & output) = 0;
-    virtual void ImportBits(QBitArray & input) = 0;
+    virtual void ImportBits(const QBitArray & input) = 0;
     virtual unsigned int size() = 0;
 
     QBitArray bytesToBits(QByteArray bytes)
@@ -62,7 +66,7 @@ class DataField {
       return 0;
     }
 
-    int Import(QByteArray & input)
+    int Import(const QByteArray & input)
     {
       QBitArray bits = bytesToBits(input);
       ImportBits(bits);
@@ -113,19 +117,19 @@ class BaseUnsignedField: public DataField {
       DataField("Unsigned"),
       field(field),
       min(0),
-      max(UINT_MAX)
+      max(std::numeric_limits<container>::max())
     {
     }
 
-    BaseUnsignedField(container & field, const char *name):
+    BaseUnsignedField(container & field, const char * name):
       DataField(name),
       field(field),
       min(0),
-      max(UINT_MAX)
+      max(std::numeric_limits<container>::max())
     {
     }
 
-    BaseUnsignedField(container & field, unsigned int min, unsigned int max, const char *name="Unsigned"):
+    BaseUnsignedField(container & field, container min, container max, const char * name="Unsigned"):
       DataField(name),
       field(field),
       min(min),
@@ -141,17 +145,18 @@ class BaseUnsignedField: public DataField {
 
       output.resize(N);
       for (int i=0; i<N; i++) {
-        if (value & (1<<i))
+        if (value & ((container)1<<i)) {
           output.setBit(i);
+        }
       }
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       field = 0;
       for (int i=0; i<N; i++) {
         if (input[i])
-          field |= (1<<i);
+          field |= ((container)1<<i);
       }
       eepromImportDebug() << QString("\timported %1<%2>: 0x%3(%4)").arg(name).arg(N).arg(field, 0, 16).arg(field);
     }
@@ -207,7 +212,7 @@ class BoolField: public DataField {
       }
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       field = input[0] ? true : false;
       eepromImportDebug() << QString("\timported %1<%2>: 0x%3(%4)").arg(name).arg(N).arg(field, 0, 16).arg(field);
@@ -265,7 +270,7 @@ class SignedField: public DataField {
       }
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       unsigned int value = 0;
       for (int i=0; i<N; i++) {
@@ -330,7 +335,7 @@ class CharField: public DataField {
       }
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       unsigned int b = 0;
       for (int i=0; i<N; i++) {
@@ -380,7 +385,7 @@ class ZCharField: public DataField {
       }
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       unsigned int b = 0;
       for (int i=0; i<N; i++) {
@@ -441,7 +446,7 @@ class StructField: public DataField {
       }
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       eepromImportDebug() << QString("\timporting %1[%2]:").arg(name).arg(fields.size());
       int offset = 0;
@@ -496,7 +501,7 @@ class TransformedField: public DataField {
       field.ExportBits(output);
     }
 
-    virtual void ImportBits(QBitArray & input)
+    virtual void ImportBits(const QBitArray & input)
     {
       eepromImportDebug() << QString("\timporting TransformedField %1:").arg(field.getName());
       field.ImportBits(input);
@@ -742,4 +747,4 @@ class ConversionField: public TransformedField {
     const QString error;
 };
 
-#endif
+#endif // _EEPROMIMPORTEXPORT_H_

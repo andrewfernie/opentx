@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
+ * Copyright (C) OpenTX
  *
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +16,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#ifndef eeprom_interface_h
-#define eeprom_interface_h
+#ifndef _EEPROMINTERFACE_H_
+#define _EEPROMINTERFACE_H_
 
 #include <string.h>
 #include <QString>
@@ -51,27 +55,20 @@
 #define IS_2560(board)         (board==BOARD_GRUVIN9X || board==BOARD_MEGA2560)
 #define IS_SKY9X(board)        (board==BOARD_SKY9X || board==BOARD_9XRPRO || board==BOARD_AR9X)
 #define IS_9XRPRO(board)       (board==BOARD_9XRPRO)
-#define IS_TARANIS(board)      (board==BOARD_TARANIS  || board==BOARD_TARANIS_PLUS || board==BOARD_TARANIS_X9E)
-#define IS_TARANIS_PLUS(board) (board==BOARD_TARANIS_PLUS || board==BOARD_TARANIS_X9E)
+#define IS_TARANIS(board)      (board==BOARD_TARANIS_X9D  || board==BOARD_TARANIS_X9DP || board==BOARD_TARANIS_X9E || board==BOARD_X7D)
+#define IS_TARANIS_PLUS(board) (board==BOARD_TARANIS_X9DP || board==BOARD_TARANIS_X9E)
 #define IS_TARANIS_X9E(board)  (board==BOARD_TARANIS_X9E)
 #define IS_HORUS(board)        (board==BOARD_HORUS)
 #define IS_FLAMENCO(board)     (board==BOARD_FLAMENCO)
 #define IS_STM32(board)        (IS_TARANIS(board) || IS_HORUS(board) || IS_FLAMENCO(board))
 #define IS_ARM(board)          (IS_STM32(board) || IS_SKY9X(board))
+#define HAS_LARGE_LCD(board)   (IS_HORUS(board) || (IS_TARANIS(board) && board != BOARD_X7D))
 
 const uint8_t modn12x3[4][4]= {
   {1, 2, 3, 4},
   {1, 3, 2, 4},
   {4, 2, 3, 1},
   {4, 3, 2, 1} };
-
-#define STK_RUD  1
-#define STK_ELE  2
-#define STK_THR  3
-#define STK_AIL  4
-#define STK_P1   5
-#define STK_P2   6
-#define STK_P3   7
 
 enum Switches {
   SWITCH_NONE,
@@ -149,18 +146,6 @@ enum FailsafeModes {
 #define TRIM_T6_UP 11
 #define TRIM_NONE  12
 
-// Beep center bits
-#define BC_BIT_RUD (0x01)
-#define BC_BIT_ELE (0x02)
-#define BC_BIT_THR (0x04)
-#define BC_BIT_AIL (0x08)
-#define BC_BIT_P1  (0x10)
-#define BC_BIT_P2  (0x20)
-#define BC_BIT_P3  (0x40)
-#define BC_BIT_P4  (0x80)
-#define BC_BIT_REA (0x80)
-#define BC_BIT_REB (0x100)
-
 #define CHAR_FOR_NAMES " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-."
 #define CHAR_FOR_NAMES_REGEX "[ A-Za-z0-9_.-,]*"
 
@@ -171,13 +156,6 @@ enum HeliSwashTypes {
  HELI_SWASH_TYPE_140,
  HELI_SWASH_TYPE_90
 };
-
-extern const char * switches9X[];
-extern const char * switchesX9D[];
-extern const char leftArrow[];
-extern const char rightArrow[];
-extern const char upArrow[];
-extern const char downArrow[];
 
 class ModelData;
 class GeneralSettings;
@@ -460,7 +438,7 @@ class CurveData {
     CurveType type;
     bool smooth;
     int  count;
-    CurvePoint points[C9X_MAX_POINTS];
+    CurvePoint points[CPN_MAX_POINTS];
     char name[6+1];
 };
 
@@ -493,7 +471,7 @@ enum MltpxValue {
 class MixData {
   public:
     MixData() { clear(); }
-    unsigned int destCh;            //        1..C9X_NUM_CHNOUT
+    unsigned int destCh;            //        1..CPN_MAX_CHNOUT
     RawSource srcRaw;
     int     weight;
     RawSwitch swtch;
@@ -570,7 +548,7 @@ class LogicalSwitchData { // Logical Switches data
 
 enum AssignFunc {
   FuncOverrideCH1 = 0,
-  FuncOverrideCH32 = FuncOverrideCH1+C9X_NUM_CHNOUT-1,
+  FuncOverrideCH32 = FuncOverrideCH1+CPN_MAX_CHNOUT-1,
   FuncTrainer,
   FuncTrainerRUD,
   FuncTrainerELE,
@@ -595,7 +573,7 @@ enum AssignFunc {
   FuncBackgroundMusic,
   FuncBackgroundMusicPause,
   FuncAdjustGV1,
-  FuncAdjustGVLast = FuncAdjustGV1+C9X_MAX_GVARS-1,
+  FuncAdjustGVLast = FuncAdjustGV1+CPN_MAX_GVARS-1,
   FuncSetFailsafeInternalModule,
   FuncSetFailsafeExternalModule,
   FuncRangeCheckInternalModule,
@@ -639,15 +617,15 @@ class CustomFunctionData { // Function Switches data
 class FlightModeData {
   public:
     FlightModeData() { clear(0); }
-    int trimMode[NUM_STICKS];
-    int trimRef[NUM_STICKS];
-    int trim[NUM_STICKS];
+    int trimMode[CPN_MAX_STICKS+CPN_MAX_AUX_TRIMS];
+    int trimRef[CPN_MAX_STICKS+CPN_MAX_AUX_TRIMS];
+    int trim[CPN_MAX_STICKS+CPN_MAX_AUX_TRIMS];
     RawSwitch swtch;
     char name[10+1];
     unsigned int fadeIn;
     unsigned int fadeOut;
-    int rotaryEncoders[C9X_MAX_ENCODERS];
-    int gvars[C9X_MAX_GVARS];
+    int rotaryEncoders[CPN_MAX_ENCODERS];
+    int gvars[CPN_MAX_GVARS];
     void clear(const int phase);
 };
 
@@ -903,7 +881,7 @@ class ModuleData {
     unsigned int channelsStart;
     int          channelsCount; // 0=8 channels
     unsigned int failsafeMode;
-    int          failsafeChannels[C9X_NUM_CHNOUT];
+    int          failsafeChannels[CPN_MAX_CHNOUT];
 
 
     struct {
@@ -927,18 +905,18 @@ class ModuleData {
     QString polarityToString() const { return ppm.pulsePol ? QObject::tr("Positive") : QObject::tr("Negative"); } // TODO ModelPrinter
 };
 
-#define C9X_MAX_SCRIPTS       7
-#define C9X_MAX_SCRIPT_INPUTS 10
+#define CPN_MAX_SCRIPTS       7
+#define CPN_MAX_SCRIPT_INPUTS 10
 class ScriptData {
   public:
     ScriptData() { clear(); }
     char    filename[10+1];
     char    name[10+1];
-    int     inputs[C9X_MAX_SCRIPT_INPUTS];
+    int     inputs[CPN_MAX_SCRIPT_INPUTS];
     void clear() { memset(this, 0, sizeof(ScriptData)); }
 };
 
-#define C9X_MAX_SENSORS       32
+#define CPN_MAX_SENSORS       32
 class SensorData {
 
   public:
@@ -1020,6 +998,7 @@ class SensorData {
     SensorData() { clear(); }
     unsigned int type; // custom / formula
     unsigned int id;
+    unsigned int subid;
     unsigned int instance;
     unsigned int persistentValue;
     unsigned int formula;
@@ -1073,8 +1052,8 @@ class ModelData {
     QVector<const MixData *> mixes(int channel) const;
 
     bool      used;
-    char      name[12+1];
-    TimerData timers[C9X_MAX_TIMERS];
+    char      name[15+1];
+    TimerData timers[CPN_MAX_TIMERS];
     bool      noGlobalFunctions;
     bool      thrTrim;            // Enable Throttle Trim
     int       trimInc;            // Trim Increments
@@ -1086,27 +1065,27 @@ class ModelData {
     bool      extendedLimits; // TODO xml
     bool      extendedTrims;
     bool      throttleReversed;
-    FlightModeData flightModeData[C9X_MAX_FLIGHT_MODES];
-    MixData   mixData[C9X_MAX_MIXERS];
-    LimitData limitData[C9X_NUM_CHNOUT];
+    FlightModeData flightModeData[CPN_MAX_FLIGHT_MODES];
+    MixData   mixData[CPN_MAX_MIXERS];
+    LimitData limitData[CPN_MAX_CHNOUT];
 
-    char      inputNames[C9X_MAX_INPUTS][4+1];
-    ExpoData  expoData[C9X_MAX_EXPOS];
+    char      inputNames[CPN_MAX_INPUTS][4+1];
+    ExpoData  expoData[CPN_MAX_EXPOS];
 
-    CurveData curves[C9X_MAX_CURVES];
-    LogicalSwitchData  logicalSw[C9X_NUM_CSW];
-    CustomFunctionData customFn[C9X_MAX_CUSTOM_FUNCTIONS];
+    CurveData curves[CPN_MAX_CURVES];
+    LogicalSwitchData  logicalSw[CPN_MAX_CSW];
+    CustomFunctionData customFn[CPN_MAX_CUSTOM_FUNCTIONS];
     SwashRingData swashRingData;
     unsigned int thrTraceSrc;
     uint64_t switchWarningStates;
     unsigned int switchWarningEnable;
     unsigned int potsWarningMode;
-    bool potsWarningEnabled[C9X_NUM_POTS];
-    int          potPosition[C9X_NUM_POTS];
+    bool potsWarningEnabled[CPN_MAX_POTS];
+    int          potPosition[CPN_MAX_POTS];
     bool         displayChecklist;
     // TODO structure
-    char     gvars_names[C9X_MAX_GVARS][6+1];
-    bool     gvars_popups[C9X_MAX_GVARS];
+    char     gvars_names[CPN_MAX_GVARS][6+1];
+    bool     gvars_popups[CPN_MAX_GVARS];
     MavlinkData mavlink;
     unsigned int telemetryProtocol;
     FrSkyData frsky;
@@ -1115,11 +1094,11 @@ class ModelData {
 
     unsigned int trainerMode;
 
-    ModuleData moduleData[C9X_NUM_MODULES+1/*trainer*/];
+    ModuleData moduleData[CPN_MAX_MODULES+1/*trainer*/];
 
-    ScriptData scriptData[C9X_MAX_SCRIPTS];
+    ScriptData scriptData[CPN_MAX_SCRIPTS];
 
-    SensorData sensorData[C9X_MAX_SENSORS];
+    SensorData sensorData[CPN_MAX_SENSORS];
 
     unsigned int toplcdTimer;
 
@@ -1187,13 +1166,6 @@ class GeneralSettings {
       SLIDER_WITH_DETENT
     };
 
-    enum SwitchConfig {
-      SWITCH_NONE,
-      SWITCH_TOGGLE,
-      SWITCH_2POS,
-      SWITCH_3POS,
-    };
-
     GeneralSettings();
 
     int getDefaultStick(unsigned int channel) const;
@@ -1202,9 +1174,9 @@ class GeneralSettings {
 
     unsigned int version;
     unsigned int variant;
-    int   calibMid[NUM_STICKS+C9X_NUM_POTS];
-    int   calibSpanNeg[NUM_STICKS+C9X_NUM_POTS];
-    int   calibSpanPos[NUM_STICKS+C9X_NUM_POTS];
+    int   calibMid[CPN_MAX_STICKS+CPN_MAX_POTS];
+    int   calibSpanNeg[CPN_MAX_STICKS+CPN_MAX_POTS];
+    int   calibSpanPos[CPN_MAX_STICKS+CPN_MAX_POTS];
     unsigned int  currModel; // 0..15
     unsigned int   contrast;
     unsigned int   vBatWarn;
@@ -1282,7 +1254,7 @@ class GeneralSettings {
     unsigned int switchUnlockStates;
     unsigned int hw_uartMode;
     unsigned int backlightColor;
-    CustomFunctionData customFn[C9X_MAX_CUSTOM_FUNCTIONS];
+    CustomFunctionData customFn[CPN_MAX_CUSTOM_FUNCTIONS];
     char switchName[18][3+1];
     unsigned int switchConfig[18];
     char stickName[4][3+1];
@@ -1311,10 +1283,11 @@ class GeneralSettings {
 class RadioData {
   public:
     GeneralSettings generalSettings;
-    ModelData models[C9X_MAX_MODELS];
+    ModelData models[CPN_MAX_MODELS];
 };
 
 enum Capability {
+  ModelName,
   FlightModes,
   FlightModesName,
   FlightModesHaveFades,
@@ -1395,7 +1368,9 @@ enum Capability {
   PermTimers,
   HasSDLogs,
   CSFunc,
-  LCDWidth,
+  LcdWidth,
+  LcdHeight,
+  LcdDepth,
   GetThrSwitch,
   HasDisplayText,
   HasTopLcd,
@@ -1439,10 +1414,14 @@ class EEPROMInterface
     virtual unsigned long load(RadioData &radioData, const uint8_t *eeprom, int size) = 0;
 
     virtual unsigned long loadBackup(RadioData &radioData, uint8_t *eeprom, int esize, int index) = 0;
+    
+    virtual bool loadRadioSettings(GeneralSettings & model, const QByteArray & data) { return false; }
+    
+    virtual bool loadModel(ModelData & model, const QByteArray & data) { return false; }
 
     virtual unsigned long loadxml(RadioData &radioData, QDomDocument &doc) = 0;
 
-    virtual int save(uint8_t *eeprom, RadioData &radioData, uint32_t variant=0, uint8_t version=0) = 0;
+    virtual int save(uint8_t * eeprom, RadioData & radioData, uint8_t version=0, uint32_t variant=0) = 0;
 
     virtual int getSize(const ModelData &) = 0;
 
@@ -1498,8 +1477,8 @@ inline void applyStickModeToModel(ModelData &model, unsigned int mode)
   ModelData model_copy = model;
 
   // trims
-  for (int p=0; p<C9X_MAX_FLIGHT_MODES; p++) {
-    for (int i=0; i<NUM_STICKS/2; i++) {
+  for (int p=0; p<CPN_MAX_FLIGHT_MODES; p++) {
+    for (int i=0; i<CPN_MAX_STICKS/2; i++) {
       int converted_stick = applyStickMode(i+1, mode) - 1;
       int tmp = model.flightModeData[p].trim[i];
       model.flightModeData[p].trim[i] = model.flightModeData[p].trim[converted_stick];
@@ -1516,7 +1495,7 @@ inline void applyStickModeToModel(ModelData &model, unsigned int mode)
       model_copy.expoData[i].chn = applyStickMode(model.expoData[i].chn+1, mode) - 1;
   }
   int index=0;
-  for (unsigned int i=0; i<NUM_STICKS; i++) {
+  for (unsigned int i=0; i<CPN_MAX_STICKS; i++) {
     for (unsigned int e=0; e<sizeof(model.expoData) / sizeof(model.expoData[1]); e++) {
       if (model_copy.expoData[e].mode && model_copy.expoData[e].chn == i)
         model.expoData[index++] = model_copy.expoData[e];
@@ -1524,14 +1503,14 @@ inline void applyStickModeToModel(ModelData &model, unsigned int mode)
   }
 
   // mixers
-  for (int i=0; i<C9X_MAX_MIXERS; i++) {
+  for (int i=0; i<CPN_MAX_MIXERS; i++) {
     if (model.mixData[i].srcRaw.type == SOURCE_TYPE_STICK) {
       model.mixData[i].srcRaw.index = applyStickMode(model.mixData[i].srcRaw.index + 1, mode) - 1;
     }
   }
 
   // virtual switches
-  for (int i=0; i<C9X_NUM_CSW; i++) {
+  for (int i=0; i<CPN_MAX_CSW; i++) {
     RawSource source;
     switch (model.logicalSw[i].getFunctionFamily()) {
       case LS_FAMILY_VCOMP:
@@ -1586,9 +1565,6 @@ enum EepromLoadErrors {
 void ShowEepromErrors(QWidget *parent, const QString &title, const QString &mainMessage, unsigned long errorsFound);
 void ShowEepromWarnings(QWidget *parent, const QString &title, unsigned long errorsFound);
 
-unsigned long LoadBackup(RadioData &radioData, uint8_t *eeprom, int esize, int index);
-unsigned long LoadEeprom(RadioData &radioData, const uint8_t *eeprom, int size);
-unsigned long LoadEepromXml(RadioData &radioData, QDomDocument &doc);
 
 struct Option {
   const char * name;
@@ -1597,7 +1573,7 @@ struct Option {
 };
 
 class Firmware {
-
+    
   public:
     Firmware(const QString & id, const QString & name, const BoardEnum board, EEPROMInterface * eepromInterface):
       id(id),
@@ -1647,9 +1623,9 @@ class Firmware {
 
     virtual void addOptions(Option options[]);
 
-    inline int saveEEPROM(uint8_t *eeprom, RadioData &radioData, uint32_t variant=0, unsigned int version=0)
+    inline int saveEEPROM(uint8_t * eeprom, RadioData & radioData, uint8_t version=0, uint32_t variant=0)
     {
-      return eepromInterface->save(eeprom, radioData, variant, version);
+      return eepromInterface->save(eeprom, radioData, version, variant);
     }
 
     virtual QString getStampUrl() = 0;
@@ -1678,7 +1654,21 @@ class Firmware {
       return eepromInterface;
     }
 
-    virtual int getCapability(const Capability) = 0;
+    virtual int getCapability(Capability) = 0;
+    
+    enum SwitchType {
+      SWITCH_NONE,
+      SWITCH_TOGGLE,
+      SWITCH_2POS,
+      SWITCH_3POS
+    };
+    
+    struct Switch {
+      SwitchType type;
+      const char * name;
+    };
+    
+    virtual Switch getSwitch(unsigned int index) = 0;
 
     virtual QTime getMaxTimerStart() = 0;
 
@@ -1733,4 +1723,6 @@ inline int divRoundClosest(const int n, const int d)
 
 SimulatorInterface * GetCurrentFirmwareSimulator();
 
-#endif
+extern QList<EEPROMInterface *> eepromInterfaces;
+
+#endif // _EEPROMINTERFACE_H_

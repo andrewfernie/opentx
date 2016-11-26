@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "curves.h"
 #include "ui_curves.h"
 #include "node.h"
@@ -156,7 +176,7 @@ Curves::Curves(QWidget * parent, ModelData & model, GeneralSettings & generalSet
     ui->curvesLayout2->addItem(item2,limit+1,1,1,1,0);
   }
 
-  for (int i=0; i<C9X_MAX_POINTS; i++) {
+  for (int i=0; i<CPN_MAX_POINTS; i++) {
     spnx[i] = new QSpinBox(this);
     spnx[i]->setProperty("index", i);
     spnx[i]->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
@@ -360,7 +380,7 @@ void Curves::updateCurvePoints()
       spnx[i]->hide();
     }
   }
-  for (int i=count; i<C9X_MAX_POINTS; i++) {
+  for (int i=count; i<CPN_MAX_POINTS; i++) {
     spny[i]->hide();
     spnx[i]->hide();
   }
@@ -440,7 +460,7 @@ void Curves::on_curvePoints_currentIndexChanged(int index)
       model->curves[currentCurve].count = numpoints;
 
       // TODO something better + reuse!
-      for (int i=0; i<C9X_MAX_POINTS; i++) {
+      for (int i=0; i<CPN_MAX_POINTS; i++) {
         model->curves[currentCurve].points[i].x = (i >= numpoints-1 ? +100 : -100 + (200*i)/(numpoints-1));
         model->curves[currentCurve].points[i].y = 0;
       }
@@ -463,7 +483,7 @@ void Curves::on_curveCustom_currentIndexChanged(int index)
       model->curves[currentCurve].type = type;
 
       // TODO something better + reuse!
-      for (int i=0; i<C9X_MAX_POINTS; i++) {
+      for (int i=0; i<CPN_MAX_POINTS; i++) {
         model->curves[currentCurve].points[i].x = (i >= numpoints-1 ? +100 : -100 + (200*i)/(numpoints-1));
         model->curves[currentCurve].points[i].y = 0;
       }

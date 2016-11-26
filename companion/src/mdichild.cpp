@@ -1,43 +1,22 @@
-/****************************************************************************
-**
-** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
-**
-** This file is part of the examples of the Qt Toolkit.
-**
-** $QT_BEGIN_LICENSE:LGPL$
-** Commercial Usage
-** Licensees holding valid Qt Commercial licenses may use this file in
-** accordance with the Qt Commercial License Agreement provided with the
-** Software or, alternatively, in accordance with the terms contained in
-** a written agreement between you and Nokia.
-**
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-**
-** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU
-** General Public License version 3.0 as published by the Free Software
-** Foundation and appearing in the file LICENSE.GPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU General Public License version 3.0 requirements will be
-** met: http://www.gnu.org/copyleft/gpl.html.
-**
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
-** $QT_END_LICENSE$
-**
-****************************************************************************/
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 
 #include "mdichild.h"
 #include "ui_mdichild.h"
@@ -53,6 +32,8 @@
 #include "appdata.h"
 #include "wizarddialog.h"
 #include "flashfirmwaredialog.h"
+#include "storage_eeprom.h"
+#include "storage_sdcard.h"
 #include <QFileInfo>
 
 #if defined WIN32 || !defined __GNUC__
@@ -178,7 +159,7 @@ void MdiChild::modelEdit()
   else {
     QApplication::setOverrideCursor(Qt::WaitCursor);
     checkAndInitModel( row );
-    ModelData &model = radioData.models[row - 1];
+    ModelData & model = radioData.models[row - 1];
     gStopwatch.restart();
     gStopwatch.report("ModelEdit creation");
     ModelEdit *t = new ModelEdit(this, radioData, (row - 1), GetCurrentFirmware()/*firmware*/);
@@ -213,7 +194,7 @@ void MdiChild::openEditWindow()
     generalEdit();
   }
   else{
-    ModelData &model = radioData.models[row - 1];
+    ModelData & model = radioData.models[row - 1];
     if (model.isEmpty() && g.useWizard()) {
       wizardEdit();
     }
@@ -232,134 +213,179 @@ void MdiChild::newFile()
   updateTitle();
 }
 
-bool MdiChild::loadFile(const QString &fileName, bool resetCurrentFile)
+bool MdiChild::loadFile(const QString & fileName, bool resetCurrentFile)
 {
-    QFile file(fileName);
+  QFile file(fileName);
 
-    if (!file.exists()) {
-      QMessageBox::critical(this, tr("Error"), tr("Unable to find file %1!").arg(fileName));
-      return false;
-    }
+  if (!file.exists()) {
+    QMessageBox::critical(this, tr("Error"), tr("Unable to find file %1!").arg(fileName));
+    return false;
+  }
 
-    int fileType = getFileType(fileName);
+  int fileType = getFileType(fileName);
 
 #if 0
-    if (fileType==FILE_TYPE_XML) {
-      if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {  //reading HEX TEXT file
-        QMessageBox::critical(this, tr("Error"),
-            tr("Error opening file %1:\n%2.")
-            .arg(fileName)
-            .arg(file.errorString()));
-        return false;
-      }
-      QTextStream inputStream(&file);
-      XmlInterface(inputStream).load(radioData);
+  if (fileType==FILE_TYPE_XML) {
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {  //reading HEX TEXT file
+      QMessageBox::critical(this, tr("Error"),
+          tr("Error opening file %1:\n%2.")
+          .arg(fileName)
+          .arg(file.errorString()));
+      return false;
     }
-    else
+    QTextStream inputStream(&file);
+    XmlInterface(inputStream).load(radioData);
+  }
+  else
 #endif
-    if (fileType==FILE_TYPE_HEX || fileType==FILE_TYPE_EEPE) { //read HEX file
-      if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {  //reading HEX TEXT file
-          QMessageBox::critical(this, tr("Error"),
-                               tr("Error opening file %1:\n%2.")
-                               .arg(fileName)
-                               .arg(file.errorString()));
-          return false;
-      }
-
-      QDomDocument doc(ER9X_EEPROM_FILE_TYPE);
-      bool xmlOK = doc.setContent(&file);
-      if(xmlOK) {
-        std::bitset<NUM_ERRORS> errors((unsigned long long)LoadEepromXml(radioData, doc));
-        if (errors.test(ALL_OK)) {
-          ui->modelsList->refreshList();
-          if(resetCurrentFile) setCurrentFile(fileName);
-          return true;
-        }
-      }
-      file.reset();
-
-      QTextStream inputStream(&file);
-
-      if (fileType==FILE_TYPE_EEPE) {  // read EEPE file header
-        QString hline = inputStream.readLine();
-        if (hline!=EEPE_EEPROM_FILE_HEADER) {
-          file.close();
-          return false;
-        }
-      }
-
-      QByteArray eeprom(EESIZE_MAX, 0);
-      int eeprom_size = HexInterface(inputStream).load((uint8_t *)eeprom.data(), EESIZE_MAX);
-      if (!eeprom_size) {
+  if (fileType==FILE_TYPE_HEX || fileType==FILE_TYPE_EEPE) { //read HEX file
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {  //reading HEX TEXT file
         QMessageBox::critical(this, tr("Error"),
-            tr("Invalid EEPROM File %1")
-            .arg(fileName));
+                             tr("Error opening file %1:\n%2.")
+                             .arg(fileName)
+                             .arg(file.errorString()));
+        return false;
+    }
+
+    QDomDocument doc(ER9X_EEPROM_FILE_TYPE);
+    bool xmlOK = doc.setContent(&file);
+    if (xmlOK) {
+      std::bitset<NUM_ERRORS> errors((unsigned long long)LoadEepromXml(radioData, doc));
+      if (errors.test(ALL_OK)) {
+        ui->modelsList->refreshList();
+        if(resetCurrentFile) setCurrentFile(fileName);
+        return true;
+      }
+    }
+    file.reset();
+
+    QTextStream inputStream(&file);
+
+    if (fileType==FILE_TYPE_EEPE) {  // read EEPE file header
+      QString hline = inputStream.readLine();
+      if (hline!=EEPE_EEPROM_FILE_HEADER) {
         file.close();
         return false;
       }
+    }
 
+    QByteArray eeprom(EESIZE_MAX, 0);
+    int eeprom_size = HexInterface(inputStream).load((uint8_t *)eeprom.data(), EESIZE_MAX);
+    if (!eeprom_size) {
+      QMessageBox::critical(this, tr("Error"),
+          tr("Invalid EEPROM File %1")
+          .arg(fileName));
       file.close();
+      return false;
+    }
 
-      std::bitset<NUM_ERRORS> errors((unsigned long long)LoadEeprom(radioData, (uint8_t *)eeprom.data(), eeprom_size));
-      if (!errors.test(ALL_OK)) {
-        ShowEepromErrors(this, tr("Error"), tr("Invalid EEPROM File %1").arg(fileName), errors.to_ulong());
+    file.close();
+
+    std::bitset<NUM_ERRORS> errors((unsigned long long)LoadEeprom(radioData, (uint8_t *)eeprom.data(), eeprom_size));
+    if (!errors.test(ALL_OK)) {
+      ShowEepromErrors(this, tr("Error"), tr("Invalid EEPROM File %1").arg(fileName), errors.to_ulong());
+      return false;
+    }
+    if (errors.test(HAS_WARNINGS)) {
+      ShowEepromWarnings(this, tr("Warning"), errors.to_ulong());
+    }
+
+    ui->modelsList->refreshList();
+    if (resetCurrentFile) setCurrentFile(fileName);
+
+    return true;
+  }
+  else if (fileType==FILE_TYPE_BIN) { //read binary
+    int eeprom_size = file.size();
+
+    if (!file.open(QFile::ReadOnly)) {  //reading binary file   - TODO HEX support
+        QMessageBox::critical(this, tr("Error"),
+                             tr("Error opening file %1:\n%2.")
+                             .arg(fileName)
+                             .arg(file.errorString()));
+        return false;
+    }
+    uint8_t * eeprom = (uint8_t *)malloc(eeprom_size);
+    memset(eeprom, 0, eeprom_size);
+    long result = file.read((char*)eeprom, eeprom_size);
+    file.close();
+
+    if (result != eeprom_size) {
+        QMessageBox::critical(this, tr("Error"),
+                             tr("Error reading file %1:\n%2.")
+                             .arg(fileName)
+                             .arg(file.errorString()));
+        free(eeprom);
+        return false;
+    }
+
+    std::bitset<NUM_ERRORS> errorsEeprom((unsigned long long)LoadEeprom(radioData, eeprom, eeprom_size));
+    if (!errorsEeprom.test(ALL_OK)) {
+      std::bitset<NUM_ERRORS> errorsBackup((unsigned long long)LoadBackup(radioData, eeprom, eeprom_size, 0));
+      if (!errorsBackup.test(ALL_OK)) {
+        ShowEepromErrors(this, tr("Error"), tr("Invalid binary EEPROM File %1").arg(fileName), (errorsEeprom | errorsBackup).to_ulong());
+        free(eeprom);
         return false;
       }
-      if (errors.test(HAS_WARNINGS)) {
-        ShowEepromWarnings(this, tr("Warning"), errors.to_ulong());
+      if (errorsBackup.test(HAS_WARNINGS)) {
+        ShowEepromWarnings(this, tr("Warning"), errorsBackup.to_ulong());
       }
-
-      ui->modelsList->refreshList();
-      if(resetCurrentFile) setCurrentFile(fileName);
-
-      return true;
     }
-    else if (fileType==FILE_TYPE_BIN) { //read binary
-      int eeprom_size = file.size();
-
-      if (!file.open(QFile::ReadOnly)) {  //reading binary file   - TODO HEX support
-          QMessageBox::critical(this, tr("Error"),
-                               tr("Error opening file %1:\n%2.")
-                               .arg(fileName)
-                               .arg(file.errorString()));
-          return false;
-      }
-      uint8_t *eeprom = (uint8_t *)malloc(eeprom_size);
-      memset(eeprom, 0, eeprom_size);
-      long result = file.read((char*)eeprom, eeprom_size);
-      file.close();
-
-      if (result != eeprom_size) {
-          QMessageBox::critical(this, tr("Error"),
-                               tr("Error reading file %1:\n%2.")
-                               .arg(fileName)
-                               .arg(file.errorString()));
-
-          return false;
-      }
-
-      std::bitset<NUM_ERRORS> errorsEeprom((unsigned long long)LoadEeprom(radioData, eeprom, eeprom_size));
-      if (!errorsEeprom.test(ALL_OK)) {
-        std::bitset<NUM_ERRORS> errorsBackup((unsigned long long)LoadBackup(radioData, eeprom, eeprom_size, 0));
-        if (!errorsBackup.test(ALL_OK)) {
-          ShowEepromErrors(this, tr("Error"), tr("Invalid binary EEPROM File %1").arg(fileName), (errorsEeprom | errorsBackup).to_ulong());
-          return false;
-        }
-        if (errorsBackup.test(HAS_WARNINGS)) {
-          ShowEepromWarnings(this, tr("Warning"), errorsBackup.to_ulong());
-        }
-      } else if (errorsEeprom.test(HAS_WARNINGS)) {
-        ShowEepromWarnings(this, tr("Warning"), errorsEeprom.to_ulong());
-      }
-
-      ui->modelsList->refreshList();
-      if(resetCurrentFile) setCurrentFile(fileName);
-
-      free(eeprom);
-      return true;
+    else if (errorsEeprom.test(HAS_WARNINGS)) {
+      ShowEepromWarnings(this, tr("Warning"), errorsEeprom.to_ulong());
     }
 
-    return false;
+    ui->modelsList->refreshList();
+    if (resetCurrentFile)
+      setCurrentFile(fileName);
+
+    free(eeprom);
+    return true;
+  }
+  else if (fileType == FILE_TYPE_OTX) { //read zip archive
+    if (loadOtxFile(fileName)) {
+      ui->modelsList->refreshList();
+      if (resetCurrentFile)
+        setCurrentFile(fileName);
+    }
+  }
+
+  return false;
+}
+
+bool MdiChild::loadOtxFile(const QString & fileName)
+{
+  // example of StorageSdcard usage
+
+  StorageSdcard storage;
+
+  storage.read(fileName);
+
+  // display models.txt
+  QString modelList = QString(storage.modelList);
+  qDebug() << "Models: size" << modelList.size() << "contents" << modelList;
+
+  // info about radio.bin
+  qDebug() << "Radio settings:" << storage.radio.size();
+
+  // info about all models
+  QList<QString> models = storage.getModelsFileNames();
+  qDebug() << "We have" << models.size() << "models:";
+#if 0
+  foreach(QString filename, models) {
+    QList<ModelFile>::const_iterator i = storage.getModelIterator(filename);
+    if (i != storage.models.end()) {
+      qDebug() << "\tModel:" << i->filename << "size" << i->data.size();
+    }
+  }
+#endif
+  
+  int index = 0;
+  for (QList<ModelFile>::iterator i = storage.models.begin(); i != storage.models.end(); ++i, ++index) {
+    GetEepromInterface()->loadModel(radioData.models[index], i->data);
+  }
+  
+  return true;
 }
 
 bool MdiChild::save()
@@ -412,11 +438,11 @@ bool MdiChild::saveFile(const QString &fileName, bool setCurrent)
 
   int fileType = getFileType(myFile);
 
-  uint8_t *eeprom = (uint8_t*)malloc(GetEepromInterface()->getEEpromSize());
+  uint8_t * eeprom = (uint8_t*)malloc(GetEepromInterface()->getEEpromSize());
   int eeprom_size = 0;
 
   if (fileType != FILE_TYPE_XML) {
-    eeprom_size = GetEepromInterface()->save(eeprom, radioData, GetCurrentFirmware()->getVariantNumber(), 0/*last version*/);
+    eeprom_size = GetEepromInterface()->save(eeprom, radioData, 0, GetCurrentFirmware()->getVariantNumber());
     if (!eeprom_size) {
       QMessageBox::warning(this, tr("Error"),tr("Cannot write file %1:\n%2.").arg(myFile).arg(file.errorString()));
       return false;

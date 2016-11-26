@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
+ * Copyright (C) OpenTX
  *
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +16,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#ifndef opentx_interface_h
-#define opentx_interface_h
+#ifndef _OPENTXINTERFACE_H_
+#define _OPENTXINTERFACE_H_
 
 #include "eeprominterface.h"
 
@@ -37,9 +41,13 @@ class OpenTxEepromInterface : public EEPROMInterface
 
     virtual unsigned long loadBackup(RadioData &, uint8_t *eeprom, int esize, int index);
 
-    virtual unsigned long loadxml(RadioData &radioData, QDomDocument &doc);
-
-    virtual int save(uint8_t *eeprom, RadioData &radioData, uint32_t variant=0, uint8_t version=0);
+    virtual unsigned long loadxml(RadioData & radioData, QDomDocument & doc);
+    
+    virtual bool loadRadioSettings(GeneralSettings & model, const QByteArray & data);
+    
+    virtual bool loadModel(ModelData & model, const QByteArray & data);
+    
+    virtual int save(uint8_t * eeprom, RadioData & radioData, uint8_t version=0, uint32_t variant=0);
 
     virtual int getSize(const ModelData &);
 
@@ -52,23 +60,16 @@ class OpenTxEepromInterface : public EEPROMInterface
     EepromLoadErrors checkVersion(unsigned int version);
 
     bool checkVariant(unsigned int version, unsigned int variant);
+    
+    bool loadModel(uint8_t version, ModelData &model, uint8_t *data, int index, unsigned int variant);
 
     template <class T>
-    bool loadModel(ModelData &model, uint8_t *data, int index, unsigned int stickMode=0);
+    bool saveModel(unsigned int index, ModelData & model, uint8_t version, uint32_t variant);
+
+    bool loadRadioSettings(GeneralSettings & settings, uint8_t version);
 
     template <class T>
-    bool loadModelVariant(unsigned int index, ModelData &model, uint8_t *data, unsigned int version, unsigned int variant);
-
-    bool loadModel(uint8_t version, ModelData &model, uint8_t *data, int index, unsigned int variant, unsigned int stickMode=0);
-
-    template <class T>
-    bool saveModel(unsigned int index, ModelData &model, unsigned int version, unsigned int variant);
-
-    template <class T>
-    bool loadGeneral(GeneralSettings &settings, unsigned int version);
-
-    template <class T>
-    bool saveGeneral(GeneralSettings &settings, BoardEnum board, uint32_t version, uint32_t variant);
+    bool saveRadioSettings(GeneralSettings & settings, BoardEnum board, uint8_t version, uint32_t variant);
 
     RleFile *efile;
 
@@ -117,7 +118,9 @@ class OpenTxFirmware: public Firmware {
 
     virtual QString getFirmwareUrl();
 
-    virtual int getCapability(const Capability);
+    virtual int getCapability(Capability);
+    
+    virtual Switch getSwitch(unsigned int index);
     
     virtual QTime getMaxTimerStart();
 
@@ -134,4 +137,4 @@ class OpenTxFirmware: public Firmware {
 void registerOpenTxFirmwares();
 void unregisterOpenTxFirmwares();
 
-#endif
+#endif // _OPENTXINTERFACE_H_

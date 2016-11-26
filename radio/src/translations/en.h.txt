@@ -903,6 +903,7 @@
 #define TR_SDCARD_ERROR        TR("SD error", "SD card error")
 #define TR_NO_SDCARD           "No SD card"
 #define TR_SDCARD_FULL         "SD card full"
+#define TR_SDCARD_NOWIZ        "No wizard found on SD Card"
 #define TR_INCOMPATIBLE        "Incompatible"
 #define TR_WARNING             "WARNING"
 #define TR_EEPROMWARN          "EEPROM"
@@ -1335,3 +1336,7 @@
 #define ZSTR_QOS_F             "FLss"
 #define ZSTR_QOS_H             "Hold"
 #define ZSTR_BIND              "BIND"
+#define ZSTR_LAP_NUMBER        "Lap "
+#define ZSTR_GATE_NUMBER       "Gate"
+#define ZSTR_LAP_TIME          "LapT"
+#define ZSTR_GATE_TIME         "GteT"

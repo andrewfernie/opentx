@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
- * 
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,14 +16,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include <iostream>
 #include "er9xinterface.h"
 #include "er9xeeprom.h"
-#include "simulator/er9xsimulator.h"
-#include "file.h"
+#include "rlefile.h"
 #include "appdata.h"
 
 #define FILE_TYP_GENERAL 1
@@ -97,15 +100,15 @@ unsigned long Er9xInterface::loadxml(RadioData &radioData, QDomDocument &doc)
 
   Er9xGeneral er9xGeneral;
   memset(&er9xGeneral,0,sizeof(er9xGeneral));
-  if(!loadGeneralDataXML(&doc, &er9xGeneral)) {
+  if (!loadRadioSettingsDataXML(&doc, &er9xGeneral)) {
     errors.set(UNKNOWN_ERROR);
     return errors.to_ulong();
-  } else {
+  }
+  else {
     radioData.generalSettings=er9xGeneral;
     std::cout << "version " << (unsigned int)er9xGeneral.myVers << " ";
   }
-  for(int i=0; i<getMaxModels(); i++)
-  {
+  for (int i=0; i<getMaxModels(); i++) {
     Er9xModelData er9xModel;
     memset(&er9xModel,0,sizeof(er9xModel));
     if(loadModelDataXML(&doc, &er9xModel, i)) {
@@ -197,14 +200,6 @@ unsigned long Er9xInterface::loadBackup(RadioData &radioData, uint8_t *eeprom, i
   return errors.to_ulong();
 }
 
-int Er9xInterface::save(uint8_t *eeprom, RadioData &radioData, uint32_t variant, uint8_t version)
-{
-  std::cout << "NO!\n";
-  // TODO an error
-
-  return 0;
-}
-
 int Er9xInterface::getSize(const ModelData &model)
 {
   return 0;
@@ -276,7 +271,7 @@ QDomElement Er9xInterface::getModelDataXML(QDomDocument * qdoc, Er9xModelData * 
   return md;
 }
 
-bool Er9xInterface::loadGeneralDataXML(QDomDocument * qdoc, Er9xGeneral * tgen)
+bool Er9xInterface::loadRadioSettingsDataXML(QDomDocument * qdoc, Er9xGeneral * tgen)
 {
   //look for "GENERAL_DATA" tag
   QDomElement gde = qdoc->elementsByTagName("GENERAL_DATA").at(0).toElement();
