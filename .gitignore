@@ -7,3 +7,5 @@ radio/src/bootloader/bootloader_ramBoot*
 *.o
 /doc/
 *.inc
+/companion-build/
+/build-taranis-debug/
