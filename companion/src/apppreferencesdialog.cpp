@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "apppreferencesdialog.h"
 #include "ui_apppreferencesdialog.h"
 #include "mainwindow.h"
@@ -11,7 +31,7 @@
 #include <QDesktopServices>
 #include <QtGui>
 
-AppPreferencesDialog::AppPreferencesDialog(QWidget *parent) :
+AppPreferencesDialog::AppPreferencesDialog(QWidget * parent) :
   QDialog(parent),
   ui(new Ui::AppPreferencesDialog)
 {
@@ -23,7 +43,7 @@ AppPreferencesDialog::AppPreferencesDialog(QWidget *parent) :
   connect(ui->downloadVerCB, SIGNAL(currentIndexChanged(int)), this, SLOT(baseFirmwareChanged()));
   connect(this, SIGNAL(accepted()), this, SLOT(writeValues()));
 
-#ifndef JOYSTICKS
+#if !defined(JOYSTICKS)
   ui->joystickCB->hide();
   ui->joystickCB->setDisabled(true);
   ui->joystickcalButton->hide();
@@ -91,7 +111,7 @@ void AppPreferencesDialog::writeValues()
 
 void AppPreferencesDialog::on_snapshotPathButton_clicked()
 {
-  QString fileName = QFileDialog::getExistingDirectory(this,tr("Select your snapshot folder"), g.snapshotDir());
+  QString fileName = QFileDialog::getExistingDirectory(this, tr("Select your snapshot folder"), g.snapshotDir());
   if (!fileName.isEmpty()) {
     g.snapshotDir(fileName);
     g.snapToClpbrd(false);
@@ -137,15 +157,17 @@ void AppPreferencesDialog::initSettings()
       ui->backupPath->setText(g.backupDir());
       ui->backupEnable->setEnabled(true);
       ui->backupEnable->setChecked(g.enableBackup());
-    } else {
+    }
+    else {
       ui->backupEnable->setDisabled(true);
     }
-  } else {
+  }
+  else {
       ui->backupEnable->setDisabled(true);
   }
   ui->splashincludeCB->setCurrentIndex(g.embedSplashes());
 
-#ifdef JOYSTICKS
+#if defined(JOYSTICKS)
   ui->joystickChkB->setChecked(g.jsSupport());
   if (ui->joystickChkB->isChecked()) {
     QStringList joystickNames;
@@ -172,7 +194,7 @@ void AppPreferencesDialog::initSettings()
     ui->joystickcalButton->setDisabled(true);
   }
 #endif  
-//  Profile Tab Inits  
+  //  Profile Tab Inits
   ui->channelorderCB->setCurrentIndex(g.profile[g.id()].channelOrder());
   ui->stickmodeCB->setCurrentIndex(g.profile[g.id()].defaultMode());
   ui->renameFirmware->setChecked(g.profile[g.id()].renameFwFiles());
@@ -185,7 +207,8 @@ void AppPreferencesDialog::initSettings()
     } else {
       ui->pbackupEnable->setDisabled(true);
     }
-  } else {
+  }
+  else {
       ui->pbackupEnable->setDisabled(true);
   }
 
@@ -270,7 +293,7 @@ void AppPreferencesDialog::on_ge_pathButton_clicked()
   }
 }
  
-#ifdef JOYSTICKS
+#if defined(JOYSTICKS)
 void AppPreferencesDialog::on_joystickChkB_clicked() {
   if (ui->joystickChkB->isChecked()) {
     QStringList joystickNames;
@@ -325,23 +348,17 @@ void AppPreferencesDialog::on_removeProfileButton_clicked()
   }
 }
 
-
-bool AppPreferencesDialog::displayImage( QString fileName )
+bool AppPreferencesDialog::displayImage(const QString & fileName)
 {
-  // Start by clearing the pixmap
-  ui->imageLabel->setPixmap(QPixmap());
+  // Start by clearing the label
+  ui->imageLabel->clear();
 
   QImage image(fileName);
   if (image.isNull()) 
     return false;
-
-  // Use the firmware name to determine splash width
-  int width = SPLASH_WIDTH;
-  if (g.profile[g.id()].fwType().contains("taranis"))
-    width = SPLASHX9D_WIDTH;
   
-  ui->imageLabel->setPixmap( makePixMap( image, g.profile[g.id()].fwType()));
-  ui->imageLabel->setFixedSize(width, SPLASH_HEIGHT);
+  ui->imageLabel->setPixmap(makePixMap(image));
+  ui->imageLabel->setFixedSize(GetCurrentFirmware()->getCapability(LcdWidth), GetCurrentFirmware()->getCapability(LcdHeight));
   return true;
 }
 
@@ -473,7 +490,7 @@ void AppPreferencesDialog::populateFirmwareOptions(const Firmware * firmware)
     foreach(Option opt, opts) {
       if (index >= optionsCheckBoxes.size()) {
         QCheckBox * checkbox = new QCheckBox(ui->profileTab);
-        ui->optionsLayout->addWidget(checkbox, optionsCheckBoxes.count()/5, optionsCheckBoxes.count()%5, 1, 1);
+        ui->optionsLayout->addWidget(checkbox, optionsCheckBoxes.count()/4, optionsCheckBoxes.count()%4, 1, 1);
         optionsCheckBoxes.push_back(checkbox);
         connect(checkbox, SIGNAL(toggled(bool)), this, SLOT(firmwareOptionChanged(bool)));
         if (prevFocus) {

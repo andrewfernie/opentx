@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
- * 
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +16,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#ifndef _SIMULATOR_INTERFACE_H_
-#define _SIMULATOR_INTERFACE_H_
+#ifndef _SIMULATORINTERFACE_H_
+#define _SIMULATORINTERFACE_H_
 
 #include "constants.h"
 #include <inttypes.h>
@@ -29,10 +33,10 @@ template<class t> t LIMIT(t mi, t x, t ma) { return std::min(std::max(mi, x), ma
 
 struct TxInputs
 {
-    int  sticks[NUM_STICKS]; /* lh lv rv rh */
-    int  pots[C9X_NUM_POTS];
-    int  switches[C9X_NUM_SWITCHES];
-    bool keys[C9X_NUM_KEYS];
+    int  sticks[CPN_MAX_STICKS]; /* lh lv rv rh */
+    int  pots[CPN_MAX_POTS];
+    int  switches[CPN_MAX_SWITCHES];
+    bool keys[CPN_MAX_KEYS];
     bool rotenc;
     bool trims[12];
 };
@@ -41,16 +45,16 @@ class TxOutputs
 {
   public:
     TxOutputs() { memset(this, 0, sizeof(TxOutputs)); }
-    int chans[C9X_NUM_CHNOUT];
-    bool vsw[C9X_NUM_CSW];
-    int gvars[C9X_MAX_FLIGHT_MODES][C9X_MAX_GVARS];
+    int chans[CPN_MAX_CHNOUT];
+    bool vsw[CPN_MAX_CSW];
+    int gvars[CPN_MAX_FLIGHT_MODES][CPN_MAX_GVARS];
     unsigned int beep;
     // uint8_t phase;
 };
 
 struct Trims
 {
-  int values[NUM_STICKS]; /* lh lv rv rh */
+  int values[CPN_MAX_STICKS]; /* lh lv rv rh */
   bool extended;
 };
 
@@ -64,9 +68,9 @@ class SimulatorInterface
 
     virtual void setVolumeGain(int value) { };
 
-    virtual void start(QByteArray &eeprom, bool tests=true) = 0;
+    virtual void start(QByteArray & eeprom, bool tests=true) = 0;
 
-    virtual void start(const char *filename, bool tests=true) = 0;
+    virtual void start(const char * filename, bool tests=true) = 0;
 
     virtual void stop() = 0;
 
@@ -123,4 +127,4 @@ void unregisterSimulators();
 SimulatorFactory *getSimulatorFactory(const QString &name);
 extern QMap<QString, SimulatorFactory *> registered_simulators;
 
-#endif // _SIMULATOR_INTERFACE_H_
+#endif // _SIMULATORINTERFACE_H_

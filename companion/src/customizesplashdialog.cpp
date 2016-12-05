@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "customizesplashdialog.h"
 #include "ui_customizesplashdialog.h"
 #include "flashfirmwaredialog.h"
@@ -29,11 +49,11 @@ void Side::markSourceButton()
 
 void Side::copyImage( Side side )
 {
- if ((*source!=UNDEFINED) && (*side.source!=UNDEFINED))
+  if ((*source!=UNDEFINED) && (*side.source!=UNDEFINED))
     imageLabel->setPixmap(*side.imageLabel->pixmap());
 }
 
-bool Side::displayImage( QString fileName, Source pictSource )
+bool Side::displayImage(QString fileName, Source pictSource)
 {
   QImage image;
 
@@ -41,7 +61,7 @@ bool Side::displayImage( QString fileName, Source pictSource )
     return false;
 
   // Determine which picture format to use
-  if (pictSource == FW ){
+  if (pictSource == FW) {
     FirmwareInterface firmware(fileName);
     if (!firmware.hasSplash())
       return false;
@@ -54,39 +74,36 @@ bool Side::displayImage( QString fileName, Source pictSource )
     if (pictSource== PICT)
       *format = image.width()>WIDTH_9X ? LCDTARANIS : LCD9X;
     else if (pictSource == PROFILE)
-      *format = (g.profile[g.id()].fwType().contains("taranis")) ? LCDTARANIS : LCD9X; 
+      *format = (g.profile[g.id()].fwType().contains("x9")) ? LCDTARANIS : LCD9X; 
   }
+
   if (image.isNull()) {
     return false;
   }
-  // Load image
-  if (*format==LCDTARANIS) {
-    imageLabel->setPixmap( makePixMap( image, "taranis" ));
-    imageLabel->setFixedSize(WIDTH_TARANIS*2, HEIGHT_TARANIS*2);
-  }
-  else {
-    imageLabel->setPixmap( makePixMap( image, "9x" )); 
-    imageLabel->setFixedSize(WIDTH_9X*2, HEIGHT_9X*2);
-  }
 
-  switch (pictSource){
-  case FW:
-    fileNameEdit->setText(QObject::tr("FW: %1").arg(fileName));
-    *saveToFileName = fileName;
-    *source=FW;
-    break;
-  case PICT:
-    fileNameEdit->setText(QObject::tr("Pict: %1").arg(fileName));
-    *saveToFileName = fileName;
-    *source=PICT;
-    break;
-  case PROFILE:
-    fileNameEdit->setText(QObject::tr("Profile image"));
-    *saveToFileName = fileName;
-    *source=PROFILE;
-    break;
-  default:
-    break;
+  // Load image
+  QPixmap pixmap = makePixMap(image);
+  imageLabel->setPixmap(pixmap);
+  imageLabel->setFixedSize(pixmap.width()*2, pixmap.height()*2);
+
+  switch (pictSource) {
+    case FW:
+      fileNameEdit->setText(QObject::tr("FW: %1").arg(fileName));
+      *saveToFileName = fileName;
+      *source = FW;
+      break;
+    case PICT:
+      fileNameEdit->setText(QObject::tr("Pict: %1").arg(fileName));
+      *saveToFileName = fileName;
+      *source = PICT;
+      break;
+    case PROFILE:
+      fileNameEdit->setText(QObject::tr("Profile image"));
+      *saveToFileName = fileName;
+      *source = PROFILE;
+      break;
+    default:
+      break;
   }
   saveButton->setEnabled(true);
   libraryButton->setEnabled(true);

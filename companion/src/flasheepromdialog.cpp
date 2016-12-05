@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "flasheepromdialog.h"
 #include "ui_flasheepromdialog.h"
 #include "eeprominterface.h"
@@ -7,7 +27,7 @@
 #include "appdata.h"
 #include "progressdialog.h"
 #include "radiointerface.h"
-#include "converteeprom.h"
+#include "storage_eeprom.h"
 #include "splashlibrarydialog.h"
 
 FlashEEpromDialog::FlashEEpromDialog(QWidget *parent, const QString &filename):
@@ -58,7 +78,7 @@ void FlashEEpromDialog::updateUI()
       ui->patchCalibration->show();
       ui->patchHardwareSettings->show();
       // TODO I hardcode the number of pots here, should be dependant on the board?
-      if (!((calib.length()==(NUM_STICKS+3)*12) && (trainercalib.length()==16))) {
+      if (!((calib.length()==(CPN_MAX_STICKS+3)*12) && (trainercalib.length()==16))) {
         ui->patchCalibration->setDisabled(true);
       }
       if (!((DisplaySet.length()==6) && (BeeperSet.length()==4) && (HapticSet.length()==6) && (SpeakerSet.length()==6))) {
@@ -181,11 +201,11 @@ bool FlashEEpromDialog::patchCalibration()
   int8_t txCurrentCalibration=(int8_t) g.profile[g.id()].txCurrentCalibration();
   int8_t PPM_Multiplier=(int8_t) g.profile[g.id()].ppmMultiplier();
 
-  if ((calib.length()==(NUM_STICKS+potsnum)*12) && (trainercalib.length()==16)) {
+  if ((calib.length()==(CPN_MAX_STICKS+potsnum)*12) && (trainercalib.length()==16)) {
     QString Byte;
     int16_t byte16;
     bool ok;
-    for (int i=0; i<(NUM_STICKS+potsnum); i++) {
+    for (int i=0; i<(CPN_MAX_STICKS+potsnum); i++) {
       Byte=calib.mid(i*12,4);
       byte16=(int16_t)Byte.toInt(&ok,16);
       if (ok)
@@ -277,7 +297,7 @@ void FlashEEpromDialog::on_burnButton_clicked()
     QString filename = generateProcessUniqueTempFileName("temp.bin");
     QFile file(filename);
     uint8_t *eeprom = (uint8_t*)malloc(GetEepromInterface()->getEEpromSize());
-    int eeprom_size = GetEepromInterface()->save(eeprom, *radioData, GetCurrentFirmware()->getVariantNumber());
+    int eeprom_size = GetEepromInterface()->save(eeprom, *radioData, 0, GetCurrentFirmware()->getVariantNumber());
     if (!eeprom_size) {
       QMessageBox::warning(this, tr("Error"), tr("Cannot write file %1:\n%2.").arg(filename).arg(file.errorString()));
       return;

@@ -1,5 +1,25 @@
-#ifndef HELPERS_H
-#define HELPERS_H
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#ifndef _HELPERS_H_
+#define _HELPERS_H_
 
 #include <QCheckBox>
 #include <QSpinBox>
@@ -8,7 +28,7 @@
 #include <QDebug>
 #include "eeprominterface.h"
 
-extern const QColor colors[C9X_MAX_CURVES];
+extern const QColor colors[CPN_MAX_CURVES];
 
 #define TMR_NUM_OPTION  (TMRMODE_COUNT+2*9+2*GetCurrentFirmware()->getCapability(LogicalSwitches)-1)
 
@@ -153,8 +173,8 @@ QVector<T> findWidgets(QObject * object, const QString & name)
   return result;
 }
 
-// Format a pixmap to fit on the radio using a specific firmware
-QPixmap makePixMap( QImage image, QString firmwareType );
+// Format a pixmap to fit on the current firmware
+QPixmap makePixMap(const QImage & image);
 
 int version2index(const QString & version);
 QString index2version(int index);
@@ -270,4 +290,4 @@ private:
 
 extern Stopwatch gStopwatch;
 
-#endif // HELPERS_H
+#endif // _HELPERS_H_

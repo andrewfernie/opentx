@@ -252,7 +252,6 @@ options_taranis = {
     "mixersmon": ("MIXERS_MONITOR", "YES", "NO"),
     "internalppm": ("TARANIS_INTERNAL_PPM", "YES", "NO"),
     "shutdownconfirm": ("SHUTDOWN_CONFIRMATION", "YES", "NO"),
-    "timer3": ("TIMERS", "3", "2"),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "multimodule": ("MULTIMODULE", "YES", "NO")
 }
@@ -272,7 +271,6 @@ options_taranisplus = {
     "mixersmon": ("MIXERS_MONITOR", "YES", "NO"),
     "internalppm": ("TARANIS_INTERNAL_PPM", "YES", "NO"),
     "shutdownconfirm": ("SHUTDOWN_CONFIRMATION", "YES", "NO"),
-    "timer3": ("TIMERS", "3", None),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "multimodule": ("MULTIMODULE", "YES", "NO")
 }
@@ -292,7 +290,6 @@ options_taranisx9e = {
     "mixersmon": ("MIXERS_MONITOR", "YES", "NO"),
     "internalppm": ("TARANIS_INTERNAL_PPM", "YES", "NO"),
     "shutdownconfirm": ("SHUTDOWN_CONFIRMATION", "YES", "NO"),
-    "timer3": ("TIMERS", "3", None),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "horussticks": ("STICKS", "HORUS", "STANDARD"),
     "multimodule": ("MULTIMODULE", "YES", "NO")
@@ -308,7 +305,6 @@ options_horus = {
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "massstorage": ("USB", "MASSSTORAGE", None),
     "cli": ("USB", "SERIAL", None),
-    "timer3": ("TIMERS", "3", "2"),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "multimodule": ("MULTIMODULE", "YES", "NO"),
     "pcbdev": ("PCBREV", "10", None),

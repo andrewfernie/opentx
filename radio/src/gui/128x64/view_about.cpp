@@ -26,6 +26,7 @@ const pm_uchar about_bmp[] PROGMEM = {
 
 enum AboutScreens {
   ABOUT_OPENTX,
+  ABOUT_HARDWARE,
   ABOUT_BERTRAND,
   ABOUT_ANDRE,
   ABOUT_MIKE,
@@ -33,7 +34,6 @@ enum AboutScreens {
   ABOUT_MARTIN,
   ABOUT_ROMOLO,
   ABOUT_ROB,
-  ABOUT_HARDWARE,
   ABOUT_PARENTS,
   ABOUT_END,
   ABOUT_COUNT,
@@ -41,6 +41,14 @@ enum AboutScreens {
 
 #define ABOUT_X      2
 #define ABOUT_INDENT 4
+
+#if defined(PCBX7D)
+#define EVT_KEY_PREVIOUS_VIEW          EVT_KEY_LONG(KEY_PAGE)
+#define EVT_KEY_NEXT_VIEW              EVT_KEY_BREAK(KEY_PAGE)
+#else
+#define EVT_KEY_PREVIOUS_VIEW          EVT_KEY_FIRST(KEY_UP)
+#define EVT_KEY_NEXT_VIEW              EVT_KEY_FIRST(KEY_DOWN)
+#endif
 
 void menuAboutView(event_t event)
 {
@@ -53,11 +61,14 @@ void menuAboutView(event_t event)
       screenIndex = 0;
       greyIndex = 0;
       break;
-    case EVT_KEY_FIRST(KEY_DOWN):
+    case EVT_KEY_NEXT_VIEW:
       screenIndex < ABOUT_PARENTS ? screenIndex++ : screenIndex = ABOUT_OPENTX;
       greyIndex = 0;
       break;
-    case EVT_KEY_FIRST(KEY_UP):
+    case EVT_KEY_PREVIOUS_VIEW:
+      if (IS_KEY_LONG(EVT_KEY_PREVIOUS_VIEW)) {
+        killEvents(event);
+      }
       screenIndex > ABOUT_OPENTX ? screenIndex-- : screenIndex = ABOUT_PARENTS;
       greyIndex = 0;
       break;

@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "hardware.h"
 #include "ui_hardware.h"
 
@@ -8,7 +28,7 @@ void HardwarePanel::setupSwitchConfig(int index, QLabel *label, AutoLineEdit *na
   if (IS_TARANIS(firmware->getBoard())) {
     if (IS_TARANIS_X9E(firmware->getBoard())) {
       enabled = true;
-      type->addItem(tr("None"), GeneralSettings::SWITCH_NONE);
+      type->addItem(tr("None"), Firmware::SWITCH_NONE);
     }
     else if (index < 8) {
       enabled = true;
@@ -16,9 +36,9 @@ void HardwarePanel::setupSwitchConfig(int index, QLabel *label, AutoLineEdit *na
   }
 
   if (enabled) {
-    type->addItem(tr("2 Positions Toggle"), GeneralSettings::SWITCH_TOGGLE);
-    type->addItem(tr("2 Positions"), GeneralSettings::SWITCH_2POS);
-    if (threePos) type->addItem(tr("3 Positions"), GeneralSettings::SWITCH_3POS);
+    type->addItem(tr("2 Positions Toggle"), Firmware::SWITCH_TOGGLE);
+    type->addItem(tr("2 Positions"), Firmware::SWITCH_2POS);
+    if (threePos) type->addItem(tr("3 Positions"), Firmware::SWITCH_3POS);
     name->setField(generalSettings.switchName[index], 3, this);
     type->setField(generalSettings.switchConfig[index], this);
   }
@@ -34,7 +54,7 @@ void HardwarePanel::setupPotConfig(int index, QLabel *label, AutoLineEdit *name,
   bool enabled = false;
 
   if (IS_TARANIS_X9E(firmware->getBoard()) && index < 4) {
-    label->setText(RawSource(SOURCE_TYPE_STICK, index+NUM_STICKS).toString());
+    label->setText(RawSource(SOURCE_TYPE_STICK, index+CPN_MAX_STICKS).toString());
     enabled = true;
   }
   else if (IS_TARANIS_PLUS(firmware->getBoard()) && index < 3) {
@@ -72,7 +92,7 @@ void HardwarePanel::setupSliderConfig(int index, QLabel *label, AutoLineEdit *na
   }
 
   if (IS_TARANIS_X9E(firmware->getBoard())) {
-    label->setText(RawSource(SOURCE_TYPE_STICK, index+NUM_STICKS+4).toString());
+    label->setText(RawSource(SOURCE_TYPE_STICK, index+CPN_MAX_STICKS+4).toString());
   }
 
   if (enabled) {

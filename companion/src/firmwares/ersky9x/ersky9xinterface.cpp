@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
- * 
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,14 +16,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include <iostream>
 #include "ersky9xinterface.h"
 #include "ersky9xeeprom.h"
-#include "simulator/ersky9xsimulator.h"
-#include "file.h"
+#include "rlefile.h"
 
 #define FILE_TYP_GENERAL 1
 #define FILE_TYP_MODEL   2
@@ -127,7 +130,7 @@ unsigned long Ersky9xInterface::loadxml(RadioData &radioData, QDomDocument &doc)
 
   Ersky9xGeneral ersky9xGeneral;
   memset(&ersky9xGeneral,0,sizeof(ersky9xGeneral));
-  if(!loadGeneralDataXML(&doc, &ersky9xGeneral)) {
+  if(!loadRadioSettingsDataXML(&doc, &ersky9xGeneral)) {
     errors.set(UNKNOWN_ERROR);
     return errors.to_ulong();
   }
@@ -241,14 +244,6 @@ unsigned long Ersky9xInterface::loadBackup(RadioData &radioData, uint8_t *eeprom
   return errors.to_ulong();
 }
 
-int Ersky9xInterface::save(uint8_t *eeprom, RadioData &radioData, uint32_t variant, uint8_t version)
-{
-  std::cout << "NO!\n";
-  // TODO an error
-
-  return 0;
-}
-
 int Ersky9xInterface::getSize(const ModelData & model)
 {
   return 0;
@@ -320,7 +315,7 @@ QDomElement Ersky9xInterface::getModelDataXML(QDomDocument * qdoc, Ersky9xModelD
   return md;
 }
 
-bool Ersky9xInterface::loadGeneralDataXML(QDomDocument * qdoc, Ersky9xGeneral * tgen)
+bool Ersky9xInterface::loadRadioSettingsDataXML(QDomDocument * qdoc, Ersky9xGeneral * tgen)
 {
   //look for "GENERAL_DATA" tag
   QDomElement gde = qdoc->elementsByTagName("GENERAL_DATA").at(0).toElement();

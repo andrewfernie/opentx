@@ -1,5 +1,12 @@
 /*
- * Author - Kjell Kernen
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,11 +16,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#ifndef WIZARDDIALOG_H
-#define WIZARDDIALOG_H
+#ifndef _WIZARDDIALOG_H_
+#define _WIZARDDIALOG_H_
 
 #include <QtWidgets>
 #include "wizarddata.h"
@@ -31,7 +37,7 @@ class WizardDialog : public QWizard
     void showHelp();
 };
 
-class  StandardPage: public QWizardPage
+class StandardPage: public QWizardPage
 {
   Q_OBJECT
 
@@ -57,7 +63,7 @@ class  StandardPage: public QWizardPage
     int nextId() const;
 };
 
-class  ModelSelectionPage: public StandardPage
+class ModelSelectionPage: public StandardPage
 {
   Q_OBJECT
 public:
@@ -71,7 +77,7 @@ private:
   int nextId() const;
 };
 
-class  WingtypeSelectionPage: public StandardPage
+class WingtypeSelectionPage: public StandardPage
 {
   Q_OBJECT
 public:
@@ -82,7 +88,7 @@ private:
   int nextId() const;
 };
 
-class  TailSelectionPage: public StandardPage
+class TailSelectionPage: public StandardPage
 {
   Q_OBJECT
 public:
@@ -94,7 +100,7 @@ private:
   int nextId() const;
 };
 
-class  FlybarSelectionPage: public StandardPage
+class FlybarSelectionPage: public StandardPage
 {
   Q_OBJECT
 public:
@@ -363,7 +369,7 @@ private:
   QString vehicleName( Vehicle );
   QString printChannel( Input, int, Input, int );
 };
-#endif  // WIZARDDIALOG_H
+#endif // _WIZARDDIALOG_H_
 
 
 

@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include <algorithm>
 #include "helpers.h"
 #include "ersky9xeeprom.h"
@@ -55,7 +75,7 @@ t_Ersky9xTrainerData::t_Ersky9xTrainerData()
 t_Ersky9xTrainerData::operator TrainerData ()
 {
   TrainerData c9x;
-  for (int i=0; i<NUM_STICKS; i++) {
+  for (int i=0; i<CPN_MAX_STICKS; i++) {
     c9x.calib[i] = calib[i];
     c9x.mix[i] = mix[i];
   }
@@ -73,7 +93,7 @@ Ersky9xGeneral::operator GeneralSettings ()
   
   result.version = myVers;
   
-  for (int i=0; i<NUM_STICKSnPOTS; i++) {
+  for (int i=0; i<CPN_MAX_STICKSnPOTS; i++) {
     result.calibMid[i] = calibMid[i];
     result.calibSpanNeg[i] = calibSpanNeg[i];
     result.calibSpanPos[i] = calibSpanPos[i];
@@ -530,8 +550,8 @@ t_Ersky9xModelData_v10::operator ModelData ()
 
   // expoData
   int e = 0;
-  for (int ch = 0; ch < 4 && e < C9X_MAX_EXPOS; ch++) {
-    for (int dr = 0, pos = 0; dr < 3 && e < C9X_MAX_EXPOS; dr++, pos++) {
+  for (int ch = 0; ch < 4 && e < CPN_MAX_EXPOS; ch++) {
+    for (int dr = 0, pos = 0; dr < 3 && e < CPN_MAX_EXPOS; dr++, pos++) {
       if ((dr == 0 && !expoData[ch].drSw1) || (dr == 1 && !expoData[ch].drSw2))
         dr = 2;
       if (dr == 2 && !expoData[ch].expo[0][0][0] && !expoData[ch].expo[0][0][1] && !expoData[ch].expo[0][1][0] && !expoData[ch].expo[0][1][1])
@@ -554,7 +574,7 @@ t_Ersky9xModelData_v10::operator ModelData ()
       }
       else {
         c9x.expoData[e].mode = 2;
-        if (e < C9X_MAX_EXPOS - 1) {
+        if (e < CPN_MAX_EXPOS - 1) {
           c9x.expoData[e + 1].swtch = c9x.expoData[e].swtch;
           c9x.expoData[++e].chn = ch;
           c9x.expoData[e].mode = 1;
@@ -568,7 +588,7 @@ t_Ersky9xModelData_v10::operator ModelData ()
     }
   }
 
-  for (int i=0; i<NUM_STICKS; i++)
+  for (int i=0; i<CPN_MAX_STICKS; i++)
     c9x.flightModeData[0].trim[i] = trim[i];
 
   for (int i=0; i<ERSKY9X_MAX_CURVE5; i++) {
@@ -645,8 +665,8 @@ t_Ersky9xModelData_v11::operator ModelData ()
 
   // expoData
   int e = 0;
-  for (int ch = 0; ch < 4 && e < C9X_MAX_EXPOS; ch++) {
-    for (int dr = 0, pos = 0; dr < 3 && e < C9X_MAX_EXPOS; dr++, pos++) {
+  for (int ch = 0; ch < 4 && e < CPN_MAX_EXPOS; ch++) {
+    for (int dr = 0, pos = 0; dr < 3 && e < CPN_MAX_EXPOS; dr++, pos++) {
       if ((dr == 0 && !expoData[ch].drSw1) || (dr == 1 && !expoData[ch].drSw2))
         dr = 2;
       if (dr == 2 && !expoData[ch].expo[0][0][0] && !expoData[ch].expo[0][0][1] && !expoData[ch].expo[0][1][0] && !expoData[ch].expo[0][1][1])
@@ -669,7 +689,7 @@ t_Ersky9xModelData_v11::operator ModelData ()
       }
       else {
         c9x.expoData[e].mode = 2;
-        if (e < C9X_MAX_EXPOS - 1) {
+        if (e < CPN_MAX_EXPOS - 1) {
           c9x.expoData[e + 1].swtch = c9x.expoData[e].swtch;
           c9x.expoData[++e].chn = ch;
           c9x.expoData[e].mode = 1;
@@ -683,7 +703,7 @@ t_Ersky9xModelData_v11::operator ModelData ()
     }
   }
 
-  for (int i=0; i<NUM_STICKS; i++)
+  for (int i=0; i<CPN_MAX_STICKS; i++)
     c9x.flightModeData[0].trim[i] = trim[i];
 
   for (int i=0; i<ERSKY9X_MAX_CURVE5; i++) {

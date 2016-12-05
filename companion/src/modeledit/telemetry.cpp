@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 #include "telemetry.h"
 #include "ui_telemetry.h"
 #include "ui_telemetry_analog.h"
@@ -628,13 +648,13 @@ void populateTelemetrySourcesComboBox(AutoComboBox * cb, const ModelData * model
 {
   cb->clear();
   if (negative) {
-    for (int i=-C9X_MAX_SENSORS; i<0; ++i) {
+    for (int i=-CPN_MAX_SENSORS; i<0; ++i) {
       if (model->sensorData[-i-1].isAvailable())
         cb->addItem(QObject::tr("-%1").arg(model->sensorData[-i-1].label), i);
     }
   }
   cb->addItem("---", 0);
-  for (int i=1; i<=C9X_MAX_SENSORS; ++i) {
+  for (int i=1; i<=CPN_MAX_SENSORS; ++i) {
     if (model->sensorData[i-1].isAvailable())
       cb->addItem(model->sensorData[i-1].label, i);
   }
@@ -720,7 +740,7 @@ TelemetryPanel::TelemetryPanel(QWidget *parent, ModelData & model, GeneralSettin
   if (IS_ARM(firmware->getBoard())) {
     ui->A1GB->hide();
     ui->A2GB->hide();
-    for (int i=0; i<C9X_MAX_SENSORS; ++i) {
+    for (int i=0; i<CPN_MAX_SENSORS; ++i) {
       TelemetrySensorPanel * panel = new TelemetrySensorPanel(this, model.sensorData[i], model, generalSettings, firmware);
       ui->sensorsLayout->addWidget(panel);
       sensorPanels[i] = panel;
@@ -782,7 +802,7 @@ void TelemetryPanel::update()
   }
 
   if (IS_ARM(firmware->getBoard())) {
-    for (int i=0; i<C9X_MAX_SENSORS; ++i) {
+    for (int i=0; i<CPN_MAX_SENSORS; ++i) {
       sensorPanels[i]->update();
     }
     for (int i=0; i<firmware->getCapability(TelemetryCustomScreens); i++) {
@@ -827,7 +847,7 @@ void TelemetryPanel::setup()
     }
 
     /*if (IS_ARM(firmware->getBoard())) {
-      for (int i=0; i<C9X_MAX_SENSORS; ++i) {
+      for (int i=0; i<CPN_MAX_SENSORS; ++i) {
         TelemetrySensorPanel * panel = new TelemetrySensorPanel(this, model->, model, generalSettings, firmware);
         ui->sensorsLayout->addWidget(panel);
         sensorPanels[i] = panel;

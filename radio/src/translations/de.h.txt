@@ -437,7 +437,7 @@
   #define LEN_VUNITSSYSTEM     TR("\006", "\012")
   #define TR_VUNITSSYSTEM      TR("Metrik""Imper.", "Metrisch\0 ""Imperial\0 ")
   #define LEN_VTELEMUNIT       "\003"
-  #define TR_VTELEMUNIT        "-\0 ""V\0 ""A\0 ""mA\0""kts""m/s""f/s""kmh""mph""m\0 ""ft\0""@C\0""@F\0""%\0 ""mAh""W\0 ""dB\0""rpm""g\0 ""@\0 ""ml\0""fOz"
+  #define TR_VTELEMUNIT        "-\0 ""V\0 ""A\0 ""mA\0""kts""m/s""f/s""kmh""mph""m\0 ""ft\0""@C\0""@F\0""%\0 ""mAh""W\0 ""mW\0""dB\0""rpm""g\0 ""@\0 ""rad""ml\0""fOz"
 #else
   #if defined(IMPERIAL_UNITS)
     #define LENGTH_UNIT        LENGTH_UNIT_IMP
@@ -937,6 +937,7 @@
 #define TR_SDCARD_ERROR        "SD-Kartenfehler"
 #define TR_NO_SDCARD           "Keine SD-Karte"
 #define TR_SDCARD_FULL         "SD-Karte voll"
+#define TR_SDCARD_NOWIZ        "No wizard found on SD Card"
 #define TR_INCOMPATIBLE        "Nicht kompatibel"
 #define TR_WARNING             "WARNUNG"
 #define TR_EEPROMWARN          "EEPROM"
@@ -1014,6 +1015,7 @@
 #define TR_FLASH_BOOTLOADER      "Flash BootLoader selbst"      //
 #define TR_FLASH_EXTERNAL_DEVICE "Flash externes Gerät"
 #define TR_FLASH_INTERNAL_MODULE "Flash internes XJT-Modul"
+#define TR_FIRMWARE_UPDATE_ERROR "Firmware update error"
 #define TR_WRITING               "\032Writing..."        //
 #define TR_CONFIRM_FORMAT      "Formatieren bestätigen?"
 #define TR_INTERNALRF          "----Internes HF-Modul----------"
@@ -1183,7 +1185,7 @@
 
 #define TR_ABOUT_BERTRAND_1    "Bertrand Songis"
 #define TR_ABOUT_BERTRAND_2    "OpenTX Hauptauthor"
-#define TR_ABOUT_BERTRAND_3    "Companion9x-Mitentwickler"
+#define TR_ABOUT_BERTRAND_3    "Companion-Mitentwickler"
 
 #define TR_ABOUT_MIKE_1        "Mike Blandford"
 #define TR_ABOUT_MIKE_2        "Code- und Treiber-Guru"
@@ -1191,7 +1193,7 @@
 #define TR_ABOUT_MIKE_4        "Sehr inspirierend."
 
 #define TR_ABOUT_ROMOLO_1      "Romolo Manfredini"
-#define TR_ABOUT_ROMOLO_2      "Companion9x-Hauptentwickler"
+#define TR_ABOUT_ROMOLO_2      "Companion-Hauptentwickler"
 #define TR_ABOUT_ROMOLO_3      ""
 
 #define TR_ABOUT_ANDRE_1       "Andre Bernet"
@@ -1346,12 +1348,14 @@
 #define ZSTR_RX_RSSI2          "2RSS"
 #define ZSTR_RX_QUALITY        "RQly"
 #define ZSTR_RX_SNR            "RSNR"
+#define ZSTR_RX_NOISE          "RNse"
 #define ZSTR_ANTENNA           "ANT"
 #define ZSTR_RF_MODE           "RFMD"
 #define ZSTR_TX_POWER          "TPWR"
 #define ZSTR_TX_RSSI           "TRSS"
 #define ZSTR_TX_QUALITY        "TQly"
 #define ZSTR_TX_SNR            "TSNR"
+#define ZSTR_TX_NOISE          "TNse"
 #define ZSTR_PITCH             "Ptch"
 #define ZSTR_ROLL              "Roll"
 #define ZSTR_YAW               "Yaw"
@@ -1364,3 +1368,7 @@
 #define ZSTR_QOS_F             "FLss"
 #define ZSTR_QOS_H             "Hold"
 #define ZSTR_BIND              "BIND"
+#define ZSTR_LAP_NUMBER        "Lap "
+#define ZSTR_GATE_NUMBER       "Gate"
+#define ZSTR_LAP_TIME          "LapT"
+#define ZSTR_GATE_TIME         "GteT"

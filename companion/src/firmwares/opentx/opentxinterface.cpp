@@ -1,7 +1,12 @@
 /*
- * Author - Bertrand Songis <bsongis@gmail.com>
+ * Copyright (C) OpenTX
  *
- * Based on th9x -> http://code.google.com/p/th9x/
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,17 +16,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include <iostream>
 #include <QMessageBox>
 #include "opentxinterface.h"
 #include "opentxeeprom.h"
-#include "open9xGruvin9xeeprom.h"
-#include "open9xSky9xeeprom.h"
-#include "file.h"
+#include "rlefile.h"
 #include "appdata.h"
+#include "storage_sdcard.h"
 
 #define OPENTX_FIRMWARE_DOWNLOADS        "http://downloads-22.open-tx.org/firmware"
 #define OPENTX_NIGHT_FIRMWARE_DOWNLOADS  "http://downloads-22.open-tx.org/nightly/firmware"
@@ -34,9 +37,9 @@
 /// convert model number 0..MAX_MODELS-1  int fileId
 #define FILE_MODEL(n) (1+n)
 
-template <typename T, size_t N>
+template<typename T, size_t N>
 inline
-size_t SizeOfArray( T(&)[ N ] )
+size_t SizeOfArray(T(&)[N])
 {
   return N;
 }
@@ -63,12 +66,14 @@ const char * OpenTxEepromInterface::getName()
       return "OpenTX for MEGA2560 board";
     case BOARD_GRUVIN9X:
       return "OpenTX for Gruvin9x board / 9X";
-    case BOARD_TARANIS:
-      return "OpenTX for FrSky Taranis";
-    case BOARD_TARANIS_PLUS:
-      return "OpenTX for FrSky Taranis Plus";
+    case BOARD_TARANIS_X9D:
+      return "OpenTX for FrSky Taranis X9D";
+    case BOARD_TARANIS_X9DP:
+      return "OpenTX for FrSky Taranis X9D+";
     case BOARD_TARANIS_X9E:
       return "OpenTX for FrSky Taranis X9E";
+    case BOARD_X7D:
+      return "OpenTX for FrSky X7D";
     case BOARD_SKY9X:
       return "OpenTX for Sky9x board / 9X";
     case BOARD_9XRPRO:
@@ -99,14 +104,14 @@ const int OpenTxEepromInterface::getEEpromSize()
     case BOARD_9XRPRO:
     case BOARD_AR9X:
       return EESIZE_9XRPRO;
-    case BOARD_TARANIS:
-    case BOARD_TARANIS_PLUS:
+    case BOARD_X7D:
+    case BOARD_TARANIS_X9D:
+    case BOARD_TARANIS_X9DP:
     case BOARD_TARANIS_X9E:
     case BOARD_FLAMENCO:
-    case BOARD_HORUS:
       return EESIZE_TARANIS;
     default:
-      return 0;
+      return 0; // unlimited
   }
 }
 
@@ -122,194 +127,91 @@ const int OpenTxEepromInterface::getMaxModels()
     return 16;
 }
 
-template <class T>
-bool OpenTxEepromInterface::loadModel(ModelData &model, uint8_t *data, int index, unsigned int stickMode)
+bool OpenTxEepromInterface::loadRadioSettingsFromRLE(GeneralSettings & settings, RleFile * rleFile, uint8_t version)
 {
-  T _model;
-
-  if (!data) {
-    // load from EEPROM
-    efile->openRd(FILE_MODEL(index));
-    int sz = efile->readRlc2((uint8_t*)&_model, sizeof(T));
-    if (sz) {
-      model = _model;
-      if (sz < (int)sizeof(T)) {
-        std::cout << " size(" << model.name << ") " << sz << " < " << (int)sizeof(T) << " ";
-      }
-      if (stickMode) {
-        applyStickModeToModel(model, stickMode);
-      }
-    }
-    else {
-      model.clear();
-    }
-  }
-  else {
-    // load from SD Backup, size is stored in index
-    if ((unsigned int)index < sizeof(T))
-      return false;
-    memcpy((uint8_t*)&_model, data, sizeof(T));
-    model = _model;
-  }
-
-  return true;
-}
-
-template <class T>
-bool OpenTxEepromInterface::loadModelVariant(unsigned int index, ModelData &model, uint8_t *data, unsigned int version, unsigned int variant)
-{
-  T open9xModel(model, board, version, variant);
-
-  if (!data) {
-    // load from EEPROM
-    QByteArray eepromData(sizeof(model), 0);  // ModelData should be always bigger than the EEPROM struct
-    efile->openRd(FILE_MODEL(index));
-    int numbytes = efile->readRlc2((uint8_t *)eepromData.data(), eepromData.size());
-    if (numbytes) {
-      open9xModel.Import(eepromData);
-      // open9xModel.Dump();
-      model.used = true;
-    }
-    else {
-      model.clear();
-    }
-  }
-  else {
-    // load from SD Backup, size is stored in index
-    QByteArray backupData((char *)data, index);
-    QByteArray modelData;
-    if (IS_SKY9X(board))
-      modelData = backupData;
-    else
-      importRlc(modelData, backupData);
-    if (modelData.size()) {
-      open9xModel.Import(modelData);
-      // open9xModel.Dump();
-      model.used = true;
-    }
-    else {
-      model.clear();
-    }
-  }
-
-  return true;
-}
-
-bool OpenTxEepromInterface::loadModel(uint8_t version, ModelData &model, uint8_t *data, int index, unsigned int variant, unsigned int stickMode)
-{
-  if (version == 201) {
-    return loadModel<Open9xModelData_v201>(model, data, index, stickMode);
-  }
-  else if (version == 202) {
-    return loadModel<Open9xModelData_v202>(model, data, index, 0 /*no more stick mode messed*/);
-  }
-  else if (version == 203) {
-    return loadModel<Open9xModelData_v203>(model, data, index, 0 /*no more stick mode messed*/);
-  }
-  else if (version == 204) {
-    return loadModel<Open9xModelData_v204>(model, data, index, 0 /*no more stick mode messed*/);
-  }
-  else if (version == 205) {
-    return loadModel<Open9xModelData_v205>(model, data, index, 0 /*no more stick mode messed*/);
-  }
-  else if (board == BOARD_GRUVIN9X && version == 207) {
-    return loadModel<Open9xGruvin9xModelData_v207>(model, data, index, 0 /*no more stick mode messed*/);
-  }
-  else if (version == 208) {
-    if (board == BOARD_GRUVIN9X) {
-      return loadModel<Open9xGruvin9xModelData_v208>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else if (IS_SKY9X(board)) {
-      return loadModel<Open9xArmModelData_v208>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else {
-      return loadModel<Open9xModelData_v208>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-  }
-  else if (version == 209) {
-    if (board == BOARD_GRUVIN9X) {
-      return loadModel<Open9xGruvin9xModelData_v209>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else if (IS_SKY9X(board)) {
-      return loadModel<Open9xArmModelData_v209>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else {
-      return loadModel<Open9xModelData_v209>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-  }
-  else if (version == 210) {
-    if (board == BOARD_GRUVIN9X) {
-      return loadModel<Open9xGruvin9xModelData_v210>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else if (IS_SKY9X(board)) {
-      return loadModel<Open9xArmModelData_v210>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else {
-      return loadModel<Open9xModelData_v210>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-  }
-  else if (version == 211) {
-    if (board == BOARD_GRUVIN9X) {
-      return loadModel<Open9xGruvin9xModelData_v211>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else if (IS_SKY9X(board)) {
-      return loadModel<Open9xArmModelData_v211>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-    else {
-      return loadModel<Open9xModelData_v211>(model, data, index, 0 /*no more stick mode messed*/);
-    }
-  }
-  else if (version == 212) {
-    if (IS_SKY9X(board)) {
-      return loadModel<Open9xArmModelData_v212>(model, data, index);
-    }
-    else {
-      return loadModelVariant<OpenTxModelData>(index, model, data, version, variant);
-    }
-  }
-  else if (version >= 213) {
-    return loadModelVariant<OpenTxModelData>(index, model, data, version, variant);
-  }
-
-  std::cout << " ko\n";
-  return false;
-}
-
-template <class T>
-bool OpenTxEepromInterface::loadGeneral(GeneralSettings &settings, unsigned int version)
-{
-  QByteArray eepromData(sizeof(settings), 0); // GeneralSettings should be always bigger than the EEPROM struct
-  T open9xSettings(settings, board, version);
+  QByteArray data(sizeof(settings), 0); // GeneralSettings should be always bigger than the EEPROM struct
+  OpenTxGeneralData open9xSettings(settings, board, version);
   efile->openRd(FILE_GENERAL);
-  int sz = efile->readRlc2((uint8_t *)eepromData.data(), eepromData.size());
-  if (sz) {
-    open9xSettings.Import(eepromData);
+  int size = rleFile->readRlc2((uint8_t *)data.data(), data.size());
+  if (size) {
+    open9xSettings.Import(data);
     return checkVariant(settings.version, settings.variant);
   }
-
-  std::cout << " error when loading general settings";
-  return false;
+  else {
+    std::cout << " error when loading general settings";
+    return false;
+  }
 }
 
-template <class T>
-bool OpenTxEepromInterface::saveGeneral(GeneralSettings &settings, BoardEnum board, uint32_t version, uint32_t variant)
+bool OpenTxEepromInterface::loadModelFromRLE(ModelData & model, RleFile * rleFile, unsigned int index, uint8_t version, uint32_t variant)
+{
+  QByteArray data(sizeof(model), 0);  // ModelData should be always bigger than the EEPROM struct
+  rleFile->openRd(FILE_MODEL(index));
+  int size = rleFile->readRlc2((uint8_t *)data.data(), data.size());
+  if (size) {
+    if (loadFromByteArray<ModelData, OpenTxModelData>(model, data, version, variant)) {
+      model.used = true;
+    }
+  }
+  else {
+    model.clear();
+  }
+  return true;
+}
+
+template <class T, class M>
+bool OpenTxEepromInterface::saveToByteArray(const T & src, QByteArray & data, uint8_t version)
+{
+  QByteArray raw;
+  M manager((T&)src, board, version, 0);
+  manager.Dump();
+  manager.Export(raw);
+  data.resize(8);
+  *((uint32_t*)&data.data()[0]) = 0x3178396F;
+  data[4] = version;
+  data[5] = 'M';
+  *((uint16_t*)&data.data()[6]) = raw.size();
+  data.append(raw);
+  return true;
+}
+
+template <class T, class M>
+bool OpenTxEepromInterface::loadFromByteArray(T & dest, const QByteArray & data, uint8_t version, uint32_t variant)
+{
+  M manager(dest, board, version, variant);
+  manager.Import(data);
+  manager.Dump(); // Dumps the structure so that it's easy to check with firmware datastructs.h
+  return true;
+}
+
+template <class T, class M>
+bool OpenTxEepromInterface::loadFromByteArray(T & dest, const QByteArray & data)
+{
+  uint8_t version = data[4];
+  QByteArray raw = data.right(data.size() - 8);
+  return loadFromByteArray<T, M>(dest, raw, version);
+}
+
+template<class T>
+bool
+OpenTxEepromInterface::saveRadioSettings(GeneralSettings &settings, BoardEnum board, uint8_t version, uint32_t variant)
 {
   T open9xSettings(settings, board, version, variant);
   // open9xSettings.Dump();
   QByteArray eeprom;
   open9xSettings.Export(eeprom);
-  int sz = efile->writeRlc2(FILE_GENERAL, FILE_TYP_GENERAL, (const uint8_t*)eeprom.constData(), eeprom.size());
+  int sz = efile->writeRlc2(FILE_GENERAL, FILE_TYP_GENERAL, (const uint8_t *) eeprom.constData(), eeprom.size());
   return (sz == eeprom.size());
 }
 
-template <class T>
-bool OpenTxEepromInterface::saveModel(unsigned int index, ModelData &model, unsigned int version, unsigned int variant)
+template<class T>
+bool OpenTxEepromInterface::saveModel(unsigned int index, ModelData &model, uint8_t version, uint32_t variant)
 {
   T open9xModel(model, board, version, variant);
   // open9xModel.Dump();
   QByteArray eeprom;
   open9xModel.Export(eeprom);
-  int sz = efile->writeRlc2(FILE_MODEL(index), FILE_TYP_MODEL, (const uint8_t*)eeprom.constData(), eeprom.size());
+  int sz = efile->writeRlc2(FILE_MODEL(index), FILE_TYP_MODEL, (const uint8_t *) eeprom.constData(), eeprom.size());
   return (sz == eeprom.size());
 }
 
@@ -320,18 +222,74 @@ unsigned long OpenTxEepromInterface::loadxml(RadioData &radioData, QDomDocument 
   return errors.to_ulong();
 }
 
-unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t *eeprom, int size)
+int OpenTxEepromInterface::loadFile(RadioData & radioData, const QString & filename)
+{
+  StorageSdcard storage;
+  
+  storage.read(filename);
+  
+  // models.txt
+  QString modelList = QString(storage.modelList);
+  qDebug() << "Models: size" << modelList.size() << "contents" << modelList;
+  
+  // radio.bin
+  qDebug() << "Radio settings:" << storage.radio.size();
+  loadFromByteArray<GeneralSettings, OpenTxGeneralData>(radioData.generalSettings, storage.radio);
+  
+  // all models
+  QList<QString> models = storage.getModelsFileNames();
+  qDebug() << "We have" << models.size() << "models:";
+  
+  int index = 0;
+  for (QList<ModelFile>::iterator it = storage.models.begin(); it != storage.models.end(); ++it, ++index) {
+    loadFromByteArray<ModelData, OpenTxModelData>(radioData.models[index], it->data);
+    radioData.models[index].used = true;
+  }
+  
+  return 0;
+}
+
+int OpenTxEepromInterface::saveFile(const RadioData & radioData, const QString & filename)
+{
+  StorageSdcard storage;
+  uint8_t version = getLastDataVersion(board);
+  
+  // models.txt
+  storage.modelList = QByteArray("[Models]\n");
+  
+  // radio.bin
+  saveToByteArray<GeneralSettings, OpenTxGeneralData>(radioData.generalSettings, storage.radio, version);
+  
+  // all models
+  for (int i=0; i<CPN_MAX_MODELS; i++) {
+    const ModelData & model = radioData.models[i];
+    if (!model.isEmpty()) {
+      QString modelFilename = QString().sprintf("model%d.bin", i+1);
+      QByteArray modelData;
+      saveToByteArray<ModelData, OpenTxModelData>(model, modelData, version);
+      ModelFile modelFile = { modelFilename, modelData };
+      storage.models.append(modelFile);
+      storage.modelList.append(QString("  ") + modelFilename + "\n");
+    }
+  }
+  
+  storage.write(filename);
+  
+  return 0;
+}
+
+unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * eeprom, int size)
 {
   std::cout << "trying " << getName() << " import...";
-
+  
   std::bitset<NUM_ERRORS> errors;
-
+  
   if (size != getEEpromSize()) {
-    if (size==4096) {
-      int notnull=false;
-      for (int i=2048; i<4096; i++) {
-        if (eeprom[i]!=255) {
-          notnull=true;
+    if (size == 4096) {
+      int notnull = false;
+      for (int i = 2048; i < 4096; i++) {
+        if (eeprom[i] != 255) {
+          notnull = true;
         }
       }
       if (notnull) {
@@ -342,107 +300,103 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t *e
       else {
         errors.set(HAS_WARNINGS);
         errors.set(WARNING_WRONG_FIRMWARE);
-        size=2048;
+        size = 2048;
       }
-    } else {
+    }
+    else {
       std::cout << " wrong size (" << size << "/" << getEEpromSize() << ")\n";
       errors.set(WRONG_SIZE);
       return errors.to_ulong();
     }
   }
-
-  if (!efile->EeFsOpen((uint8_t *)eeprom, size, board)) {
+  
+  if (!efile->EeFsOpen((uint8_t *) eeprom, size, board)) {
     std::cout << " wrong file system\n";
     errors.set(WRONG_FILE_SYSTEM);
     return errors.to_ulong();
   }
-
+  
   efile->openRd(FILE_GENERAL);
-
+  
   uint8_t version;
   if (efile->readRlc2(&version, 1) != 1) {
     std::cout << " no\n";
     errors.set(UNKNOWN_ERROR);
     return errors.to_ulong();
   }
-
-  std::cout << " version " << (unsigned int)version;
-
+  
+  std::cout << " version " << (unsigned int) version;
+  
   EepromLoadErrors version_error = checkVersion(version);
   if (version_error == OLD_VERSION) {
     errors.set(version_error);
     errors.set(HAS_WARNINGS);
-  } else if (version_error == NOT_OPENTX) {
+  }
+  else if (version_error == NOT_OPENTX) {
     std::cout << " not open9x\n";
     errors.set(version_error);
     return errors.to_ulong();
   }
-
-  if (!loadGeneral<OpenTxGeneralData>(radioData.generalSettings, version)) {
+  
+  if (!loadRadioSettingsFromRLE(radioData.generalSettings, efile, version)) {
     std::cout << " ko\n";
     errors.set(UNKNOWN_ERROR);
     return errors.to_ulong();
   }
-
+  
   std::cout << " variant " << radioData.generalSettings.variant;
-  for (int i=0; i<getMaxModels(); i++) {
-    if (!loadModel(version, radioData.models[i], NULL, i, radioData.generalSettings.variant, radioData.generalSettings.stickMode+1)) {
+  for (int i = 0; i < getMaxModels(); i++) {
+    if (!loadModelFromRLE(radioData.models[i], efile, i, version, radioData.generalSettings.variant)) {
       std::cout << " ko\n";
       errors.set(UNKNOWN_ERROR);
       return errors.to_ulong();
     }
   }
+  
   std::cout << " ok\n";
   errors.set(ALL_OK);
   return errors.to_ulong();
 }
 
-int OpenTxEepromInterface::save(uint8_t *eeprom, RadioData &radioData, uint32_t variant, uint8_t version)
+uint8_t OpenTxEepromInterface::getLastDataVersion(BoardEnum board)
+{
+  switch (board) {
+    case BOARD_STOCK:
+      return 216;
+    case BOARD_GRUVIN9X:
+    case BOARD_MEGA2560:
+    case BOARD_M128:
+      return 217;
+    default:
+      return 218;
+  }
+}
+
+int OpenTxEepromInterface::save(uint8_t * eeprom, RadioData & radioData, uint8_t version, uint32_t variant)
 {
   EEPROMWarnings.clear();
-
-  if (!version) {
-    switch(board) {
-      case BOARD_TARANIS:
-      case BOARD_TARANIS_PLUS:
-      case BOARD_TARANIS_X9E:
-      case BOARD_SKY9X:
-      case BOARD_AR9X:
-      case BOARD_9XRPRO:
-      case BOARD_FLAMENCO:
-      case BOARD_HORUS:
-        version = 218;
-        break;
-      case BOARD_GRUVIN9X:
-      case BOARD_MEGA2560:
-        version = 217;
-        break;
-      case BOARD_M128:
-        version = 217;
-        break;
-      case BOARD_STOCK:
-        version = 216;
-        break;
-    }
+  
+  if (version == 0) {
+    version = getLastDataVersion(board);
   }
-
+  
   int size = getEEpromSize();
-
+  
   efile->EeFsCreate(eeprom, size, board, version);
-
+  
   if (board == BOARD_M128) {
     variant |= M128_VARIANT;
   }
   else if (board == BOARD_TARANIS_X9E) {
     variant |= TARANIS_X9E_VARIANT;
   }
-
-  int result = saveGeneral<OpenTxGeneralData>(radioData.generalSettings, board, version, variant);
+  
+  int result = saveRadioSettings<OpenTxGeneralData>(radioData.generalSettings, board, version, variant);
   if (!result) {
     return 0;
   }
-
-  for (int i=0; i<getMaxModels(); i++) {
+  
+  for (int i = 0; i < getMaxModels(); i++) {
     if (!radioData.models[i].isEmpty()) {
       result = saveModel<OpenTxModelData>(i, radioData.models[i], version, variant);
       if (!result) {
@@ -450,10 +404,10 @@ int OpenTxEepromInterface::save(uint8_t *eeprom, RadioData &radioData, uint32_t 
       }
     }
   }
-
+  
   if (!EEPROMWarnings.empty()) {
     QString msg;
-    int noErrorsToDisplay = std::min((int)EEPROMWarnings.size(),10);
+    int noErrorsToDisplay = std::min((int) EEPROMWarnings.size(), 10);
     for (int n = 0; n < noErrorsToDisplay; n++) {
       msg += "-" + EEPROMWarnings.front() + "\n";
       EEPROMWarnings.pop_front();
@@ -463,61 +417,61 @@ int OpenTxEepromInterface::save(uint8_t *eeprom, RadioData &radioData, uint32_t 
     }
     EEPROMWarnings.clear();
     QMessageBox::warning(NULL,
-        QObject::tr("Warning"),
-        QObject::tr("EEPROM saved with these warnings:") + "\n" + msg);
+                         QObject::tr("Warning"),
+                         QObject::tr("EEPROM saved with these warnings:") + "\n" + msg);
   }
-
+  
   return size;
 }
 
-int OpenTxEepromInterface::getSize(const ModelData & model)
+int OpenTxEepromInterface::getSize(const ModelData &model)
 {
   if (IS_SKY9X(board))
     return 0;
-
+  
   if (model.isEmpty())
     return 0;
-
+  
   QByteArray tmp(EESIZE_MAX, 0);
-  efile->EeFsCreate((uint8_t *)tmp.data(), EESIZE_MAX, board, 255/*version max*/);
-
-  OpenTxModelData open9xModel((ModelData &)model, board, 255/*version max*/, GetCurrentFirmware()->getVariantNumber());
-
+  efile->EeFsCreate((uint8_t *) tmp.data(), EESIZE_MAX, board, 255/*version max*/);
+  
+  OpenTxModelData open9xModel((ModelData &) model, board, 255/*version max*/, GetCurrentFirmware()->getVariantNumber());
+  
   QByteArray eeprom;
   open9xModel.Export(eeprom);
-  int sz = efile->writeRlc2(0, FILE_TYP_MODEL, (const uint8_t*)eeprom.constData(), eeprom.size());
+  int sz = efile->writeRlc2(0, FILE_TYP_MODEL, (const uint8_t *) eeprom.constData(), eeprom.size());
   if (sz != eeprom.size()) {
     return -1;
   }
   return efile->size(0);
 }
 
-int OpenTxEepromInterface::getSize(const GeneralSettings & settings)
+int OpenTxEepromInterface::getSize(const GeneralSettings &settings)
 {
   if (IS_SKY9X(board))
     return 0;
-
+  
   QByteArray tmp(EESIZE_MAX, 0);
-  efile->EeFsCreate((uint8_t *)tmp.data(), EESIZE_MAX, board, 255);
-
-  OpenTxGeneralData open9xGeneral((GeneralSettings &)settings, board, 255, GetCurrentFirmware()->getVariantNumber());
+  efile->EeFsCreate((uint8_t *) tmp.data(), EESIZE_MAX, board, 255);
+  
+  OpenTxGeneralData open9xGeneral((GeneralSettings &) settings, board, 255, GetCurrentFirmware()->getVariantNumber());
   // open9xGeneral.Dump();
-
+  
   QByteArray eeprom;
   open9xGeneral.Export(eeprom);
-  int sz = efile->writeRlc2(0, FILE_TYP_GENERAL, (const uint8_t*)eeprom.constData(), eeprom.size());
+  int sz = efile->writeRlc2(0, FILE_TYP_GENERAL, (const uint8_t *) eeprom.constData(), eeprom.size());
   if (sz != eeprom.size()) {
     return -1;
   }
   return efile->size(0);
 }
 
-Firmware * OpenTxFirmware::getFirmwareVariant(const QString & id)
+Firmware * OpenTxFirmware::getFirmwareVariant(const QString &id)
 {
   if (id == getId()) {
     return this;
   }
-  else if (id.contains(getId()+"-") || (!id.contains("-") && id.contains(getId()))) {
+  else if (id.contains(getId() + "-") || (!id.contains("-") && id.contains(getId()))) {
     Firmware * result = new OpenTxFirmware(id, this);
     // TODO result.variant = firmware->getVariant(id);
     return result;
@@ -527,7 +481,7 @@ Firmware * OpenTxFirmware::getFirmwareVariant(const QString & id)
   }
 }
 
-int OpenTxFirmware::getCapability(const Capability capability)
+int OpenTxFirmware::getCapability(Capability capability)
 {
   switch (capability) {
     case Imperial:
@@ -536,15 +490,9 @@ int OpenTxFirmware::getCapability(const Capability capability)
       else
         return id.contains("imperial") ? 1 : 0;
     case ModelImage:
-      if (IS_TARANIS(board))
-        return 1;
-      else
-        return 0;
+      return (board == BOARD_TARANIS_X9D || board == BOARD_TARANIS_X9DP || board == BOARD_TARANIS_X9E);
     case HasBeeper:
-      if (IS_ARM(board))
-        return 0;
-      else
-        return 1;
+      return (!IS_ARM(board));
     case HasPxxCountry:
       return 1;
     case HasGeneralUnits:
@@ -553,10 +501,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
       else
         return 0;
     case HasNegAndSwitches:
-      if (IS_ARM(board))
-        return 1;
-      else
-        return 0;
+      return IS_ARM(board);
     case PPMExtCtrl:
       return 1;
     case PPMFrameLength:
@@ -571,19 +516,21 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case FlightModesHaveFades:
       return 1;
     case Heli:
-      if (IS_TARANIS(board))
+      if (IS_TARANIS(board) || IS_HORUS(board))
         return id.contains("noheli") ? 0 : 1;
       else
         return id.contains("heli") ? 1 : 0;
     case Gvars:
-      if (IS_TARANIS(board))
+      if (IS_TARANIS(board) || IS_HORUS(board))
         return id.contains("nogvars") ? 0 : 9;
       else if (id.contains("gvars"))
         return IS_ARM(board) ? 9 : 5;
       else
         return 0;
+    case ModelName:
+      return (IS_HORUS(board) ? 15 : (HAS_LARGE_LCD(board) ? 12 : 10));
     case FlightModesName:
-      return (IS_TARANIS(board) ? 10 : 6);
+      return ((IS_TARANIS(board) || IS_HORUS(board)) ? 10 : 6);
     case GvarsName:
       return (IS_9X(board) ? 0 : 6);
     case GvarsInCS:
@@ -593,27 +540,37 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case GvarsFlightModes:
       return ((IS_ARM(board) || IS_2560(board)) ? 1 : 0);
     case Mixes:
-      return (IS_TARANIS(board) ? 64 : (IS_ARM(board) ? 60 : 32));
+      return (IS_ARM(board) ? 64 : 32);
     case OffsetWeight:
       return (IS_ARM(board) ? 500 : 245);
     case Timers:
       return (IS_ARM(board) ? 3 : 2);
     case TimersName:
-      return (IS_TARANIS(board) ? 8 : (IS_ARM(board) ? 3 : 0));
-    case PermTimers:
-      if (IS_2560(board) || IS_ARM(board))
-        return 1;
+      if (HAS_LARGE_LCD(board))
+        return 8;
+      else if (IS_ARM(board))
+        return 3;
       else
         return 0;
+    case PermTimers:
+      return (IS_2560(board) || IS_ARM(board));
     case Pots:
-      if (IS_TARANIS_X9E(board))
+      if (IS_HORUS(board))
+        return 3;
+      else if (board == BOARD_X7D)
+        return 2;
+      else if (IS_TARANIS_X9E(board))
         return 4;
       else if (IS_TARANIS(board))
-        return 3;   //Taranis has only 2 pots but still has a placeholder in settings for 3 pots
+        return 3; // Taranis has only 2 pots but still has a placeholder in settings for 3 pots
       else
         return 3;
     case Sliders:
-      if (IS_TARANIS_X9E(board))
+      if (IS_HORUS(board))
+        return 4;
+      else if (board == BOARD_X7D)
+        return 0;
+      else if (IS_TARANIS_X9E(board))
         return 4;
       else if (IS_TARANIS(board))
         return 2;
@@ -622,21 +579,23 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case Switches:
       if (IS_TARANIS_X9E(board))
         return 18;
+      else if (board == BOARD_X7D)
+        return 6;
       else if (IS_TARANIS(board))
         return 8;
       else
         return 7;
     case SwitchesPositions:
       if (IS_TARANIS_X9E(board))
-        return 18*3;
+        return 18 * 3;
       else if (IS_TARANIS(board))
-        return 8*3;
+        return 8 * 3;
       else
         return 9;
     case CustomFunctions:
       if (IS_ARM(board))
         return 64;
-      else if (IS_2560(board) || board==BOARD_M128)
+      else if (IS_2560(board) || board == BOARD_M128)
         return 24;
       else
         return 16;
@@ -651,7 +610,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
       if (IS_ARM(board))
         return getCapability(LogicalSwitches);
       else
-        return 15/*4bits*/-9/*sw positions*/;
+        return 15/*4bits*/- 9/*sw positions*/;
     case LogicalSwitchesExt:
       return (IS_ARM(board) ? true : false);
     case RotaryEncoders:
@@ -668,7 +627,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case VoicesAsNumbers:
       return (IS_ARM(board) ? 0 : 1);
     case VoicesMaxLength:
-      return (IS_ARM(board) ? (IS_TARANIS(board) ? 8 :  6) : 0);
+      return (IS_ARM(board) ? (IS_TARANIS(board) ? 8 : 6) : 0);
     case MultiLangVoice:
       return (IS_ARM(board) ? 1 : 0);
     case SoundPitch:
@@ -691,7 +650,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case Simulation:
       return 1;
     case NumCurves:
-      return (IS_TARANIS(board) ? 32 : (IS_ARM(board) ? 16 : 8));
+      return (HAS_LARGE_LCD(board) ? 32 : (IS_ARM(board) ? 16 : 8));
     case HasMixerNames:
       return (IS_ARM(board) ? (IS_TARANIS(board) ? 8 : 6) : false);
     case HasExpoNames:
@@ -699,12 +658,12 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case HasNoExpo:
       return (IS_TARANIS(board) ? false : true);
     case ChannelsName:
-      return (IS_TARANIS(board) ? 6 : 0);
+      return (IS_ARM(board) ? (HAS_LARGE_LCD(board) ? 6 : 4) : 0);
     case HasCvNames:
       return (IS_TARANIS(board) ? 1 : 0);
     case Telemetry:
       if (IS_2560(board) || IS_ARM(board) || id.contains("frsky") || id.contains("telemetrez"))
-        return TM_HASTELEMETRY|TM_HASOFFSET|TM_HASWSHH;
+        return TM_HASTELEMETRY | TM_HASOFFSET | TM_HASWSHH;
       else
         return 0;
     case TelemetryBars:
@@ -712,7 +671,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case TelemetryCustomScreens:
       return IS_ARM(board) ? 4 : 2;
     case TelemetryCustomScreensFieldsPerLine:
-      return IS_TARANIS(board) ? 3 : 2;
+      return HAS_LARGE_LCD(board) ? 3 : 2;
     case NoTelemetryProtocol:
       return IS_TARANIS(board) ? 1 : 0;
     case TelemetryUnits:
@@ -726,7 +685,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case SYMLimits:
       return 1;
     case OptrexDisplay:
-      return (board==BOARD_SKY9X ? true : false);
+      return (board == BOARD_SKY9X ? true : false);
     case HasVario:
       return 1;
     case HasVarioSink:
@@ -753,10 +712,27 @@ int OpenTxFirmware::getCapability(const Capability capability)
       return 18;
     case HasSDLogs:
       return ((IS_2560(board) || IS_ARM(board)) ? true : false);
-    case LCDWidth:
-      return (IS_TARANIS(board) ? 212 : 128) ;
+    case LcdWidth:
+      if (IS_HORUS(board))
+        return 480;
+      else if (IS_TARANIS(board))
+        return 212;
+      else
+        return 128;
+    case LcdHeight:
+      if (IS_HORUS(board))
+        return 272;
+      else
+        return 64;
+    case LcdDepth:
+      if (IS_HORUS(board))
+        return 16;
+      else if (IS_TARANIS(board))
+        return 4;
+      else
+        return 1;
     case GetThrSwitch:
-      return (IS_TARANIS(board) ? SWITCH_SF1 : SWITCH_THR) ;
+      return (IS_TARANIS(board) ? SWITCH_SF1 : SWITCH_THR);
     case HasDisplayText:
       return IS_ARM(board) ? 1 : 0;
     case HasTopLcd:
@@ -764,7 +740,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
     case GlobalFunctions:
       return IS_ARM(board) ? 64 : 0;
     case VirtualInputs:
-      return IS_TARANIS(board) ? 32 : 0;
+      return IS_ARM(board) ? 64 : 0;
     case TrainerInputs:
       return IS_ARM(board) ? 16 : 8;
     case RtcTime:
@@ -777,7 +753,7 @@ int OpenTxFirmware::getCapability(const Capability capability)
       return IS_TARANIS(board) ? 6 : 0;
     case LimitsPer1000:
     case EnhancedCurves:
-      return IS_TARANIS(board);
+      return IS_ARM(board);
     case HasFasOffset:
       return (IS_STOCK(board) ? false : true);
     case HasMahPersistent:
@@ -813,6 +789,102 @@ int OpenTxFirmware::getCapability(const Capability capability)
   }
 }
 
+QString OpenTxFirmware::getAnalogInputName(unsigned int index)
+{
+  if (index < 4) {
+    const QString sticks[] = { QObject::tr("Rud"),
+                               QObject::tr("Ele"),
+                               QObject::tr("Thr"),
+                               QObject::tr("Ail") };
+    return sticks[index];
+  }
+  
+  index -= 4;
+  
+  if (IS_9X(board) || IS_2560(board) || IS_SKY9X(board)) {
+    const QString pots[]  = { QObject::tr("P1"),
+                              QObject::tr("P2"),
+                              QObject::tr("P3") };
+    return CHECK_IN_ARRAY(pots, index);
+  }
+  else if (IS_TARANIS_X9E(board)) {
+    const QString pots[] = { QObject::tr("F1"),
+                             QObject::tr("F2"),
+                             QObject::tr("F3"),
+                             QObject::tr("F4"),
+                             QObject::tr("S1"),
+                             QObject::tr("S2"),
+                             QObject::tr("LS"),
+                             QObject::tr("RS") };
+    return CHECK_IN_ARRAY(pots, index);
+  }
+  else if (IS_TARANIS(board)) {
+    const QString pots[] = {QObject::tr("S1"),
+                            QObject::tr("S2"),
+                            QObject::tr("S3"),
+                            QObject::tr("LS"),
+                            QObject::tr("RS")};
+    return CHECK_IN_ARRAY(pots, index);
+  }
+  else if (IS_HORUS(board)) {
+    const QString pots[] = {QObject::tr("S1"),
+                            QObject::tr("6P"),
+                            QObject::tr("S2"),
+                            QObject::tr("L1"),
+                            QObject::tr("L2"),
+                            QObject::tr("LS"),
+                            QObject::tr("RS")};
+    return CHECK_IN_ARRAY(pots, index);
+  }
+  else {
+    return "???";
+  }
+}
+
+Firmware::Switch OpenTxFirmware::getSwitch(unsigned int index)
+{
+  if (board == BOARD_X7D) {
+    const Switch switches[] = {{SWITCH_3POS,   "SA"},
+                               {SWITCH_3POS,   "SB"},
+                               {SWITCH_3POS,   "SC"},
+                               {SWITCH_3POS,   "SD"},
+                               {SWITCH_2POS,   "SF"},
+                               {SWITCH_TOGGLE, "SH"}};
+    return switches[index];
+  }
+  else if (IS_TARANIS(board) || board == BOARD_HORUS) {
+    const Switch switches[] = {{SWITCH_3POS,   "SA"},
+                               {SWITCH_3POS,   "SB"},
+                               {SWITCH_3POS,   "SC"},
+                               {SWITCH_3POS,   "SD"},
+                               {SWITCH_3POS,   "SE"},
+                               {SWITCH_2POS,   "SF"},
+                               {SWITCH_3POS,   "SG"},
+                               {SWITCH_TOGGLE, "SH"},
+                               {SWITCH_3POS,   "SI"},
+                               {SWITCH_3POS,   "SJ"},
+                               {SWITCH_3POS,   "SK"},
+                               {SWITCH_3POS,   "SL"},
+                               {SWITCH_3POS,   "SM"},
+                               {SWITCH_3POS,   "SN"},
+                               {SWITCH_3POS,   "SO"},
+                               {SWITCH_3POS,   "SP"},
+                               {SWITCH_3POS,   "SQ"},
+                               {SWITCH_3POS,   "SR"}};
+    return switches[index];
+  }
+  else {
+    const Switch switches[] = {{SWITCH_3POS,   "3POS"},
+                               {SWITCH_2POS,   "THR"},
+                               {SWITCH_2POS,   "RUD"},
+                               {SWITCH_2POS,   "ELE"},
+                               {SWITCH_2POS,   "AIL"},
+                               {SWITCH_2POS,   "GEA"},
+                               {SWITCH_TOGGLE, "SH"}};
+    return switches[index];
+  }
+}
+
 QTime OpenTxFirmware::getMaxTimerStart()
 {
   if (IS_TARANIS(board) || IS_HORUS(board))
@@ -827,16 +899,16 @@ bool OpenTxFirmware::isTelemetrySourceAvailable(int source)
 {
   if (IS_TARANIS(board) && (source == TELEMETRY_SOURCE_RSSI_TX))
     return false;
-
+  
   if (source == TELEMETRY_SOURCE_DTE)
     return false;
-
+  
   return true;
 }
 
 int OpenTxFirmware::isAvailable(PulsesProtocol proto, int port)
 {
-  if (IS_TARANIS(board)) {
+  if (IS_TARANIS(board) || IS_HORUS(board)) {
     switch (port) {
       case 0:
         switch (proto) {
@@ -859,7 +931,7 @@ int OpenTxFirmware::isAvailable(PulsesProtocol proto, int port)
           case PULSES_PXX_XJT_X16:
           case PULSES_PXX_XJT_D8:
           case PULSES_PXX_XJT_LR12:
-          //case PULSES_PXX_DJT:     // Unavailable for now
+            //case PULSES_PXX_DJT:     // Unavailable for now
           case PULSES_LP45:
           case PULSES_DSM2:
           case PULSES_DSMX:
@@ -917,7 +989,7 @@ int OpenTxFirmware::isAvailable(PulsesProtocol proto, int port)
       case PULSES_DSMX:
       case PULSES_LP45:
       case PULSES_DSM2:
-      // case PULSES_PXX_DJT:     // Unavailable for now
+        // case PULSES_PXX_DJT:     // Unavailable for now
       case PULSES_PPM16:
       case PULSES_PPMSIM:
         return 1;
@@ -928,13 +1000,14 @@ int OpenTxFirmware::isAvailable(PulsesProtocol proto, int port)
 }
 
 template<typename T, size_t SIZE>
-size_t getSizeA(T (&)[SIZE]) {
-    return SIZE;
+size_t getSizeA(T (&)[SIZE])
+{
+  return SIZE;
 }
 
 EepromLoadErrors OpenTxEepromInterface::checkVersion(unsigned int version)
 {
-  switch(version) {
+  switch (version) {
     case 201:
       // first version
     case 202:
@@ -950,7 +1023,7 @@ EepromLoadErrors OpenTxEepromInterface::checkVersion(unsigned int version)
       // telemetry changes (bars)
     case 205:
       // mixer changes (differential, negative curves)...
-    // case 206:
+      // case 206:
     case 207:
       // V4: Rotary Encoders position in FlightModes
     case 208:
@@ -984,7 +1057,7 @@ EepromLoadErrors OpenTxEepromInterface::checkVersion(unsigned int version)
     default:
       return NOT_OPENTX;
   }
-
+  
   return ALL_OK;
 }
 
@@ -993,7 +1066,7 @@ bool OpenTxEepromInterface::checkVariant(unsigned int version, unsigned int vari
   if (board == BOARD_M128 && !(variant & M128_VARIANT)) {
     if (version == 212) {
       uint8_t tmp[1000];
-      for (int i=1; i<31; i++) {
+      for (int i = 1; i < 31; i++) {
         efile->openRd(i);
         int sz = efile->readRlc2(tmp, sizeof(tmp));
         if (sz == 849) {
@@ -1017,26 +1090,47 @@ bool OpenTxEepromInterface::checkVariant(unsigned int version, unsigned int vari
       return false;
     }
   }
-
+  
   return true;
 }
 
-unsigned long OpenTxEepromInterface::loadBackup(RadioData &radioData, uint8_t *eeprom, int esize, int index)
+bool
+OpenTxEepromInterface::loadModelFromBackup(ModelData & model, const uint8_t * data, unsigned int size, uint8_t version, uint32_t variant)
+{
+  QByteArray backupData((char *) data, size);
+  QByteArray modelData;
+  if (IS_SKY9X(board)) {
+    modelData = QByteArray((char *) data, size);
+  }
+  else {
+    importRlc(modelData, backupData);
+  }
+  if (modelData.size()) {
+    if (loadFromByteArray<ModelData, OpenTxModelData>(model, modelData, version, variant)) {
+      model.used = true;
+      return true;
+    }
+  }
+  model.clear();
+  return false;
+}
+
+unsigned long OpenTxEepromInterface::loadBackup(RadioData &radioData, const uint8_t * eeprom, int esize, int index)
 {
   std::bitset<NUM_ERRORS> errors;
-
+  
   std::cout << "trying " << getName() << " backup import...";
-
+  
   if (esize < 8 || memcmp(eeprom, "o9x", 3) != 0) {
     std::cout << " no\n";
     errors.set(WRONG_SIZE);
     return errors.to_ulong();
   }
-
-  BoardEnum backupBoard = (BoardEnum)-1;
+  
+  BoardEnum backupBoard = (BoardEnum) -1;
   switch (eeprom[3]) {
     case 0x33:
-      backupBoard = BOARD_TARANIS;
+      backupBoard = BOARD_TARANIS_X9D;
       break;
     case 0x32:
       backupBoard = BOARD_SKY9X;
@@ -1049,38 +1143,39 @@ unsigned long OpenTxEepromInterface::loadBackup(RadioData &radioData, uint8_t *e
       errors.set(UNKNOWN_BOARD);
       return errors.to_ulong();
   }
-
+  
   if (backupBoard != board) {
     std::cout << " not right board\n";
     errors.set(WRONG_BOARD);
     return errors.to_ulong();
   }
-
+  
   uint8_t version = eeprom[4];
   uint8_t bcktype = eeprom[5];
-  uint16_t size = ((uint16_t)eeprom[7] << 8) + eeprom[6];
-  uint16_t variant = ((uint16_t)eeprom[9] << 8) + eeprom[8];
-
-  std::cout << " version " << (unsigned int)version << " ";
-
+  uint16_t size = ((uint16_t) eeprom[7] << 8) + eeprom[6];
+  uint16_t variant = ((uint16_t) eeprom[9] << 8) + eeprom[8];
+  
+  std::cout << " version " << (unsigned int) version << " ";
+  
   EepromLoadErrors version_error = checkVersion(version);
   if (version_error == OLD_VERSION) {
     errors.set(version_error);
     errors.set(HAS_WARNINGS);
-  } else if (version_error == NOT_OPENTX) {
+  }
+  else if (version_error == NOT_OPENTX) {
     std::cout << " not open9x\n";
     errors.set(version_error);
     return errors.to_ulong();
   }
-
-  if (size > esize-8) {
+  
+  if (size > esize - 8) {
     std::cout << " wrong size\n";
     errors.set(WRONG_SIZE);
     return errors.to_ulong();
   }
-
-  if (bcktype=='M') {
-    if (!loadModel(version, radioData.models[index], &eeprom[8], size, variant)) {
+  
+  if (bcktype == 'M') {
+    if (!loadModelFromBackup(radioData.models[index], &eeprom[8], size, version, variant)) {
       std::cout << " ko\n";
       errors.set(UNKNOWN_ERROR);
       return errors.to_ulong();
@@ -1091,7 +1186,7 @@ unsigned long OpenTxEepromInterface::loadBackup(RadioData &radioData, uint8_t *e
     errors.set(BACKUP_NOT_SUPPORTED);
     return errors.to_ulong();
   }
-
+  
   std::cout << " ok\n";
   errors.set(ALL_OK);
   return errors.to_ulong();
@@ -1112,9 +1207,9 @@ QString OpenTxFirmware::getFirmwareUrl()
   QByteArray data = QUrl::toPercentEncoding(id);
   
   if (IS_ARM(board))
-    url.append(QString("/getfw.php?fw=%1.bin").arg((QString)data));
+    url.append(QString("/getfw.php?fw=%1.bin").arg((QString) data));
   else
-    url.append(QString("/getfw.php?fw=%1.hex").arg((QString)data));
+    url.append(QString("/getfw.php?fw=%1.hex").arg((QString) data));
   return url;
 }
 
@@ -1136,33 +1231,43 @@ void addOpenTxCommonOptions(OpenTxFirmware * firmware)
 {
   firmware->addOption("ppmus", QObject::tr("Channel values displayed in us"));
   firmware->addOption("nooverridech", QObject::tr("No OverrideCH functions available"));
-  Option fai_options[] = { { "faichoice", QObject::tr("Possibility to enable FAI MODE (no telemetry) at field") }, { "faimode", QObject::tr("FAI MODE (no telemetry) always enabled") }, { NULL } };
+  Option fai_options[] = {{"faichoice", QObject::tr("Possibility to enable FAI MODE (no telemetry) at field")},
+                          {"faimode",   QObject::tr("FAI MODE (no telemetry) always enabled")},
+                          {NULL}};
   firmware->addOptions(fai_options);
+}
+
+void addOpenTxFrskyOptions(OpenTxFirmware * firmware)
+{
+  addOpenTxCommonOptions(firmware);
+  firmware->addOption("noheli", QObject::tr("Disable HELI menu and cyclic mix support"));
+  firmware->addOption("nogvars", QObject::tr("Disable Global variables"));
+  firmware->addOption("lua", QObject::tr("Support for Lua model scripts"));
+  Option usb_options[] = {{"massstorage", QObject::tr("Instead of Joystick emulation, USB connection is Mass Storage (as in the Bootloader)")},
+                          {"cli",         QObject::tr("Instead of Joystick emulation, USB connection is Command Line Interface")},
+                          {NULL}};
+  firmware->addOptions(usb_options);
+  firmware->addOption("eu", QObject::tr("Removes D8 FrSky protocol support which is not legal for use in the EU on radios sold after Jan 1st, 2015"));
+  firmware->addOption("multimodule", QObject::tr("Support for the DIY-Multiprotocol-TX-Module"));
 }
 
 void addOpenTxTaranisOptions(OpenTxFirmware * firmware)
 {
-  firmware->addOption("noheli", QObject::tr("Disable HELI menu and cyclic mix support"));
-  firmware->addOption("nogvars", QObject::tr("Disable Global variables"));
-  firmware->addOption("lua", QObject::tr("Support for Lua model scripts"));
-  Option usb_options[] = { { "massstorage", QObject::tr("Instead of Joystick emulation, USB connection is Mass Storage (as in the Bootloader)") }, { "cli", QObject::tr("Instead of Joystick emulation, USB connection is Command Line Interface") }, { NULL } };
-  firmware->addOptions(usb_options);
+  addOpenTxFrskyOptions(firmware);
   firmware->addOption("mixersmon", QObject::tr("Adds mixers output view to the CHANNELS MONITOR screen, pressing [ENT] switches between the views"));
-  firmware->addOption("eu", QObject::tr("Removes D8 FrSky protocol support which is not legal for use in the EU on radios sold after Jan 1st, 2015"));
   firmware->addOption("internalppm", QObject::tr("Support for PPM internal module hack"));
-  firmware->addOption("multimodule", QObject::tr("Support for the DIY-Multiprotocol-TX-Module"));
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
 }
 
 void addOpenTxLcdOptions(OpenTxFirmware * firmware)
 {
   Option lcd_options[] = {
-    { "ST7565P", QObject::tr("ST7565P LCD or compatible") },
-    { "ST7565R", QObject::tr("ST7565R LCD or compatible") },
-    { "ERC12864FSF", QObject::tr("ERC12864FSF LCD") },
-    { "ST7920", QObject::tr("ST7920 LCD") },
-    { "KS108", QObject::tr("KS108 LCD") },
-    { NULL }
+    {"ST7565P",     QObject::tr("ST7565P LCD or compatible")},
+    {"ST7565R",     QObject::tr("ST7565R LCD or compatible")},
+    {"ERC12864FSF", QObject::tr("ERC12864FSF LCD")},
+    {"ST7920",      QObject::tr("ST7920 LCD")},
+    {"KS108",       QObject::tr("KS108 LCD")},
+    {NULL}
   };
   firmware->addOptions(lcd_options);
 }
@@ -1170,44 +1275,56 @@ void addOpenTxLcdOptions(OpenTxFirmware * firmware)
 void registerOpenTxFirmwares()
 {
   OpenTxFirmware * firmware;
-
-  Option ext_options[] = { { "frsky", QObject::tr("Support for frsky telemetry mod"), FRSKY_VARIANT }, { "telemetrez", QObject::tr("Support for telemetry easy board"), FRSKY_VARIANT }, { "jeti", QObject::tr("Support for jeti telemetry mod"), 0 }, { "ardupilot", QObject::tr("Support for receiving ardupilot data"), 0 }, { "nmea", QObject::tr("Support for receiving NMEA data"), 0 }, { "mavlink", QObject::tr("Support for MAVLINK devices"), MAVLINK_VARIANT }, { NULL } };
-  Option extr_options[] = { { "frsky", QObject::tr("Support for frsky telemetry mod"), FRSKY_VARIANT }, { "jeti", QObject::tr("Support for jeti telemetry mod"), 0 }, { "ardupilot", QObject::tr("Support for receiving ardupilot data"), 0 }, { "nmea", QObject::tr("Support for receiving NMEA data"), 0 }, { "mavlink", QObject::tr("Support for MAVLINK devices"), MAVLINK_VARIANT }, { NULL } };
-  Option nav_options[] = { { "rotenc", QObject::tr("Rotary Encoder use in menus navigation") }, { "potscroll", QObject::tr("Pots use in menus navigation") }, { NULL } };
-  Option dsm2_options[] = { { "DSM2", QObject::tr("Support for DSM2 modules"), 0 }, { "DSM2PPM", QObject::tr("Support for DSM2 modules using ppm instead of true serial"), 0 }, { NULL } };
-
-  /* Taranis Plus board */
-  firmware = new OpenTxFirmware("opentx-x9d+", QObject::tr("FrSky Taranis Plus"), BOARD_TARANIS_PLUS);
+  
+  Option ext_options[] = {{"frsky",      QObject::tr("Support for frsky telemetry mod"),  FRSKY_VARIANT},
+                          {"telemetrez", QObject::tr("Support for telemetry easy board"), FRSKY_VARIANT},
+                          {"jeti",       QObject::tr("Support for jeti telemetry mod"),       0},
+                          {"ardupilot",  QObject::tr("Support for receiving ardupilot data"), 0},
+                          {"nmea",       QObject::tr("Support for receiving NMEA data"),      0},
+                          {"mavlink",    QObject::tr("Support for MAVLINK devices"),      MAVLINK_VARIANT},
+                          {NULL}};
+  Option extr_options[] = {{"frsky",     QObject::tr("Support for frsky telemetry mod"), FRSKY_VARIANT},
+                           {"jeti",      QObject::tr("Support for jeti telemetry mod"),       0},
+                           {"ardupilot", QObject::tr("Support for receiving ardupilot data"), 0},
+                           {"nmea",      QObject::tr("Support for receiving NMEA data"),      0},
+                           {"mavlink",   QObject::tr("Support for MAVLINK devices"),     MAVLINK_VARIANT},
+                           {NULL}};
+  Option nav_options[] = {{"rotenc",    QObject::tr("Rotary Encoder use in menus navigation")},
+                          {"potscroll", QObject::tr("Pots use in menus navigation")},
+                          {NULL}};
+  Option dsm2_options[] = {{"DSM2",    QObject::tr("Support for DSM2 modules"),                                  0},
+                           {"DSM2PPM", QObject::tr("Support for DSM2 modules using ppm instead of true serial"), 0},
+                           {NULL}};
+  
+  /* FrSky Taranis X9D+ board */
+  firmware = new OpenTxFirmware("opentx-x9d+", QObject::tr("FrSky Taranis X9D+"), BOARD_TARANIS_X9DP);
   addOpenTxTaranisOptions(firmware);
-  addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
-  /* Taranis board */
-  firmware = new OpenTxFirmware("opentx-x9d", QObject::tr("FrSky Taranis"), BOARD_TARANIS);
+  
+  /* FrSky Taranis X9D board */
+  firmware = new OpenTxFirmware("opentx-x9d", QObject::tr("FrSky Taranis X9D"), BOARD_TARANIS_X9D);
   firmware->addOption("haptic", QObject::tr("Haptic module installed"));
   addOpenTxTaranisOptions(firmware);
-  addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
-  /* Taranis X9E board */
+  
+  /* FrSky Taranis X9E board */
   firmware = new OpenTxFirmware("opentx-x9e", QObject::tr("FrSky Taranis X9E"), BOARD_TARANIS_X9E);
   firmware->addOption("shutdownconfirm", QObject::tr("Confirmation before radio shutdown"));
+  firmware->addOption("horussticks", QObject::tr("Horus gimbals installed (Hall sensors)"));
   addOpenTxTaranisOptions(firmware);
-  addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
-  /* Horus board */
+  
+  /* FrSky X7D board */
+  firmware = new OpenTxFirmware("opentx-x7d", QObject::tr("FrSky X7D"), BOARD_X7D);
+  addOpenTxTaranisOptions(firmware);
+  firmwares.push_back(firmware);
+  
+  /* FrSky Horus board */
   firmware = new OpenTxFirmware("opentx-horus", QObject::tr("FrSky Horus"), BOARD_HORUS);
-  firmware->addOption("noheli", QObject::tr("Disable HELI menu and cyclic mix support"));
-  firmware->addOption("nogvars", QObject::tr("Disable Global variables"));
-  firmware->addOption("lua", QObject::tr("Support for Lua model scripts"));
-  Option usb_options[] = { { "massstorage", QObject::tr("Instead of Joystick emulation, USB connection is Mass Storage (as in the Bootloader)") }, { "cli", QObject::tr("Instead of Joystick emulation, USB connection is Command Line Interface") }, { NULL } };
-  firmware->addOptions(usb_options);
-  firmware->addOption("multimodule", QObject::tr("Support for the DIY-Multiprotocol-TX-Module"));
-  addOpenTxCommonOptions(firmware);
+  addOpenTxFrskyOptions(firmware);
   firmware->addOption("pcbdev", QObject::tr("Use ONLY with first DEV pcb version"));
   firmwares.push_back(firmware);
-
+  
   /* 9XR-Pro */
   firmware = new OpenTxFirmware("opentx-9xrpro", QObject::tr("Turnigy 9XR-PRO"), BOARD_9XRPRO);
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
@@ -1227,7 +1344,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* 9XR board with M128 chip */
   firmware = new OpenTxFirmware("opentx-9xr128", QObject::tr("Turnigy 9XR with m128 chip"), BOARD_M128);
   firmware->addOptions(extr_options);
@@ -1256,7 +1373,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* 9XR board */
   firmware = new OpenTxFirmware("opentx-9xr", QObject::tr("Turnigy 9XR"), BOARD_STOCK);
   firmware->addOptions(extr_options);
@@ -1290,7 +1407,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* 9x board */
   firmware = new OpenTxFirmware("opentx-9x", QObject::tr("9X with stock board"), BOARD_STOCK);
   firmware->addOptions(ext_options);
@@ -1327,7 +1444,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* 9x board with M128 chip */
   firmware = new OpenTxFirmware("opentx-9x128", QObject::tr("9X with stock board and m128 chip"), BOARD_M128);
   firmware->addOptions(ext_options);
@@ -1358,7 +1475,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* ar9x board */
   firmware = new OpenTxFirmware("opentx-ar9x", QObject::tr("9X with AR9X board"), BOARD_AR9X);
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
@@ -1381,7 +1498,7 @@ void registerOpenTxFirmwares()
 //  firmware->addOption("volume", QObject::tr("i2c volume control added"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* Sky9x board */
   firmware = new OpenTxFirmware("opentx-sky9x", QObject::tr("9X with Sky9x board"), BOARD_SKY9X);
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
@@ -1402,7 +1519,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* Gruvin9x board */
   firmware = new OpenTxFirmware("opentx-gruvin9x", QObject::tr("9X with Gruvin9x board"), BOARD_GRUVIN9X);
   firmware->addOption("heli", QObject::tr("Enable heli menu and cyclic mix support"));
@@ -1428,7 +1545,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   /* MEGA2560 board */
   firmware = new OpenTxFirmware("opentx-mega2560", QObject::tr("DIY MEGA2560 radio"), BOARD_MEGA2560);
   addOpenTxLcdOptions(firmware);
@@ -1459,14 +1576,14 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   addOpenTxCommonOptions(firmware);
   firmwares.push_back(firmware);
-
+  
   default_firmware_variant = GetFirmware("opentx-x9d+");
   current_firmware_variant = default_firmware_variant;
 }
 
 void unregisterOpenTxFirmwares()
 {
-  foreach (Firmware * f, firmwares) {
-    delete f;
-  }
+    foreach (Firmware * f, firmwares) {
+      delete f;
+    }
 }

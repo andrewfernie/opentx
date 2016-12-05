@@ -22,17 +22,20 @@ if(ALLOW_NIGHTLY_BUILDS)
   add_definitions(-DALLOW_NIGHTLY_BUILDS)
 endif(ALLOW_NIGHTLY_BUILDS)
 
-option(DEBUG_IMPORT "Turn on debug output for EEPROM import") # Disabled by default
-if(DEBUG_IMPORT)
-  add_definitions(-DDEBUG_MODEL_IMPORT)
-  message(STATUS "EEPROM import debugging enabled")
-endif(DEBUG_IMPORT)
+option(DEBUG_STORAGE_IMPORT "Turn on debug output for storage import") # Disabled by default
+if(DEBUG_STORAGE_IMPORT)
+  add_definitions(-DDEBUG_STORAGE_IMPORT)
+  message(STATUS "Storage import debugging enabled")
+endif()
+if(DEBUG)
+  add_definitions(-DDEBUG)
+endif()
 
 option(TABLE_LAYOUT "Use QTableWidget for grid layouts") # Disabled by default
 if(TABLE_LAYOUT)
   add_definitions(-DTABLE_LAYOUT)
   message(STATUS "Using QTableWidget")
-endif(TABLE_LAYOUT)
+endif()
 
 if(SDL_FOUND)
   include_directories(${SDL_INCLUDE_DIR})
@@ -72,33 +75,28 @@ include_directories(
   ${COMPANION_SRC_DIRECTORY}
   ${COMPANION_SRC_DIRECTORY}/shared
   ${SIMU_SRC_DIRECTORY}
-  ${COMPANION_SRC_DIRECTORY}/qxtcommandoptions
+  ${COMPANION_SRC_DIRECTORY}/thirdparty/qxtcommandoptions
+  ${COMPANION_SRC_DIRECTORY}/thirdparty/qcustomplot
+  ${COMPANION_SRC_DIRECTORY}/thirdparty/miniz
+  ${COMPANION_SRC_DIRECTORY}/storage
 )
 
 add_subdirectory(shared)
 add_subdirectory(modeledit)
 add_subdirectory(generaledit)
 add_subdirectory(simulation)
-add_subdirectory(qcustomplot)
-add_subdirectory(qxtcommandoptions)
+add_subdirectory(storage)
+add_subdirectory(thirdparty/qcustomplot)
+add_subdirectory(thirdparty/qxtcommandoptions)
 
 set(common_SRCS
   eeprominterface.cpp
-  firmwares/th9x/th9xeeprom.cpp # TODO not needed
-  firmwares/th9x/th9xinterface.cpp
   firmwares/er9x/er9xeeprom.cpp
   firmwares/er9x/er9xinterface.cpp
-  firmwares/gruvin9x/gruvin9xeeprom.cpp
-  firmwares/gruvin9x/gruvin9xinterface.cpp
   firmwares/ersky9x/ersky9xeeprom.cpp
   firmwares/ersky9x/ersky9xinterface.cpp
   firmwares/opentx/opentxeeprom.cpp
-  firmwares/opentx/open9xStockeeprom.cpp
-  firmwares/opentx/open9xGruvin9xeeprom.cpp
-  firmwares/opentx/open9xSky9xeeprom.cpp
   firmwares/opentx/opentxinterface.cpp
-  file.cpp
-  appdata.cpp
   )
 
 qt5_wrap_cpp(common_SRCS)
@@ -107,16 +105,10 @@ add_library(common ${common_SRCS})
 qt5_use_modules(common Core Xml Widgets)
 
 set(companion_SRCS
-  hexinterface.cpp
-  firmwareinterface.cpp
-  converteeprom.cpp
-  # xmlinterface.cpp
-  # ${PROJECT_BINARY_DIR}/radio.cxx
   helpers.cpp
   helpers_html.cpp
   mdichild.cpp
   modelslist.cpp
-  mountlist.cpp
   apppreferencesdialog.cpp
   fwpreferencesdialog.cpp
   burnconfigdialog.cpp
@@ -236,7 +228,7 @@ add_executable(${COMPANION_NAME} MACOSX_BUNDLE WIN32 ${companion_SRCS} ${compani
 
 add_dependencies(${COMPANION_NAME} gen_qrc)
 qt5_use_modules(${COMPANION_NAME} Core Widgets Network)
-target_link_libraries(${COMPANION_NAME} PRIVATE generaledit modeledit simulation common qcustomplot shared ${PTHREAD_LIBRARY} ${SDL_LIBRARY})
+target_link_libraries(${COMPANION_NAME} PRIVATE generaledit modeledit simulation common qcustomplot shared storage ${PTHREAD_LIBRARY} ${SDL_LIBRARY})
 
 ############# Standalone simu ###############
 
@@ -261,7 +253,7 @@ add_executable(${SIMULATOR_NAME} MACOSX_BUNDLE WIN32 ${simu_SRCS} ${companion_RC
 
 add_dependencies(${SIMULATOR_NAME} gen_qrc)
 # TODO not the same link command than companion?
-target_link_libraries(${SIMULATOR_NAME} PRIVATE simulation common qxtcommandoptions ${QT_LIBRARIES} ${QT_QTMAIN_LIBRARY} ${PTHREAD_LIBRARY} ${SDL_LIBRARY} ${OPENTX_SIMULATOR_LIBS})
+target_link_libraries(${SIMULATOR_NAME} PRIVATE simulation common storage qxtcommandoptions ${QT_LIBRARIES} ${QT_QTMAIN_LIBRARY} ${PTHREAD_LIBRARY} ${SDL_LIBRARY} ${OPENTX_SIMULATOR_LIBS})
 
 ############# Packaging ####################
 message(STATUS ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_PREFIX}/bin)
@@ -395,7 +387,7 @@ if(APPLE)
   file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/libopentx-*${CMAKE_SHARED_LIBRARY_SUFFIX}")
   set(companion_res_dir ${COMPANION_NAME}.app/Contents/Resources)
   install(FILES ${simulator_plugins} DESTINATION "${companion_res_dir}" COMPONENT Runtime)
-  
+
   # Write qt.conf to tell qt where to find it plugins
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/qt.conf"
     "[Paths]\nPlugins = Plugins\n")
@@ -413,7 +405,7 @@ if(APPLE)
   get_target_property(QPA_PLUGIN Qt5::QCocoaIntegrationPlugin LOCATION)
   install(FILES ${QPA_PLUGIN} DESTINATION "${plugin_dest_dir}/platforms/" COMPONENT Runtime)
   set(bundle_qt_libs "\${CMAKE_INSTALL_PREFIX}/${plugin_dest_dir}/platforms/libqcocoa.dylib")
-  
+
   # Add icon
   set(MACOSX_BUNDLE_ICON_FILE iconmac.icns)
   set(MAC_ICON_FILE ${COMPANION_SRC_DIRECTORY}/images/${MACOSX_BUNDLE_ICON_FILE})

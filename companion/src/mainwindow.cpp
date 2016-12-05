@@ -1,43 +1,22 @@
-/****************************************************************************
-**
-** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
-**
-** This file is part of the examples of the Qt Toolkit.
-**
-** $QT_BEGIN_LICENSE:LGPL$
-** Commercial Usage
-** Licensees holding valid Qt Commercial licenses may use this file in
-** accordance with the Qt Commercial License Agreement provided with the
-** Software or, alternatively, in accordance with the terms contained in
-** a written agreement between you and Nokia.
-**
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-**
-** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU
-** General Public License version 3.0 as published by the Free Software
-** Foundation and appearing in the file LICENSE.GPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU General Public License version 3.0 requirements will be
-** met: http://www.gnu.org/copyleft/gpl.html.
-**
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
-** $QT_END_LICENSE$
-**
-****************************************************************************/
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 
 #include <QtGui>
 #include <QNetworkProxyFactory>
@@ -69,6 +48,7 @@
 #include "process_sync.h"
 #include "radiointerface.h"
 #include "progressdialog.h"
+#include "storage_sdcard.h"
 
 #define OPENTX_COMPANION_DOWNLOADS        "http://downloads-22.open-tx.org/companion"
 #define DONATE_STR                        "https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QUZ48K4SEXDP2"
@@ -576,22 +556,29 @@ void MainWindow::openDocURL()
 
 void MainWindow::openFile()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open Models and Settings file"), g.eepromDir(), tr(EEPROM_FILES_FILTER));
-    if (!fileName.isEmpty()) {
-      g.eepromDir(QFileInfo(fileName).dir().absolutePath());
+  QString fileFilter;
+  if (GetCurrentFirmware()->getBoard() == BOARD_HORUS && HORUS_READY_FOR_RELEASE()) {
+    fileFilter = tr(OTX_FILES_FILTER);
+  }
+  else {
+    fileFilter = tr(EEPROM_FILES_FILTER);
+  }
+  QString fileName = QFileDialog::getOpenFileName(this, tr("Open Models and Settings file"), g.eepromDir(), fileFilter);
+  if (!fileName.isEmpty()) {
+    g.eepromDir(QFileInfo(fileName).dir().absolutePath());
 
-      QMdiSubWindow *existing = findMdiChild(fileName);
-      if (existing) {
-        mdiArea->setActiveSubWindow(existing);
-        return;
-      }
-
-      MdiChild *child = createMdiChild();
-      if (child->loadFile(fileName)) {
-        statusBar()->showMessage(tr("File loaded"), 2000);
-        child->show();
-      }
+    QMdiSubWindow *existing = findMdiChild(fileName);
+    if (existing) {
+      mdiArea->setActiveSubWindow(existing);
+      return;
     }
+
+    MdiChild *child = createMdiChild();
+    if (child->loadFile(fileName)) {
+      statusBar()->showMessage(tr("File loaded"), 2000);
+      child->show();
+    }
+  }
 }
 
 void MainWindow::save()
@@ -764,6 +751,46 @@ void MainWindow::loadBackup()
 
 void MainWindow::readEeprom()
 {
+  if(GetCurrentFirmware()->getBoard()== BOARD_HORUS && HORUS_READY_FOR_RELEASE()) {
+    // just an example
+    QString path = findMassstoragePath("RADIO");
+    if (path.isEmpty()) {
+      qDebug() << "Horus card not found";
+      return;
+    }
+
+    QString realPath = path.remove(path.size()- 5, 5);
+
+    qDebug() << "Reading files from" << realPath;
+    StorageSdcard storage;
+    storage.read(realPath);
+
+    // display models.txt
+    QString modelList = QString(storage.modelList);
+    qDebug() << "Models: size" << modelList.size() << "contents" << modelList;
+
+    // info about radio.bin
+    qDebug() << "Radio settings:" << storage.radio.size();
+
+    // info about all models
+    QList<QString> models = storage.getModelsFileNames();
+    qDebug() << "We have" << models.size() << "models:";
+    foreach(QString filename, models) {
+      QList<ModelFile>::const_iterator i = storage.getModelIterator(filename);
+      if (i != storage.models.end()) {
+        qDebug() << "\tModel:" << i->filename << "size" << i->data.size();
+      }
+    }
+
+    for (QList<ModelFile>::iterator i = storage.models.begin(); i != storage.models.end(); ++i) {
+    }
+
+
+    // for test immediately save to current dir
+    storage.write("./");
+
+  }
+  else {
     QString tempFile;
 
     EEPROMInterface *eepromInterface = GetEepromInterface();
@@ -782,6 +809,7 @@ void MainWindow::readEeprom()
       child->show();
       qunlink(tempFile);
     }
+  }
 }
 
 bool MainWindow::readFirmwareFromRadio(const QString &filename)
@@ -922,7 +950,7 @@ void MainWindow::updateMenus()
     bool hasMdiChild = (activeMdiChild() != 0);
     bool hasSelection = (activeMdiChild() && activeMdiChild()->hasSelection());
 
-    if(GetCurrentFirmware()->getBoard() == BOARD_HORUS) {
+  if(GetCurrentFirmware()->getBoard() == BOARD_HORUS && !HORUS_READY_FOR_RELEASE()) {
       newAct->setEnabled(false);
       openAct->setEnabled(false);
       saveAct->setEnabled(false);

@@ -23,6 +23,7 @@ set(FIRMWARE_DEPENDENCIES ${FIRMWARE_DEPENDENCIES} horus_bitmaps)
 set(LUA_EXPORT lua_export_horus)
 set(FLAVOUR horus)
 set(RAMBACKUP YES)
+set(LUA YES)
 
 add_definitions(-DPCBHORUS -DPCBREV=${PCBREV} -DSTM32F429_439xx -DSDRAM -DCOLORLCD -DPPM_PIN_UART -DPPM_PIN_TIMER)
 add_definitions(-DEEPROM_VARIANT=0 -DAUDIO -DVOICE -DRTCLOCK)
@@ -66,6 +67,7 @@ if(INTERNAL_GPS)
   message("Internal GPS enabled")
 endif()
 set(SERIAL2_DRIVER serial2_driver.cpp)
+set(GVAR_SCREEN model_gvars.cpp)
 set(TARGET_SRC
   ${TARGET_SRC}
   board.cpp

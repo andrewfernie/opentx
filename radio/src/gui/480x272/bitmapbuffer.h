@@ -45,7 +45,8 @@ class BitmapBufferBase
       format(format),
       width(width),
       height(height),
-      data(data)
+      data(data),
+      data_end(data + (width * height))
     {
     }
 
@@ -74,6 +75,7 @@ class BitmapBufferBase
     uint16_t width;
     uint16_t height;
     T * data;
+    T * data_end;
 };
 
 typedef BitmapBufferBase<const uint16_t> Bitmap;
@@ -82,19 +84,29 @@ class BitmapBuffer: public BitmapBufferBase<uint16_t>
 {
   private:
     bool dataAllocated;
+#if defined(DEBUG)
+    bool leakReported;
+#endif
 
   public:
 
     BitmapBuffer(uint8_t format, uint16_t width, uint16_t height):
       BitmapBufferBase<uint16_t>(format, width, height, NULL),
       dataAllocated(true)
+#if defined(DEBUG)
+      , leakReported(false)
+#endif
     {
       data = (uint16_t *)malloc(width*height*sizeof(uint16_t));
+      data_end = data + (width * height);
     }
 
     BitmapBuffer(uint8_t format, uint16_t width, uint16_t height, uint16_t * data):
       BitmapBufferBase<uint16_t>(format, width, height, data),
       dataAllocated(false)
+#if defined(DEBUG)
+      , leakReported(false)
+#endif
     {
     }
 
@@ -117,7 +129,15 @@ class BitmapBuffer: public BitmapBufferBase<uint16_t>
 
     inline void drawPixel(display_t * p, display_t value)
     {
-      *p = value;
+      if (data && (data <= p || p < data_end)) {
+        *p = value;
+      }
+#if defined(DEBUG)
+      else if (!leakReported) {
+        leakReported = true;
+        TRACE("BitmapBuffer(%p).drawPixel(): buffer overrun, data: %p, written at: %p", this, data, p);
+      }
+#endif
     }
 
     inline display_t * getPixelPtr(coord_t x, coord_t y)
@@ -198,7 +218,8 @@ class BitmapBuffer: public BitmapBufferBase<uint16_t>
     template<class T>
     void drawBitmap(coord_t x, coord_t y, const T * bmp, coord_t srcx=0, coord_t srcy=0, coord_t w=0, coord_t h=0, float scale=0)
     {
-      if (!bmp) return;
+      if (!bmp || x >= width || y >= height)
+        return;
 
       int srcw = bmp->getWidth();
       int srch = bmp->getHeight();
@@ -211,7 +232,7 @@ class BitmapBuffer: public BitmapBufferBase<uint16_t>
         w = srcw - srcx;
       if (srcy+h > srch)
         h = srch - srcy;
-
+      
       if (scale == 0) {
         if (x + w > width) {
           w = width - x;

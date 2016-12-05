@@ -1,5 +1,25 @@
-#ifndef CUSTOMFUNCTIONS_H
-#define CUSTOMFUNCTIONS_H
+/*
+ * Copyright (C) OpenTX
+ *
+ * Based on code named
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#ifndef _CUSTOMFUNCTIONS_H_
+#define _CUSTOMFUNCTIONS_H_
 
 #include "modeledit.h"
 #include "eeprominterface.h"
@@ -58,22 +78,22 @@ class CustomFunctionsPanel : public GenericPanel
     QSet<QString> tracksSet;
     QSet<QString> scriptsSet;
     int mediaPlayerCurrent;
-    QComboBox * fswtchSwtch[C9X_MAX_CUSTOM_FUNCTIONS];
-    QComboBox * fswtchFunc[C9X_MAX_CUSTOM_FUNCTIONS];
-    QCheckBox * fswtchParamGV[C9X_MAX_CUSTOM_FUNCTIONS];
-    QDoubleSpinBox * fswtchParam[C9X_MAX_CUSTOM_FUNCTIONS];
-    QTimeEdit * fswtchParamTime[C9X_MAX_CUSTOM_FUNCTIONS];
-    QPushButton * playBT[C9X_MAX_CUSTOM_FUNCTIONS];
-    QComboBox * fswtchParamT[C9X_MAX_CUSTOM_FUNCTIONS];
-    QComboBox * fswtchParamArmT[C9X_MAX_CUSTOM_FUNCTIONS];
-    QCheckBox * fswtchEnable[C9X_MAX_CUSTOM_FUNCTIONS];
-    RepeatComboBox * fswtchRepeat[C9X_MAX_CUSTOM_FUNCTIONS];
-    QComboBox * fswtchGVmode[C9X_MAX_CUSTOM_FUNCTIONS];
-    QSlider * fswtchBLcolor[C9X_MAX_CUSTOM_FUNCTIONS];
+    QComboBox * fswtchSwtch[CPN_MAX_CUSTOM_FUNCTIONS];
+    QComboBox * fswtchFunc[CPN_MAX_CUSTOM_FUNCTIONS];
+    QCheckBox * fswtchParamGV[CPN_MAX_CUSTOM_FUNCTIONS];
+    QDoubleSpinBox * fswtchParam[CPN_MAX_CUSTOM_FUNCTIONS];
+    QTimeEdit * fswtchParamTime[CPN_MAX_CUSTOM_FUNCTIONS];
+    QPushButton * playBT[CPN_MAX_CUSTOM_FUNCTIONS];
+    QComboBox * fswtchParamT[CPN_MAX_CUSTOM_FUNCTIONS];
+    QComboBox * fswtchParamArmT[CPN_MAX_CUSTOM_FUNCTIONS];
+    QCheckBox * fswtchEnable[CPN_MAX_CUSTOM_FUNCTIONS];
+    RepeatComboBox * fswtchRepeat[CPN_MAX_CUSTOM_FUNCTIONS];
+    QComboBox * fswtchGVmode[CPN_MAX_CUSTOM_FUNCTIONS];
+    QSlider * fswtchBLcolor[CPN_MAX_CUSTOM_FUNCTIONS];
     QMediaPlayer * mediaPlayer;
 
     int selectedFunction;
 
 };
 
-#endif // CUSTOMFUNCTIONS_H
+#endif // _CUSTOMFUNCTIONS_H_
