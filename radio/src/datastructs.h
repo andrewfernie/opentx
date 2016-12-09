@@ -913,8 +913,8 @@ PACK(struct TrainerData {
 #elif defined(PCBFLAMENCO)
   #define EXTRA_GENERAL_FIELDS \
     EXTRA_GENERAL_FIELDS_ARM \
-    uint8_t  serial2Mode:6; \
-    uint8_t  spare:2; \
+    uint8_t  serial2Mode:4; \
+    uint8_t  spare:4; \
     uint32_t switchConfig; \
     uint8_t  potsType; /*two bits for every pot*/\
     char switchNames[NUM_SWITCHES][LEN_SWITCH_NAME]; \
@@ -1100,7 +1100,8 @@ static inline void check_struct()
   CHKSIZE(CurveData, 4);
   CHKSIZE(RadioData, 847);
   CHKSIZE(ModelData, 9380);
-
+  CHKSIZE(CustomScreenData, 610);
+  CHKSIZE(Topbar::PersistentData, 216);
 #elif defined(PCBSKY9X)
   CHKSIZE(MixData, 20);
   CHKSIZE(ExpoData, 17);

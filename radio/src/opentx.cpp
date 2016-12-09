@@ -231,7 +231,7 @@ void generalDefault()
   g_eeGeneral.variant = EEPROM_VARIANT;
 
 #if !defined(PCBHORUS)
-  g_eeGeneral.contrast = 25;
+  g_eeGeneral.contrast = LCD_CONTRAST_DEFAULT;
 #endif
 
 #if defined(PCBFLAMENCO)
@@ -250,8 +250,10 @@ void generalDefault()
   g_eeGeneral.potsConfig = 0x05;    // S1 and S2 = pots with detent
   g_eeGeneral.slidersConfig = 0x03; // LS and RS = sliders with detent
 #endif
-
-#if defined(PCBTARANIS) || defined(PCBHORUS)
+  
+#if defined(PCBX7D)
+  g_eeGeneral.switchConfig = 0x000006ff; // 4x3POS, 1x2POS, 1xTOGGLE
+#elif defined(PCBTARANIS) || defined(PCBHORUS)
   g_eeGeneral.switchConfig = 0x00007bff; // 6x3POS, 1x2POS, 1xTOGGLE
 #endif
 
@@ -1881,7 +1883,10 @@ void opentxClose(uint8_t shutdown)
     // TODO needed? telemetryEnd();
 #endif
 #if defined(LUA)
-    luaClose();
+    luaClose(&lsScripts);
+#if defined(PCBHORUS)
+    luaClose(&lsWidgets);
+#endif
 #endif
 #if defined(HAPTIC)
     hapticOff();
@@ -2432,7 +2437,7 @@ void opentxInit(OPENTX_INIT_ARGS)
 
 #if defined(PCBHORUS)
   topbar = new Topbar(&g_model.topbarData);
-  luaInit();
+  LUA_INIT_THEMES_AND_WIDGETS();
 #endif
 
 #if defined(RAMBACKUP)
@@ -2444,6 +2449,10 @@ void opentxInit(OPENTX_INIT_ARGS)
   }
 #else
   storageReadAll();
+#endif
+
+#if defined(SERIAL2)
+  serial2Init(g_eeGeneral.serial2Mode, MODEL_TELEMETRY_PROTOCOL());
 #endif
 
 #if defined(PCBTARANIS)
@@ -2502,10 +2511,6 @@ void opentxInit(OPENTX_INIT_ARGS)
 #endif
   backlightOn();
 
-#if defined(SERIAL2)
-  serial2Init(g_eeGeneral.serial2Mode, MODEL_TELEMETRY_PROTOCOL());
-#endif
-
 #if defined(PCBSKY9X) && !defined(SIMU)
   init_trainer_capture();
 #endif
@@ -2540,7 +2545,7 @@ int main()
   MCUCSR = 0x80 ;   // Must be done twice
 #endif
 #if defined(PCBTARANIS)
-  g_eeGeneral.contrast = 30;
+  g_eeGeneral.contrast = LCD_CONTRAST_DEFAULT;
 #endif
   wdt_disable();
 

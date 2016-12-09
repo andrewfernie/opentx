@@ -72,8 +72,7 @@ int StorageSdcard::readOtx(const QString & path)
 
   // go trough all files in an archive
   QRegularExpression regexModel("MODELS/\\w+.bin", QRegularExpression::CaseInsensitiveOption);
-  for (unsigned int i = 0; i < mz_zip_reader_get_num_files(&zip_archive); i++)
-  {
+  for (unsigned int i = 0; i < mz_zip_reader_get_num_files(&zip_archive); i++) {
     mz_zip_archive_file_stat file_stat;
     if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) {
        lastErrorMessage = QObject::tr("mz_zip_reader_file_stat() failed!");
@@ -117,9 +116,9 @@ int StorageSdcard::readOtx(const QString & path)
     else {
       qDebug() << "Unknown file " << filename;
     }
-
   }
   mz_zip_reader_end(&zip_archive);
+  
   return 0;
 }
 
@@ -163,6 +162,7 @@ void StorageSdcard::writeFile(const QByteArray & data, const QString & path)
   QFile file(path);
   if (!file.open(QFile::WriteOnly)) {
     lastErrorMessage = QObject::tr("Error opening file %1:\n%2.").arg(path).arg(file.errorString());
+    qDebug() << "File" << path << "write error";
     throw StorageSdcardWriteFileError();
   }
   file.write(data.data(), data.size());
@@ -176,12 +176,12 @@ int StorageSdcard::writeSdcard(const QString & path)
     QDir dir(path);
     dir.mkdir("RADIO");
     writeFile(radio, path + "/RADIO/radio.bin");
-    writeFile(modelList, path + "RADIO/models.txt");
+    writeFile(modelList, path + "/RADIO/models.txt");
 
     dir.mkdir("MODELS");
     for (QList<ModelFile>::const_iterator i = models.begin(); i != models.end(); ++i) {
       qDebug() << "writing" << i->filename;
-      writeFile(i->data, path + "MODELS/" + i->filename);
+      writeFile(i->data, path + "/MODELS/" + i->filename);
     }
   }
   catch (StorageSdcardWriteFileError) {

@@ -6,7 +6,7 @@ set(TRANSLATIONS "EN" CACHE STRING "Radio language")
 option(HELI "Heli menu" ON)
 option(FLIGHT_MODES "Flight Modes" ON)
 option(CURVES "Curves" ON)
-option(GVARS "Global variables")
+option(GVARS "Global variables" OFF)
 option(GUI "GUI enabled" ON)
 option(SPLASH "Splash enabled" ON)
 set(PPM_UNIT "PERCENT_PREC1" CACHE STRING "PPM display unit (US/PERCENT_PREC1/PERCENT_PREC0)")
@@ -24,6 +24,7 @@ option(SIMU_DISKIO "Enable disk IO simulation in simulator. Simulator will use F
 option(FAS_PROTOTYPE "Support of old FAS prototypes (different resistors)" OFF)
 option(TEMPLATES "Model templates menu" OFF)
 option(WARNINGS_AS_ERRORS "Treat all compiler warnings as error" OFF)
+option(TRACE_SIMPGMSPACE "Turn on traces in simpgmspace.cpp" ON)
 
 enable_language(ASM)
 set(OPT s)
@@ -177,6 +178,9 @@ if(NOT LUA STREQUAL NO)
     set(GUI_SRC ${GUI_SRC} model_custom_scripts.cpp)
   endif()
   set(SRC ${SRC} lua/interface.cpp lua/api_general.cpp lua/api_lcd.cpp lua/api_model.cpp)
+  if(PCB STREQUAL HORUS)
+    set(SRC ${SRC} lua/widgets.cpp)
+  endif()
   set(LUA_SRC lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c
     lstate.c lstring.c ltable.c lrotable.c ltm.c lundump.c lvm.c lzio.c linit.c
     lbaselib.c lmathlib.c lbitlib.c loadlib.c lauxlib.c ltablib.c lcorolib.c liolib.c lstrlib.c
@@ -273,6 +277,10 @@ endif()
 
 if(SPLASH)
   add_definitions(-DSPLASH)
+endif()
+
+if(TRACE_SIMPGMSPACE)
+  add_definitions(-DTRACE_SIMPGMSPACE)
 endif()
 
 set(SRC
@@ -455,4 +463,6 @@ if(NOT MSVC)
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
       )
   endif()
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 endif(NOT MSVC)

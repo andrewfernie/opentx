@@ -242,7 +242,6 @@ enum RawSourceType {
   MAX_SOURCE_TYPE
 };
 
-QString AnalogString(int index);
 QString RotaryEncoderString(int index);
 
 class RawSourceRange
@@ -858,7 +857,8 @@ enum MultiModuleRFProtocols {
   MM_RF_PROTO_HONTAI,
   MM_RF_PROTO_OLRS,
   MM_RF_PROTO_AFHDS2A,
-  MM_RF_PROTO_LAST= MM_RF_PROTO_AFHDS2A
+  MM_RF_PROTO_Q2X2,
+  MM_RF_PROTO_LAST= MM_RF_PROTO_Q2X2
 };
 
 unsigned int getNumSubtypes(MultiModuleRFProtocols type);
@@ -1035,6 +1035,34 @@ class SensorData {
     void clear() { memset(this, 0, sizeof(SensorData)); }
 };
 
+/*
+ * TODO ...
+ */
+#if 0
+class CustomScreenOptionData {
+  public:
+    
+};
+
+class CustomScreenZoneData {
+  public:
+    char widgetName[10+1];
+    WidgetOptionData widgetOptions[5];
+};
+
+class CustomScreenData {
+  public:
+    CustomScreenData();
+    
+    char layoutName[10+1];
+    CustomScreenZoneData zones[];
+    CustomScreenOptionData options[];
+};
+#else
+typedef char CustomScreenData[610+1];
+typedef char TopbarData[216+1];
+#endif
+
 class ModelData {
   public:
     ModelData();
@@ -1052,7 +1080,9 @@ class ModelData {
     QVector<const MixData *> mixes(int channel) const;
 
     bool      used;
+    char      category[15+1];
     char      name[15+1];
+    char      filename[16+1];
     TimerData timers[CPN_MAX_TIMERS];
     bool      noGlobalFunctions;
     bool      thrTrim;            // Enable Throttle Trim
@@ -1101,7 +1131,11 @@ class ModelData {
     SensorData sensorData[CPN_MAX_SENSORS];
 
     unsigned int toplcdTimer;
-
+    
+    CustomScreenData customScreenData[5];
+    
+    TopbarData topbarData;
+    
     void clear();
     bool isEmpty() const;
     void setDefaultInputs(const GeneralSettings & settings);
@@ -1174,10 +1208,11 @@ class GeneralSettings {
 
     unsigned int version;
     unsigned int variant;
-    int   calibMid[CPN_MAX_STICKS+CPN_MAX_POTS];
-    int   calibSpanNeg[CPN_MAX_STICKS+CPN_MAX_POTS];
-    int   calibSpanPos[CPN_MAX_STICKS+CPN_MAX_POTS];
-    unsigned int  currModel; // 0..15
+    int   calibMid[CPN_MAX_STICKS+CPN_MAX_POTS+CPN_MAX_MOUSE_ANALOGS];
+    int   calibSpanNeg[CPN_MAX_STICKS+CPN_MAX_POTS+CPN_MAX_MOUSE_ANALOGS];
+    int   calibSpanPos[CPN_MAX_STICKS+CPN_MAX_POTS+CPN_MAX_MOUSE_ANALOGS];
+    unsigned int  currModelIndex;
+    char currModelFilename[16+1];
     unsigned int   contrast;
     unsigned int   vBatWarn;
     int    txVoltageCalibration;
@@ -1228,6 +1263,7 @@ class GeneralSettings {
     unsigned int    gpsFormat;
     int     speakerVolume;
     unsigned int   backlightBright;
+    unsigned int   backlightOffBright;
     int switchesDelay;
     int    temperatureCalib;
     int    temperatureWarn;
@@ -1240,6 +1276,7 @@ class GeneralSettings {
     unsigned int sticksGain;
     unsigned int rotarySteps;
     unsigned int countryCode;
+    bool jitterFilter;
     unsigned int imperial;
     bool crosstrim;
     char ttsLanguage[2+1];
@@ -1263,6 +1300,10 @@ class GeneralSettings {
     char sliderName[4][3+1];
     unsigned int sliderConfig[4];
 
+    char themeName[8+1];
+    typedef uint8_t ThemeOptionData[8+1];
+    ThemeOptionData themeOptionValue[5];
+    
     struct SwitchInfo {
       SwitchInfo(unsigned int index, unsigned int position):
         index(index),
@@ -1284,6 +1325,30 @@ class RadioData {
   public:
     GeneralSettings generalSettings;
     ModelData models[CPN_MAX_MODELS];
+    
+    void setCurrentModel(unsigned int index)
+    {
+      generalSettings.currModelIndex = index;
+      strcpy(generalSettings.currModelFilename, models[index].filename);
+    }
+    
+    QString getNextModelFilename()
+    {
+      char filename[sizeof(ModelData::filename)];
+      int index = 0;
+      bool found = true;
+      while (found) {
+        sprintf(filename, "model%d.bin", ++index);
+        found = false;
+        for (int i=0; i<CPN_MAX_MODELS; i++) {
+          if (strcmp(filename, models[i].filename) == 0) {
+            found = true;
+            break;
+          }
+        }
+      }
+      return filename;
+    }
 };
 
 enum Capability {
@@ -1411,15 +1476,11 @@ class EEPROMInterface
 
     inline BoardEnum getBoard() { return board; }
 
-    virtual unsigned long load(RadioData &radioData, const uint8_t *eeprom, int size) = 0;
+    virtual unsigned long load(RadioData &radioData, const uint8_t * eeprom, int size) = 0;
 
-    virtual unsigned long loadBackup(RadioData &radioData, uint8_t *eeprom, int esize, int index) = 0;
+    virtual unsigned long loadBackup(RadioData & radioData, const uint8_t * eeprom, int esize, int index) = 0;
     
-    virtual bool loadRadioSettings(GeneralSettings & model, const QByteArray & data) { return false; }
-    
-    virtual bool loadModel(ModelData & model, const QByteArray & data) { return false; }
-
-    virtual unsigned long loadxml(RadioData &radioData, QDomDocument &doc) = 0;
+    virtual unsigned long loadxml(RadioData & radioData, QDomDocument &doc) = 0;
 
     virtual int save(uint8_t * eeprom, RadioData & radioData, uint8_t version=0, uint32_t variant=0) = 0;
 
@@ -1430,7 +1491,11 @@ class EEPROMInterface
     virtual const int getEEpromSize() = 0;
 
     virtual const int getMaxModels() = 0;
-
+    
+    virtual int loadFile(RadioData & radioData, const QString & filename) = 0;
+    
+    virtual int saveFile(const RadioData & radioData, const QString & filename) = 0;
+  
   protected:
 
     BoardEnum board;
@@ -1669,7 +1734,9 @@ class Firmware {
     };
     
     virtual Switch getSwitch(unsigned int index) = 0;
-
+    
+    virtual QString getAnalogInputName(unsigned int index) = 0;
+    
     virtual QTime getMaxTimerStart() = 0;
 
     virtual bool isTelemetrySourceAvailable(int source) = 0;

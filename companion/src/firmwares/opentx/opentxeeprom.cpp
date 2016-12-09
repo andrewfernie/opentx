@@ -31,10 +31,11 @@
 
 #define HAS_PERSISTENT_TIMERS(board)          (IS_ARM(board) || IS_2560(board))
 #define MAX_VIEWS(board)                      (HAS_LARGE_LCD(board) ? 2 : 256)
-#define MAX_POTS(board, version)              (board == BOARD_X7D ? 2 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 4 : (version >= 216 ? 3 : 2)) : 3))
+#define MAX_POTS(board, version)              (IS_HORUS(board) ? 3 : (board == BOARD_X7D ? 2 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 4 : (version >= 216 ? 3 : 2)) : 3)))
 #define MAX_SLIDERS(board)                    (IS_HORUS(board) ? 4 : (board == BOARD_X7D ? 0 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 4 : 2) : 0)))
-#define MAX_SWITCHES(board, version)          (board == BOARD_X7D ? 6 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 18 : 8) : 7))
-#define MAX_SWITCHES_POSITION(board, version) (board == BOARD_X7D ? 6*3 : (IS_TARANIS_X9E(board) ? 18*3 : (IS_TARANIS(board) ? 8*3 : 9)))
+#define MAX_MOUSE_ANALOGS(board)              (IS_HORUS(board) ? 2 : 0)
+#define MAX_SWITCHES(board, version)          (IS_HORUS(board) ? 8 : (board == BOARD_X7D ? 6 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 18 : 8) : 7)))
+#define MAX_SWITCHES_POSITION(board, version) (IS_HORUS(board) ? 24 : (board == BOARD_X7D ? 6*3 : (IS_TARANIS_X9E(board) ? 18*3 : (IS_TARANIS(board) ? 8*3 : 9))))
 #define MAX_ROTARY_ENCODERS(board)            (IS_2560(board) ? 2 : (IS_SKY9X(board) ? 1 : 0))
 #define MAX_FLIGHT_MODES(board, version)      (IS_ARM(board) ? 9 :  (IS_DBLRAM(board, version) ? 6 :  5))
 #define MAX_TIMERS(board, version)            ((IS_ARM(board) && version >= 217) ? 3 : 2)
@@ -834,9 +835,9 @@ class FlightModeField: public TransformedField {
       }
       if (IS_ARM(board) && version >= 218) {
         if (HAS_LARGE_LCD(board))
-          internalField.Append(new ZCharField<10>(phase.name));
+          internalField.Append(new ZCharField<10>(phase.name, "Flight mode name"));
         else
-          internalField.Append(new ZCharField<6>(phase.name));
+          internalField.Append(new ZCharField<6>(phase.name, "Flight mode name"));
         internalField.Append(new SwitchField<9>(phase.swtch, board, version));
         internalField.Append(new SpareBitsField<7>());
       }
@@ -2598,7 +2599,7 @@ class FrskyScreenField: public DataField {
       }
 
       if (IS_TARANIS(board) && version >= 217) {
-        script.Append(new CharField<8>(screen.body.script.filename));
+        script.Append(new CharField<8>(screen.body.script.filename, true, "Script name"));
         script.Append(new SpareBitsField<16*8>());
       }
 
@@ -2911,6 +2912,23 @@ class MavlinkField: public StructField {
     }
 };
 
+/*
+ * TODO
+ */
+#if 0
+class CustomScreenField: public StructField {
+  public:
+    CustomScreenField(CustomScreenData & customScreen):
+      StructField("Custom Screen"),
+      customScreen(customScreen)
+    {
+    }
+    
+  protected:
+    CustomScreenData & customScreen;
+};
+#endif
+
 class SensorField: public TransformedField {
   public:
     SensorField(SensorData & sensor, BoardEnum board, unsigned int version):
@@ -3015,11 +3033,11 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
   eepromImportDebug() << QString("OpenTxModelData::OpenTxModelData(name: %1, board: %2, ver: %3, var: %4)").arg(name).arg(board).arg(version).arg(variant);
 
   if (board == BOARD_HORUS)
-    internalField.Append(new ZCharField<15>(modelData.name));
+    internalField.Append(new ZCharField<15>(modelData.name, "Model name"));
   else if (HAS_LARGE_LCD(board))
-    internalField.Append(new ZCharField<12>(modelData.name));
+    internalField.Append(new ZCharField<12>(modelData.name, "Model name"));
   else
-    internalField.Append(new ZCharField<10>(modelData.name));
+    internalField.Append(new ZCharField<10>(modelData.name, "Model name"));
 
   bool afterrelease21March2013 = IS_AFTER_RELEASE_21_MARCH_2013(board, version);
 
@@ -3031,7 +3049,7 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
   }
 
   if (HAS_LARGE_LCD(board) && version >= 215) {
-    internalField.Append(new CharField<10>(modelData.bitmap));
+    internalField.Append(new CharField<10>(modelData.bitmap, true, "Model bitmap"));
   }
 
   for (int i=0; i<MAX_TIMERS(board, version); i++) {
@@ -3044,9 +3062,9 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
       internalField.Append(new UnsignedField<2>(modelData.timers[i].persistent));
       internalField.Append(new SpareBitsField<3>());
       if (HAS_LARGE_LCD(board))
-        internalField.Append(new ZCharField<8>(modelData.timers[i].name));
+        internalField.Append(new ZCharField<8>(modelData.timers[i].name, "Timer name"));
       else
-        internalField.Append(new ZCharField<3>(modelData.timers[i].name));
+        internalField.Append(new ZCharField<3>(modelData.timers[i].name, "Timer name"));
     }
     else if (IS_ARM(board) && version >= 217) {
       internalField.Append(new SwitchField<8>(modelData.timers[i].mode, board, version, true));
@@ -3057,9 +3075,9 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
       internalField.Append(new UnsignedField<2>(modelData.timers[i].persistent));
       internalField.Append(new SpareBitsField<3>());
       if (IS_TARANIS(board))
-        internalField.Append(new ZCharField<8>(modelData.timers[i].name));
+        internalField.Append(new ZCharField<8>(modelData.timers[i].name, "Timer name"));
       else
-        internalField.Append(new ZCharField<3>(modelData.timers[i].name));
+        internalField.Append(new ZCharField<3>(modelData.timers[i].name, "Timer name"));
     }
     else if ((IS_ARM(board) || IS_2560(board)) && version >= 216) {
       internalField.Append(new SwitchField<8>(modelData.timers[i].mode, board, version, true));
@@ -3186,7 +3204,7 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
   if (board != BOARD_STOCK && (board != BOARD_M128 || version < 215)) {
     for (int i=0; i<MAX_GVARS(board, version); i++) {
       if (version >= 218) {
-        internalField.Append(new ZCharField<3>(modelData.gvars_names[i]));
+        internalField.Append(new ZCharField<3>(modelData.gvars_names[i], "GVar name"));
         internalField.Append(new SpareBitsField<12>()); // TODO min
         internalField.Append(new SpareBitsField<12>()); // TODO max
         internalField.Append(new BoolField<1>(modelData.gvars_popups[i]));
@@ -3195,7 +3213,7 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
         internalField.Append(new SpareBitsField<4>());
       }
       else {
-        internalField.Append(new ZCharField<6>(modelData.gvars_names[i]));
+        internalField.Append(new ZCharField<6>(modelData.gvars_names[i], "GVar name"));
         if (version >= 216) {
           internalField.Append(new BoolField<1>(modelData.gvars_popups[i]));
           internalField.Append(new SpareBitsField<7>());
@@ -3218,7 +3236,7 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
   }
 
   if (IS_TARANIS(board) && version < 215) {
-    internalField.Append(new CharField<10>(modelData.bitmap));
+    internalField.Append(new CharField<10>(modelData.bitmap, true, "Model bitmap"));
   }
 
   int modulesCount = 2;
@@ -3285,7 +3303,7 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
 
   if (IS_TARANIS(board) && version < 218) {
     for (int i=0; i<MAX_CURVES(board, version); i++) {
-      internalField.Append(new ZCharField<6>(modelData.curves[i].name));
+      internalField.Append(new ZCharField<6>(modelData.curves[i].name, "Curve name"));
     }
   }
 
@@ -3293,8 +3311,8 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
     if (version >= 218) {
       for (int i=0; i<MAX_SCRIPTS(board); i++) {
         ScriptData & script = modelData.scriptData[i];
-        internalField.Append(new CharField<6>(script.filename));
-        internalField.Append(new ZCharField<6>(script.name));
+        internalField.Append(new CharField<6>(script.filename, true, "Script filename"));
+        internalField.Append(new ZCharField<6>(script.name, "Script name"));
         for (int j=0; j<6; j++) {
           internalField.Append(new SignedField<16>(script.inputs[j]));
         }
@@ -3303,8 +3321,8 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
     else if (version >= 217) {
       for (int i=0; i<7; i++) {
         ScriptData & script = modelData.scriptData[i];
-        internalField.Append(new CharField<8>(script.filename));
-        internalField.Append(new ZCharField<8>(script.name));
+        internalField.Append(new CharField<8>(script.filename, true, "Script filename"));
+        internalField.Append(new ZCharField<8>(script.name, "Script name"));
         for (int j=0; j<8; j++) {
           internalField.Append(new SignedField<8>(script.inputs[j]));
         }
@@ -3313,8 +3331,8 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
     else if (version >= 216) {
       for (int i=0; i<7; i++) {
         ScriptData & script = modelData.scriptData[i];
-        internalField.Append(new CharField<10>(script.filename));
-        internalField.Append(new ZCharField<10>(script.name));
+        internalField.Append(new CharField<10>(script.filename, true, "Script filename"));
+        internalField.Append(new ZCharField<10>(script.name, "Script name"));
         for (int j=0; j<10; j++) {
           internalField.Append(new SignedField<8>(script.inputs[j]));
         }
@@ -3325,9 +3343,9 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
   if (IS_ARM(board) && version >= 216) {
     for (int i=0; i<32; i++) {
       if (HAS_LARGE_LCD(board))
-        internalField.Append(new ZCharField<4>(modelData.inputNames[i]));
+        internalField.Append(new ZCharField<4>(modelData.inputNames[i], "Input name"));
       else
-        internalField.Append(new ZCharField<3>(modelData.inputNames[i]));
+        internalField.Append(new ZCharField<3>(modelData.inputNames[i], "Input name"));
     }
   }
 
@@ -3372,6 +3390,14 @@ OpenTxModelData::OpenTxModelData(ModelData & modelData, BoardEnum board, unsigne
 
   if (IS_TARANIS_X9E(board)) {
     internalField.Append(new UnsignedField<8>(modelData.toplcdTimer));
+  }
+  
+  if (IS_HORUS(board)) {
+    for (int i = 0; i < 5; i++) {
+      internalField.Append(new CharField<610>(modelData.customScreenData[i], false, "Custom screen blob"));
+    }
+    internalField.Append(new CharField<216>(modelData.topbarData, false, "Top bar blob"));
+    internalField.Append(new SpareBitsField<8>()); // current view
   }
 }
 
@@ -3418,7 +3444,7 @@ void OpenTxModelData::afterImport()
           break;
         }
       }
-      strncpy(modelData.inputNames[i], AnalogString(i).toLatin1().constData(), sizeof(modelData.inputNames[i])-1);
+      strncpy(modelData.inputNames[i], GetCurrentFirmware()->getAnalogInputName(i).toLatin1().constData(), sizeof(modelData.inputNames[i])-1);
     }
   }
 
@@ -3451,7 +3477,7 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
   generalData(generalData),
   board(board),
   version(version),
-  inputsCount(CPN_MAX_STICKS+MAX_POTS(board, version)+MAX_SLIDERS(board))
+  inputsCount(CPN_MAX_STICKS+MAX_POTS(board, version)+MAX_SLIDERS(board)+MAX_MOUSE_ANALOGS(board))
 {
   eepromImportDebug() << QString("OpenTxGeneralData::OpenTxGeneralData(board: %1, version:%2, variant:%3)").arg(board).arg(version).arg(variant);
 
@@ -3485,8 +3511,10 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
   }
 
   internalField.Append(new UnsignedField<16>(chkSum));
-  internalField.Append(new UnsignedField<8>(generalData.currModel));
-  internalField.Append(new UnsignedField<8>(generalData.contrast));
+  if (!IS_HORUS(board)) {
+    internalField.Append(new UnsignedField<8>(generalData.currModelIndex));
+    internalField.Append(new UnsignedField<8>(generalData.contrast));
+  }
   internalField.Append(new UnsignedField<8>(generalData.vBatWarn));
   internalField.Append(new SignedField<8>(generalData.txVoltageCalibration));
   internalField.Append(new SignedField<8>(generalData.backlightMode));
@@ -3501,7 +3529,7 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
   }
 
   internalField.Append(new UnsignedField<8>(generalData.view, 0, MAX_VIEWS(board)-1));
-
+  
   internalField.Append(new SpareBitsField<2>()); // TODO buzzerMode?
   internalField.Append(new BoolField<1>(generalData.fai));
   internalField.Append(new SignedField<2>((int &)generalData.beeperMode));
@@ -3550,11 +3578,11 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
   internalField.Append(new SignedField<8>(generalData.PPM_Multiplier));
   internalField.Append(new SignedField<8>(generalData.hapticLength));
 
-  if (version < 216 || (version < 218 && !IS_9X(board)) || (!IS_9X(board) && !IS_TARANIS(board))) {
+  if (version < 216 || (version < 218 && !IS_9X(board)) || (!IS_9X(board) && !IS_TARANIS(board) && !IS_HORUS(board))) {
     internalField.Append(new UnsignedField<8>(generalData.reNavigation));
   }
 
-  if (version >= 216 && !IS_TARANIS(board)) {
+  if (version >= 216 && !IS_TARANIS(board) && !IS_HORUS(board)) {
     internalField.Append(new UnsignedField<8>(generalData.stickReverse));
   }
 
@@ -3574,7 +3602,7 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
     internalField.Append(new SignedField<8>(generalData.vBatMin));
     internalField.Append(new SignedField<8>(generalData.vBatMax));
   }
-
+  
   if (IS_ARM(board)) {
     internalField.Append(new UnsignedField<8>(generalData.backlightBright));
     if (version < 218) internalField.Append(new SignedField<8>(generalData.txCurrentCalibration));
@@ -3591,20 +3619,27 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
     if (version >= 214) {
       if (version < 218) internalField.Append(new UnsignedField<8>(generalData.rotarySteps)); // TODO
       internalField.Append(new UnsignedField<8>(generalData.countryCode));
-      internalField.Append(new UnsignedField<8>(generalData.imperial));
-    }
-    if (version >= 215) {
-      internalField.Append(new CharField<2>(generalData.ttsLanguage));
-      if (version < 218) {
-        internalField.Append(new SignedField<8>(generalData.beepVolume));
-        internalField.Append(new SignedField<8>(generalData.wavVolume));
-        internalField.Append(new SignedField<8>(generalData.varioVolume));
+      internalField.Append(new UnsignedField<1>(generalData.imperial));
+      if (version >= 218) {
+        internalField.Append(new BoolField<1>(generalData.jitterFilter));
+        internalField.Append(new SpareBitsField<6>());
       }
       else {
+        internalField.Append(new SpareBitsField<7>());
+      }
+    }
+    if (version >= 215) {
+      internalField.Append(new CharField<2>(generalData.ttsLanguage, true, "TTS language"));
+      if (version >= 218) {
         internalField.Append(new SignedField<4>(generalData.beepVolume));
         internalField.Append(new SignedField<4>(generalData.wavVolume));
         internalField.Append(new SignedField<4>(generalData.varioVolume));
         internalField.Append(new SignedField<4>(generalData.backgroundVolume));
+      }
+      else {
+        internalField.Append(new SignedField<8>(generalData.beepVolume));
+        internalField.Append(new SignedField<8>(generalData.wavVolume));
+        internalField.Append(new SignedField<8>(generalData.varioVolume));
       }
       if (version >= 216) {
         internalField.Append(new SignedField<8>(generalData.varioPitch));
@@ -3618,8 +3653,15 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
         internalField.Append(new ArmCustomFunctionField(generalData.customFn[i], board, version, variant));
       }
     }
-    if (IS_TARANIS(board) && version >= 216) {
-      if (version >= 217) {
+    
+    if (IS_STM32(board) && version >= 216) {
+      if (version >= 218) {
+        internalField.Append(new UnsignedField<4>(generalData.hw_uartMode));
+        for (uint8_t i=0; i<4; i++) {
+          internalField.Append(new UnsignedField<1>(generalData.sliderConfig[i]));
+        }
+      }
+      else if (version >= 217) {
         internalField.Append(new UnsignedField<6>(generalData.hw_uartMode));
         if (IS_TARANIS_X9E(board)) {
           internalField.Append(new UnsignedField<1>(generalData.sliderConfig[2]));
@@ -3632,13 +3674,17 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
       else {
         internalField.Append(new UnsignedField<8>(generalData.hw_uartMode));
       }
+      if (IS_HORUS(board)) {
+        internalField.Append(new SpareBitsField<32>()); // switchConfig
+      }
       for (int i=0; i<4; i++) {
         if (i < MAX_POTS(board, version))
           internalField.Append(new UnsignedField<2>(generalData.potConfig[i]));
         else
           internalField.Append(new SpareBitsField<2>());
       }
-      internalField.Append(new UnsignedField<8>(generalData.backlightColor));
+      if (!IS_HORUS(board))
+        internalField.Append(new UnsignedField<8>(generalData.backlightColor));
     }
 
     if (IS_TARANIS_X9E(board))
@@ -3652,7 +3698,22 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
       }
     }
 
-    if (IS_TARANIS(board) && version >= 217) {
+    if (IS_HORUS(board)) {
+      for (int i=0; i<MAX_SWITCHES(board, version); ++i) {
+        internalField.Append(new ZCharField<3>(generalData.switchName[i], "Switch name"));
+      }
+      for (int i=0; i<CPN_MAX_STICKS; ++i) {
+        internalField.Append(new ZCharField<3>(generalData.stickName[i], "Stick name"));
+      }
+      for (int i=0; i<MAX_POTS(board, version); ++i) {
+        internalField.Append(new ZCharField<3>(generalData.potName[i], "Pot name"));
+      }
+      for (int i=0; i<MAX_SLIDERS(board); ++i) {
+        internalField.Append(new ZCharField<3>(generalData.sliderName[i], "Slider name"));
+      }
+      internalField.Append(new CharField<17>(generalData.currModelFilename, true, "Current model filename"));
+    }
+    else if (IS_TARANIS(board) && version >= 217) {
       for (int i=0; i<MAX_SWITCHES(board, version); i++) {
         internalField.Append(new UnsignedField<2>(generalData.switchConfig[i]));
       }
@@ -3660,22 +3721,34 @@ OpenTxGeneralData::OpenTxGeneralData(GeneralSettings & generalData, BoardEnum bo
         internalField.Append(new SpareBitsField<64-2*18>());
       }
       for (int i=0; i<MAX_SWITCHES(board, version); ++i) {
-        internalField.Append(new ZCharField<3>(generalData.switchName[i]));
+        internalField.Append(new ZCharField<3>(generalData.switchName[i], "Switch name"));
       }
       for (int i=0; i<CPN_MAX_STICKS; ++i) {
-        internalField.Append(new ZCharField<3>(generalData.stickName[i]));
+        internalField.Append(new ZCharField<3>(generalData.stickName[i], "Stick name"));
       }
       for (int i=0; i<MAX_POTS(board, version); ++i) {
-        internalField.Append(new ZCharField<3>(generalData.potName[i]));
+        internalField.Append(new ZCharField<3>(generalData.potName[i], "Pot name"));
       }
       for (int i=0; i<MAX_SLIDERS(board); ++i) {
-        internalField.Append(new ZCharField<3>(generalData.sliderName[i]));
+        internalField.Append(new ZCharField<3>(generalData.sliderName[i], "Slider name"));
       }
     }
 
-    if (IS_TARANIS_X9E(board) && version >= 217) {
+    if (IS_HORUS(board)) {
+      internalField.Append(new BoolField<1>(generalData.bluetoothEnable));
+      internalField.Append(new UnsignedField<7>(generalData.backlightOffBright));
+      internalField.Append(new ZCharField<10>(generalData.bluetoothName, "Bluetooth name"));
+    }
+    else if (IS_TARANIS_X9E(board) && version >= 217) {
       internalField.Append(new BoolField<8>(generalData.bluetoothEnable));
-      internalField.Append(new ZCharField<10>(generalData.bluetoothName));
+      internalField.Append(new ZCharField<10>(generalData.bluetoothName, "Bluetooth name"));
+    }
+    
+    if (IS_HORUS(board)) {
+      internalField.Append(new CharField<8>(generalData.themeName, true, "Theme name"));
+      for (int i=0; i<5; i++) {
+        internalField.Append(new CharField<8>((char *)generalData.themeOptionValue[i], true, "Theme blob"));
+      }
     }
   }
 }
