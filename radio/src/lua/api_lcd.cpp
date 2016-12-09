@@ -121,7 +121,7 @@ static int luaLcdDrawLine(lua_State *L)
   return 0;
 }
 
-#if !defined(COLORLCD)
+//#if !defined(COLORLCD)
 /*luadoc
 @function lcd.getLastPos()
 
@@ -136,7 +136,7 @@ static int luaLcdGetLastPos(lua_State *L)
   lua_pushinteger(L, lcdLastPos);
   return 1;
 }
-#endif
+//#endif
 
 /*luadoc
 @function lcd.drawText(x, y, text [, flags])
@@ -758,6 +758,7 @@ const luaL_Reg lcdLib[] = {
   { "drawSource", luaLcdDrawSource },
   { "drawGauge", luaLcdDrawGauge },
 #if defined(COLORLCD)
+  { "getLastPos", luaLcdGetLastPos },
   { "drawBitmap", luaLcdDrawBitmap },
   { "setColor", luaLcdSetColor },
   { "RGB", luaRGB },
