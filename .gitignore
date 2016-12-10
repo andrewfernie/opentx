@@ -13,3 +13,4 @@ radio/src/lua/lua_exports_*.txt
 build*/
 .vscode/
 /companion-build/
+CMakeFiles/

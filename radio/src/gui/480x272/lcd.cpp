@@ -28,6 +28,7 @@ display_t displayBuf[DISPLAY_BUFFER_SIZE];
 
 uint16_t lcdColorTable[LCD_COLOR_COUNT];
 
+coord_t lcdLastPos;
 coord_t lcdNextPos;
 
 uint8_t getMappedChar(uint8_t c)
@@ -72,6 +73,7 @@ void lcdPutFontPattern(coord_t x, coord_t y, const uint8_t * font, const uint16_
   coord_t width = spec[index+1] - offset;
   if (width > 0) lcdDrawBitmapPattern(x, y, font, flags, offset, width);
   lcdNextPos = x + width;
+  lcdLastPos = x + width;
 }
 
 void lcdDrawChar(coord_t x, coord_t y, char c, LcdFlags flags)

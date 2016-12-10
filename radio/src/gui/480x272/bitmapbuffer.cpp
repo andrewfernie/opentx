@@ -408,6 +408,7 @@ void BitmapBuffer::drawSizedText(coord_t x, coord_t y, const char * s, uint8_t l
     s++;
   }
   lcdNextPos = pos;
+  lcdLastPos = pos;
 }
 
 void BitmapBuffer::drawBitmapPie(int x0, int y0, const uint16_t * img, int startAngle, int endAngle)
