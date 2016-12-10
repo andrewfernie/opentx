@@ -16,6 +16,7 @@ set(COMPANION_OSX_APP_BUNDLE_NAME "OpenTX Companion ${VERSION_MAJOR}.${VERSION_M
 # On OS X we copy dfu-util to the application bundle. This the path from which we copy
 # the binary (default homebrew path)
 set(DFU_UTIL_PATH "/usr/local/bin/dfu-util")
+set(AVRDUDE_PATH "/usr/local/bin/avrdude")
 
 option(ALLOW_NIGHTLY_BUILDS "Allow nightly builds download / update") # Disabled by default
 if(ALLOW_NIGHTLY_BUILDS)
@@ -54,7 +55,7 @@ endif()
 add_definitions(-DQXT_STATIC)
 
 if(MSVC)
-  set(CMAKE_CXX_FLAGS "/EHsc /LD")
+  set(CMAKE_CXX_FLAGS "/EHsc /LD /MP")
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS,5.01")
   include_directories(${PROJECT_SOURCE_DIR}/winbuild C:/Programs/pthreads/Pre-built.2/include C:/Programs/msinttypes C:/Programs/dirent/include)
   link_directories(C:/Programs/pthreads/Pre-built.2/lib/)
@@ -368,6 +369,10 @@ IF(APPLE)
   set(APPS "\${CMAKE_INSTALL_PREFIX}/${COMPANION_NAME}.app")
   set_target_properties(${COMPANION_NAME} PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Companion ${VERSION_MAJOR}.${VERSION_MINOR}")
   set_target_properties(${SIMULATOR_NAME} PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Simulator ${VERSION_MAJOR}.${VERSION_MINOR}")
+
+  # Use a non standard Info.plist that adds Retina support flags
+  set_target_properties(${COMPANION_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/companion/targets/mac/MacOSXBundleInfo.plist.in)
+  set_target_properties(${SIMULATOR_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/companion/targets/mac/MacOSXBundleInfo.plist.in)
 ENDIF(APPLE)
 IF(WIN32)
   set(APPS "\${CMAKE_INSTALL_PREFIX}/bin/QtTest.exe")
@@ -413,10 +418,11 @@ if(APPLE)
   set(${COMPANION_SOURCES} ${COMPANION_SOURCES} ${PROJECT_SOURCE_DIR}/images/${MACOSX_BUNDLE_ICON_FILE})
   install(FILES ${MAC_ICON_FILE} DESTINATION ${companion_res_dir} COMPONENT Runtime)
 
-  # Copy dfu-util, resolve symlink first
+  # Copy dfu-util and avrdude, resolve symlink first
   get_filename_component(DFU_UTIL_ABSOLUTE_PATH ${DFU_UTIL_PATH} REALPATH)
-  install(FILES ${DFU_UTIL_ABSOLUTE_PATH} DESTINATION ${companion_res_dir} COMPONENT Runtime)
-  set(bundle_dfu_util_path "\${CMAKE_INSTALL_PREFIX}/${companion_res_dir}/dfu-util")
+  get_filename_component(AVRDUDE_ABSOLUTE_PATH ${AVRDUDE_PATH} REALPATH)
+  install(PROGRAMS ${DFU_UTIL_ABSOLUTE_PATH} ${AVRDUDE_ABSOLUTE_PATH} DESTINATION ${companion_res_dir} COMPONENT Runtime)
+  set(bundle_tools_path "\${CMAKE_INSTALL_PREFIX}/${companion_res_dir}/dfu-util;\${CMAKE_INSTALL_PREFIX}/${companion_res_dir}/avrdude")
 
   # These needs to be relative to CMAKE_INSTALL_PREFIX
   get_target_property(QT_LIBRARY_DIR Qt5::Core LOCATION)
@@ -430,7 +436,7 @@ if(APPLE)
    include(BundleUtilities)
    file(GLOB bundle_simulator_libs \"\${CMAKE_INSTALL_PREFIX}/${companion_res_dir}/libopentx-*${CMAKE_SHARED_LIBRARY_SUFFIX}\")
    set(BU_CHMOD_BUNDLE_ITEMS on)
-   fixup_bundle(\"${APPS}\"   \"\${bundle_simulator_libs};${bundle_qt_libs};${bundle_dfu_util_path}\"   \"${QT_LIBRARY_DIR}\")
+   fixup_bundle(\"${APPS}\"   \"\${bundle_simulator_libs};${bundle_qt_libs};${bundle_tools_path}\"   \"${QT_LIBRARY_DIR}\")
    file(RENAME \"\${CMAKE_INSTALL_PREFIX}/${COMPANION_NAME}.app\" \"\${CMAKE_INSTALL_PREFIX}/${COMPANION_OSX_APP_BUNDLE_NAME}.app\")
    " COMPONENT Runtime)
 endif()
