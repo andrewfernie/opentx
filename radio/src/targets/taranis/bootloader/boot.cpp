@@ -383,6 +383,7 @@ int main()
             unlocked = 1;
             unlockFlash();
           }
+          usbStart();
           usbPluggedIn();
         }
       }
@@ -417,6 +418,7 @@ int main()
         lcdDrawTextAlignedLeft(4*FH, STR_USB_CONNECTED);
         if (usbPlugged() == 0) {
           vpos = 0;
+          usbStop();
           if (unlocked) {
             lockFlash();
             unlocked = 0;
