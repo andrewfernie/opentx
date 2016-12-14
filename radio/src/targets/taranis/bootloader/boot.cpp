@@ -21,7 +21,7 @@
 #include "opentx.h"
 #include "stamp.h"
 
-#if defined(PCBX7D)
+#if defined(PCBX7)
   #define BOOTLOADER_TITLE               " X7 Bootloader - " VERSION
 #elif defined(PCBTARANIS)
   #define BOOTLOADER_TITLE               " Taranis Bootloader - " VERSION
@@ -29,7 +29,7 @@
   #error "Not implemented"
 #endif
 
-#if defined(PCBX9E) || defined(PCBX7D)
+#if defined(PCBX9E) || defined(PCBX7)
   #define BOOT_KEY_UP                  KEY_MINUS
   #define BOOT_KEY_DOWN                KEY_PLUS
 #else
@@ -122,7 +122,7 @@ void interrupt10ms(void)
     ++index;
   }
 
-#if defined(PCBX9E) || defined(PCBX7D)
+#if defined(PCBX9E) || defined(PCBX7)
   checkRotaryEncoder();
   static rotenc_t rePreviousValue;
   rotenc_t reNewValue = (rotencValue[0] / 2);
@@ -383,6 +383,7 @@ int main()
             unlocked = 1;
             unlockFlash();
           }
+          usbStart();
           usbPluggedIn();
         }
       }
@@ -417,6 +418,7 @@ int main()
         lcdDrawTextAlignedLeft(4*FH, STR_USB_CONNECTED);
         if (usbPlugged() == 0) {
           vpos = 0;
+          usbStop();
           if (unlocked) {
             lockFlash();
             unlocked = 0;
@@ -611,7 +613,7 @@ int main()
     }
 
     if (state != ST_FLASHING && state != ST_USB) {
-#if defined(PCBX9E) || defined(PCBX7D)
+#if defined(PCBX9E) || defined(PCBX7)
       if (pwrPressed()) {
 #else
       if (pwrCheck() == e_power_off) {

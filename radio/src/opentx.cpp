@@ -251,7 +251,7 @@ void generalDefault()
   g_eeGeneral.slidersConfig = 0x03; // LS and RS = sliders with detent
 #endif
   
-#if defined(PCBX7D)
+#if defined(PCBX7)
   g_eeGeneral.switchConfig = 0x000006ff; // 4x3POS, 1x2POS, 1xTOGGLE
 #elif defined(PCBTARANIS) || defined(PCBHORUS)
   g_eeGeneral.switchConfig = 0x00007bff; // 6x3POS, 1x2POS, 1xTOGGLE
@@ -964,6 +964,14 @@ void doSplash()
       }
 #endif
 
+#if defined(SPLASH_FRSKY)
+      static uint8_t secondSplash = false;
+      if (!secondSplash && get_tmr10ms() >= tgtime-200) {
+        secondSplash = true;
+        drawSecondSplash();
+      }
+#endif
+            
 #if defined(PCBSKY9X)
       if (curTime < get_tmr10ms()) {
         curTime += 10;
