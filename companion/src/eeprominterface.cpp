@@ -1067,7 +1067,16 @@ GeneralSettings::GeneralSettings()
   }
   
   BoardEnum board = GetEepromInterface()->getBoard();
-  if (IS_TARANIS(board)) {
+  if (board == BOARD_HORUS) {
+    potConfig[0] = POT_WITH_DETENT;
+    potConfig[1] = POT_MULTIPOS_SWITCH;
+    potConfig[2] = POT_WITH_DETENT;
+    sliderConfig[0] = SLIDER_WITH_DETENT;
+    sliderConfig[1] = SLIDER_WITH_DETENT;
+    sliderConfig[2] = SLIDER_WITH_DETENT;
+    sliderConfig[3] = SLIDER_WITH_DETENT;
+  }
+  else if (IS_TARANIS(board)) {
     potConfig[0] = POT_WITH_DETENT;
     potConfig[1] = POT_WITH_DETENT;
     sliderConfig[0] = SLIDER_WITH_DETENT;
@@ -1822,14 +1831,18 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
     case MM_RF_PROTO_KN:
     case MM_RF_PROTO_SLT:
     case MM_RF_PROTO_Q2X2:
+    case MM_RF_PROTO_FY326:
+    case MM_RF_PROTO_BAYANG:
+    case MM_RF_PROTO_V2X2:
       return 2;
 
     case MM_RF_PROTO_CG023:
-    case MM_RF_PROTO_MT99XX:
       return 3;
 
     case MM_RF_PROTO_FRSKY:
     case MM_RF_PROTO_DSM2:
+    case MM_RF_PROTO_MT99XX:
+    case MM_RF_PROTO_HONTAI:
     case MM_RF_PROTO_AFHDS2A:
       return 4;
 
