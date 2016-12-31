@@ -37,47 +37,13 @@ void traceCb(const char * text)
   }
 }
 
-void SimulatorDialog::traceCallback(const char * text)
-{
-  // this function is called from other threads
-  traceMutex.lock();
-  // limit the size of list
-  if (traceList.size() < 1000) {
-    traceList.append(QString(text));
-  }
-  traceMutex.unlock();
-}
-
-void SimulatorDialog::updateDebugOutput()
-{
-  traceMutex.lock();
-  while (!traceList.isEmpty()) {
-    QString text = traceList.takeFirst();
-    traceBuffer.append(text);
-    // limit the size of traceBuffer
-    if (traceBuffer.size() > 10*1024) {
-      traceBuffer.remove(0, 1*1024);
-    }
-    if (DebugOut) {
-      DebugOut->traceCallback(QString(text));
-    }
-  }
-  traceMutex.unlock();
-}
-
-void SimulatorDialog::wheelEvent (QWheelEvent *event)
-{
-  if ( event->delta() != 0) {
-    simulator->wheelEvent(event->delta() > 0 ? 1 : -1);
-  }
-}
-
 SimulatorDialog::SimulatorDialog(QWidget * parent, SimulatorInterface *simulator, unsigned int flags):
   QDialog(parent),
   flags(flags),
   timer(NULL),
   lightOn(false),
   simulator(simulator),
+  radioProfileId(g.id()),
   lastPhase(-1),
   beepVal(0),
   TelemetrySimu(0),
@@ -88,12 +54,20 @@ SimulatorDialog::SimulatorDialog(QWidget * parent, SimulatorInterface *simulator
   middleButtonPressed(false)
 {
   setWindowFlags(Qt::Window);
-  //shorcut for telemetry simulator
-  // new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_T), this, SLOT(openTelemetrySimulator()));
+  grabKeyboard();
+
+  new QShortcut(QKeySequence(Qt::Key_F1), this, SLOT(showHelp()));
   new QShortcut(QKeySequence(Qt::Key_F4), this, SLOT(openTelemetrySimulator()));
   new QShortcut(QKeySequence(Qt::Key_F5), this, SLOT(openTrainerSimulator()));
   new QShortcut(QKeySequence(Qt::Key_F6), this, SLOT(openDebugOutput()));
   new QShortcut(QKeySequence(Qt::Key_F7), this, SLOT(luaReload()));
+
+  keymapHelp.append(keymapHelp_t(tr("F1"), tr("Show Help/Keymap")));
+  keymapHelp.append(keymapHelp_t(tr("F4"), tr("Open Telemetry Simulator")));
+  keymapHelp.append(keymapHelp_t(tr("F5"), tr("Open Trainer Simulator")));
+  keymapHelp.append(keymapHelp_t(tr("F6"), tr("Open Debug Output")));
+  keymapHelp.append(keymapHelp_t(tr("F7"), tr("Reload Lua Scripts")));
+
   traceCallbackInstance = this;
 }
 
@@ -108,14 +82,16 @@ void SimulatorDialog::closeEvent (QCloseEvent *)
 {
   simulator->stop();
   timer->stop();
-  //g.simuWinGeo(GetCurrentFirmware()->getId(), saveGeometry());
+  g.profile[radioProfileId].simuWinGeo(saveGeometry());
 }
 
 void SimulatorDialog::showEvent(QShowEvent * event)
 {
   static bool firstShow = true;
   if (firstShow) {
-    if (flags & SIMULATOR_FLAGS_STICK_MODE_LEFT) {
+    restoreGeometry(g.profile[radioProfileId].simuWinGeo());
+
+    if (flags & SIMULATOR_FLAGS_STICK_MODE_LEFT || ((flags & SIMULATOR_FLAGS_STANDALONE) && (g.profile[radioProfileId].defaultMode() & 1))) {
       vJoyLeft->setStickConstraint(VirtualJoystickWidget::HOLD_Y, true);
       vJoyLeft->setStickY(1);
     }
@@ -123,22 +99,49 @@ void SimulatorDialog::showEvent(QShowEvent * event)
       vJoyRight->setStickConstraint(VirtualJoystickWidget::HOLD_Y, true);
       vJoyRight->setStickY(1);
     }
+
     firstShow = false;
   }
 }
 
 void SimulatorDialog::mousePressEvent(QMouseEvent *event)
 {
-  if (event->button() == Qt::MidButton) {
+  if (event->button() == Qt::MidButton)
     middleButtonPressed = true;
-  }
+  else
+    event->ignore();
 }
 
 void SimulatorDialog::mouseReleaseEvent(QMouseEvent *event)
 {
-  if (event->button() == Qt::MidButton) {
+  if (event->button() == Qt::MidButton)
     middleButtonPressed = false;
+  else
+    event->ignore();
+}
+
+void SimulatorDialog::wheelEvent(QWheelEvent *event)
+{
+  if (event->angleDelta().isNull())
+    return;
+  QPoint numSteps = event->angleDelta() / 8 / 15 * -1;  // one step per 15deg
+  simulator->wheelEvent(numSteps.y());
+}
+
+void SimulatorDialog::traceCallback(const char * text)
+{
+  // this function is called from other threads
+  traceMutex.lock();
+  // limit the size of list
+  if (traceList.size() < 1000) {
+    traceList.append(QString(text));
   }
+  traceMutex.unlock();
+}
+
+void SimulatorDialog::setRadioProfileId(int value)
+{
+  radioProfileId = value;
 }
 
 void SimulatorDialog::onTrimPressed(int which)
@@ -205,6 +208,25 @@ void SimulatorDialog::onDebugOutputClose()
   DebugOut = 0;
 }
 
+void SimulatorDialog::showHelp()
+{
+  QString helpText = tr("Simulator Controls:");
+  helpText += "<table cellspacing=4 cellpadding=0>";
+  helpText += tr("<tr><th>Key/Mouse</td><th>Action</td></tr>");
+  QString keyTemplate = "<tr><td align='center'><pre>%1</pre></td><td align='center'>%2</td></tr>";
+  foreach (keymapHelp_t pair, keymapHelp)
+    helpText += keyTemplate.arg(pair.first, pair.second);
+  helpText += "</table>";
+
+  QMessageBox * msgBox = new QMessageBox(this);
+  msgBox->setAttribute(Qt::WA_DeleteOnClose);
+  msgBox->setWindowFlags(msgBox->windowFlags() | Qt::WindowStaysOnTopHint);
+  msgBox->setStandardButtons( QMessageBox::Ok );
+  msgBox->setWindowTitle(tr("Simulator Help"));
+  msgBox->setText(helpText);
+  msgBox->setModal(false);
+  msgBox->show();
+}
 
 void SimulatorDialog::keyPressEvent (QKeyEvent *event)
 {
@@ -215,25 +237,27 @@ void SimulatorDialog::keyPressEvent (QKeyEvent *event)
       break;
     case Qt::Key_Escape:
     case Qt::Key_Backspace:
+    case Qt::Key_Delete:
       buttonPressed = Qt::Key_Escape;
+      break;
+    case Qt::Key_Plus:
+    case Qt::Key_Equal:
+      buttonPressed = Qt::Key_Plus;
       break;
     case Qt::Key_Up:
     case Qt::Key_Down:
     case Qt::Key_Right:
     case Qt::Key_Left:
     case Qt::Key_Minus:
-    case Qt::Key_Plus:
     case Qt::Key_PageDown:
-    case Qt::Key_PageUp:    
+    case Qt::Key_PageUp:
+    case Qt::Key_X:
+    case Qt::Key_C:
       buttonPressed = event->key();
       break;
-    case Qt::Key_X:
-      simulator->wheelEvent(-1);
+    default:
+      event->ignore();
       break;
-    case Qt::Key_C:
-      simulator->wheelEvent(1);
-      break;
-
   }
 }
 
@@ -244,24 +268,24 @@ void SimulatorDialog::keyReleaseEvent(QKeyEvent * event)
     case Qt::Key_Return:
     case Qt::Key_Escape:
     case Qt::Key_Backspace:
+    case Qt::Key_Delete:
+    case Qt::Key_Plus:
+    case Qt::Key_Equal:
     case Qt::Key_Up:
     case Qt::Key_Down:
     case Qt::Key_Right:
     case Qt::Key_Left:
-    case Qt::Key_Plus:
     case Qt::Key_Minus:
     case Qt::Key_PageDown:
     case Qt::Key_PageUp:
+    case Qt::Key_X:
+    case Qt::Key_C:
       buttonPressed = 0;
       break;
+    default:
+      event->ignore();
+      break;
   }
-}
-
-void SimulatorDialog::setupTimer()
-{
-  timer = new QTimer(this);
-  connect(timer, SIGNAL(timeout()), this, SLOT(onTimerEvent()));
-  timer->start(10);
 }
 
 template <class T>
@@ -271,9 +295,6 @@ void SimulatorDialog::initUi(T * ui)
 
   windowName = tr("Simulating Radio (%1)").arg(GetCurrentFirmware()->getName());
   setWindowTitle(windowName);
-
-  simulator->setSdPath(g.profile[g.id()].sdPath());
-  simulator->setVolumeGain(g.profile[g.id()].volumeGain());
 
   lcd = ui->lcd;
   lcd->setData(simulator->getLcd(), lcdWidth, lcdHeight, lcdDepth);
@@ -342,8 +363,6 @@ void SimulatorDialog::initUi(T * ui)
   setupOutputsDisplay();
   setupGVarsDisplay();
   setTrims();
-
-  //restoreGeometry(g.simuWinGeo(GetCurrentFirmware()->getId()));
 
   if (flags & SIMULATOR_FLAGS_NOTX)
     tabWidget->setCurrentIndex(1);
@@ -478,6 +497,7 @@ void SimulatorDialog::setupGVarsDisplay()
         if ((i % 2) ==0 ) {
           value->setStyleSheet("QLabel { background-color: rgb(220, 220, 220) }");
         }
+        value->setText("0");
         gvarValues << value;
         gvarsLayout->addWidget(value, i+1, fm+1);
       }
@@ -497,6 +517,23 @@ void SimulatorDialog::onButtonPressed(int value)
   else {
     buttonPressed = value;
   }
+}
+
+void SimulatorDialog::updateDebugOutput()
+{
+  traceMutex.lock();
+  while (!traceList.isEmpty()) {
+    QString text = traceList.takeFirst();
+    traceBuffer.append(text);
+    // limit the size of traceBuffer
+    if (traceBuffer.size() > 10*1024) {
+      traceBuffer.remove(0, 1*1024);
+    }
+    if (DebugOut) {
+      DebugOut->traceCallback(QString(text));
+    }
+  }
+  traceMutex.unlock();
 }
 
 void SimulatorDialog::onTimerEvent()
@@ -554,20 +591,25 @@ void SimulatorDialog::onTimerEvent()
   updateDebugOutput();
 }
 
-void SimulatorDialog::centerSticks()
-{
-  if (vJoyLeft)
-    vJoyLeft->centerStick();
-
-  if (vJoyRight)
-    vJoyRight->centerStick();
-}
-
-void SimulatorDialog::start(QByteArray & eeprom)
+void SimulatorDialog::startCommon()
 {
   lastPhase = -1;
   numGvars = GetCurrentFirmware()->getCapability(Gvars);
   numFlightModes = GetCurrentFirmware()->getCapability(FlightModes);
+  simulator->setSdPath(g.profile[radioProfileId].sdPath());
+  simulator->setVolumeGain(g.profile[radioProfileId].volumeGain());
+}
+
+void SimulatorDialog::setupTimer()
+{
+  timer = new QTimer(this);
+  connect(timer, SIGNAL(timeout()), this, SLOT(onTimerEvent()));
+  timer->start(10);
+}
+
+void SimulatorDialog::start(QByteArray & eeprom)
+{
+  startCommon();
   simulator->start(eeprom, (flags & SIMULATOR_FLAGS_NOTX) ? false : true);
   getValues();
   setupTimer();
@@ -575,12 +617,19 @@ void SimulatorDialog::start(QByteArray & eeprom)
 
 void SimulatorDialog::start(const char * filename)
 {
-  lastPhase = -1;
-  numGvars = GetCurrentFirmware()->getCapability(Gvars);
-  numFlightModes = GetCurrentFirmware()->getCapability(FlightModes);
+  startCommon();
   simulator->start(filename);
   getValues();
   setupTimer();
+}
+
+void SimulatorDialog::centerSticks()
+{
+  if (vJoyLeft)
+    vJoyLeft->centerStick();
+
+  if (vJoyRight)
+    vJoyRight->centerStick();
 }
 
 void SimulatorDialog::setTrims()
@@ -620,12 +669,17 @@ inline int chVal(int val)
 
 void SimulatorDialog::setValues()
 {
+  static const int numOutputs = GetCurrentFirmware()->getCapability(Outputs);
+  static const int numLogicalSwitches = GetCurrentFirmware()->getCapability(LogicalSwitches);
+  static TxOutputs prevOutputs;
+  static unsigned int prevPhase = -1;
+
   TxOutputs outputs;
   simulator->getValues(outputs);
   Trims trims;
   simulator->getTrims(trims);
 
-  for (int i=0; i<GetCurrentFirmware()->getCapability(Outputs); i++) {
+  for (int i=0; i<numOutputs; i++) {
     if (i < channelSliders.size()) {
       channelSliders[i]->setValue(chVal(outputs.chans[i]));
       channelValues[i]->setText(QString("%1").arg((qreal)outputs.chans[i]*100/1024, 0, 'f', 1));
@@ -635,19 +689,29 @@ void SimulatorDialog::setValues()
   QString CSWITCH_ON = "QLabel { background-color: #4CC417 }";
   QString CSWITCH_OFF = "QLabel { }";
 
-  for (int i=0; i<GetCurrentFirmware()->getCapability(LogicalSwitches); i++) {
-    logicalSwitchLabels[i]->setStyleSheet(outputs.vsw[i] ? CSWITCH_ON : CSWITCH_OFF);
+  for (int i=0; i<numLogicalSwitches; i++) {
+    if (prevOutputs.vsw[i] != outputs.vsw[i]) {
+      // setStyleSheet() is very CPU time consuming, doing it only on the actual
+      // switch state change brings down CPU usage time (for Taranis simulation) from 40% to 7% (Linux, one core usage)
+      logicalSwitchLabels[i]->setStyleSheet(outputs.vsw[i] ? CSWITCH_ON : CSWITCH_OFF);
+    }
   }
 
   for (unsigned int gv=0; gv<numGvars; gv++) {
     for (unsigned int fm=0; fm<numFlightModes; fm++) {
-      gvarValues[gv*numFlightModes+fm]->setText(QString((fm==lastPhase)?"<b>%1</b>":"%1").arg(outputs.gvars[fm][gv]));
+      if (prevPhase != lastPhase || prevOutputs.gvars[fm][gv] != outputs.gvars[fm][gv]) {
+        // same trick for GVARS, but this has far less effect on CPU usage as setStyleSheet()
+        gvarValues[gv*numFlightModes+fm]->setText(QString((fm==lastPhase)?"<b>%1</b>":"%1").arg(outputs.gvars[fm][gv]));
+      }
     }
   }
 
   if (outputs.beep) {
     beepVal = outputs.beep;
   }
+
+  prevOutputs = outputs;
+  prevPhase = lastPhase;
 }
 
 #ifdef JOYSTICKS
