@@ -54,11 +54,12 @@ class VirtualJoystickWidget;
 #define SIMULATOR_FLAGS_S1                4
 #define SIMULATOR_FLAGS_S2                8
 #define SIMULATOR_FLAGS_S3               16
-#define SIMULATOR_FLAGS_S4               32 // reserved for the future
+#define SIMULATOR_FLAGS_S4               32  // reserved for the future
 #define SIMULATOR_FLAGS_S1_MULTI         64
 #define SIMULATOR_FLAGS_S2_MULTI        128
 #define SIMULATOR_FLAGS_S3_MULTI        256
-#define SIMULATOR_FLAGS_S4_MULTI        512 // reserved for the future
+#define SIMULATOR_FLAGS_S4_MULTI        512  // reserved for the future
+#define SIMULATOR_FLAGS_STANDALONE     1024  // started from stanalone simulator
 
 void traceCb(const char * text);
 
@@ -72,10 +73,11 @@ class SimulatorDialog : public QDialog
 
     void start(const char * filename);
     void start(QByteArray & eeprom);
+    void setRadioProfileId(int value);
     virtual void traceCallback(const char * text);
 
-
   protected:
+    typedef QPair<QString, QString> keymapHelp_t;
     template <class T> void initUi(T * ui);
     virtual void setLightOn(bool enable) { }
     virtual void updateBeepButton() { }
@@ -97,6 +99,7 @@ class SimulatorDialog : public QDialog
     VirtualJoystickWidget *vJoyRight;
     QTimer *timer;
     QString windowName;
+    QVector<keymapHelp_t> keymapHelp;
     unsigned int backLight;
     bool lightOn;
     int switches;
@@ -109,16 +112,18 @@ class SimulatorDialog : public QDialog
 #endif
 
     SimulatorInterface *simulator;
+    int radioProfileId;
     unsigned int lastPhase;
 
-    void setupTimer();
     QFrame * createLogicalSwitch(QWidget * parent, int switchNo, QVector<QLabel *> & labels);
     void setupOutputsDisplay();
     void setupGVarsDisplay();
 
+    void startCommon();
+    void setupTimer();
+
     void centerSticks();
     void setTrims();
-
     void setValues();
     virtual void getValues() = 0;
     int getValue(qint8 i);
@@ -161,6 +166,7 @@ class SimulatorDialog : public QDialog
     void openDebugOutput();
     void onDebugOutputClose();
     void luaReload();
+    void showHelp();
 
 #ifdef JOYSTICKS
     void onjoystickAxisValueChanged(int axis, int value);
