@@ -131,7 +131,9 @@ Open9xSim::~Open9xSim()
 {
   StopSimu();
   StopAudioThread();
+#if defined(EEPROM)
   StopEepromThread();
+#endif
 
   delete bmp;
   delete sliders[0];
@@ -331,7 +333,7 @@ void Open9xSim::updateKeysAndSwitches(bool start)
   SWITCH_KEY(E, 4, 3);
   SWITCH_KEY(F, 5, 2);
   SWITCH_KEY(G, 6, 3);
-  SWITCH_KEY(H, 7, 2);
+SWITCH_KEY(H, 7, 2);
 #else
   SWITCH_KEY(1, 0, 2);
   SWITCH_KEY(2, 1, 2);
@@ -360,11 +362,11 @@ long Open9xSim::onTimeout(FXObject*, FXSelector, void*)
 
 #if defined(ROTARY_ENCODER_NAVIGATION)
     static bool rotencAction = false;
-    if (getApp()->getKeyState(KEY_C)) {
+    if (getApp()->getKeyState(KEY_X)) {
       if (!rotencAction) ROTARY_ENCODER_NAVIGATION_VALUE += ROTARY_ENCODER_GRANULARITY;
       rotencAction = true;
     }
-    else if (getApp()->getKeyState(KEY_X)) {    
+    else if (getApp()->getKeyState(KEY_W)) {    
       if (!rotencAction) ROTARY_ENCODER_NAVIGATION_VALUE -= ROTARY_ENCODER_GRANULARITY;
       rotencAction = true;
     }
@@ -548,9 +550,11 @@ int main(int argc,char **argv)
 
   simuInit();
 
+#if defined(EEPROM)
   StartEepromThread(argc >= 2 ? argv[1] : "eeprom.bin");
+#endif
   StartAudioThread();
-  StartSimu();
+  StartSimu(false, argc >= 3 ? argv[2] : 0, argc >= 4 ? argv[3] : 0);
 
   return application.run();
 }

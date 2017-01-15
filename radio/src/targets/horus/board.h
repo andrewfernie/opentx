@@ -369,8 +369,8 @@ void backlightInit(void);
 #else
 void backlightEnable(uint8_t dutyCycle);
 #endif
-#define BACKLIGHT_ENABLE()    backlightEnable(UNEXPECTED_SHUTDOWN() ? 100 : 100-g_eeGeneral.backlightBright)
-#define BACKLIGHT_DISABLE()   backlightEnable(UNEXPECTED_SHUTDOWN() ? 100 : g_eeGeneral.blOffBright)
+#define BACKLIGHT_ENABLE()    backlightEnable(unexpectedShutdown ? 100 : 100-g_eeGeneral.backlightBright)
+#define BACKLIGHT_DISABLE()   backlightEnable(unexpectedShutdown ? 100 : g_eeGeneral.blOffBright)
 #define isBacklightEnabled()  true
 
 // USB driver
@@ -400,10 +400,11 @@ int32_t getVolume(void);
 #define VOLUME_LEVEL_DEF               12
 
 // Telemetry driver
-void telemetryPortInit(uint32_t baudrate, int mode);
+#define TELEMETRY_FIFO_SIZE            512
+void telemetryPortInit(uint32_t baudrate, uint8_t mode);
 void telemetryPortSetDirectionOutput(void);
 void sportSendBuffer(uint8_t * buffer, uint32_t count);
-int telemetryGetByte(uint8_t * byte);
+uint8_t telemetryGetByte(uint8_t * byte);
 
 // Haptic driver
 void hapticInit(void);

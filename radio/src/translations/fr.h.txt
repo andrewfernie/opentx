@@ -76,8 +76,8 @@
 #define LEN_SWTYPES            "\006"
 #define TR_SWTYPES             "Rien\0 ""Levier""2-POS\0""3-POS\0"
 
-#define LEN_POTTYPES           "\017"
-#define TR_POTTYPES            "Rien\0          ""Pot avec centre""Inter multi-pos""Potentiomètre\0"
+#define LEN_POTTYPES           TR("\013","\017")
+#define TR_POTTYPES            TR("Rien       ""Pot w. det ""Multipos   ""Pot        ", "Rien\0          ""Pot avec centre""Inter multi-pos""Potentiomètre\0")
 
 #define LEN_SLIDERTYPES        "\006"
 #define TR_SLIDERTYPES         "Rien\0 ""Slider"
@@ -107,7 +107,7 @@
 #define TR_DSM_PROTOCOLS       "LP45""DSM2""DSMX"
 
 #define LEN_MULTI_PROTOCOLS    "\006"
-#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0""Q2x2\0 "
+#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0""Q2x2\0 ""Walk.\0"
 
 #define TR_MULTI_CUSTOM        "Perso"
 
@@ -154,7 +154,10 @@
 #define TR_SUBTYPE_HONTAI      "Std\0   ""JJRC X1""X5C1cln"
 
 #define LEN_SUBTYPE_Q2X2       "\004"
-#define TR_SUBTYPE_Q2X2        "Q242""Q282"
+#define TR_SUBTYPE_Q2X2        "Q222""Q242""Q282"
+
+#define LEN_SUBTYPE_WK2x01     "\006"
+#define TR_SUBTYPE_WK2x01      "WK2801""WK2401""W6_5_1""W6_6_1""W6_Hel""W6_HeI"
 
 #define LEN_SUBTYPE_V2X2       "\006"
 #define TR_SUBTYPE_V2X2        "V2x2\0 ""JXD506"
@@ -658,7 +661,11 @@
   #define TR_ENTER             "[MENU]"
 #endif
 
-#define TR_EXIT                "[EXIT]"
+#if defined(PCBHORUS)
+  #define TR_EXIT              "[RTN]"
+#else
+  #define TR_EXIT              "[EXIT]"
+#endif
 
 #if defined(PCBTARANIS)
   #define TR_POPUPS            TR_EXIT "\010" "\010" "\010" "\010" TR_ENTER
@@ -895,13 +902,13 @@
 #define TR_MULTI_AUTOBIND      TR(INDENT "Bind auto", INDENT "Bind automatique")
 #define TR_MULTI_DSM_AUTODTECT TR(INDENT "Autodét.", INDENT "Autodétection")
 #define TR_MULTI_LOWPOWER      TR(INDENT "Basse puis.", INDENT "Mode basse puiss.")
-#define TR_DISABLE_INTERNAL    TR("Disable int. RF", "Disable internal RF")
-#define TR_MODULE_NO_SERIAL_MODE       TR("!serial mode", "Not in serial mode")
-#define TR_MODULE_NO_INPUT     TR("No input", "No serial input")
-#define TR_MODULE_NO_TELEMETRY TR3( "No telmetry", "No MULTI_TELEMETRY", "No telemetry (enable MULTI_TELEMETRY)")
-#define TR_MODULE_BINDING      "Binding"
-#define TR_PROTOCOL_INVALID    TR("Prot. invalid", "Protocol invalid")
-#define TR_MODULE_STATUS       TR(INDENT "Status", INDENT "Module Status")
+#define TR_DISABLE_INTERNAL    TR("Désact. RF int", "Désact. RF interne")
+#define TR_MODULE_NO_SERIAL_MODE  TR("Mode série?", "Pas en mode série")
+#define TR_MODULE_NO_INPUT     TR("Pas de sign.", "Aucun signal série")
+#define TR_MODULE_NO_TELEMETRY TR3("Pas de télm.", "Télémétrie absente", "Télémétrie absente(act. MULTI_TELEMETRY)")
+#define TR_MODULE_BINDING      "Bind..."
+#define TR_PROTOCOL_INVALID    TR("Prot. invalide", "Protocole invalide")
+#define TR_MODULE_STATUS       TR(INDENT "Etat", INDENT "Etat module")
 #define TR_MULTI_SERVOFREQ     TR(INDENT "Fréq.servo", INDENT "Fréquence servos")
 #define TR_SYNCMENU            "Sync [MENU]"
 #define TR_LIMIT               INDENT "Limite"
@@ -1011,10 +1018,10 @@
 #define TR_PATH_TOO_LONG       "Chemin trop long"
 #define TR_VIEW_TEXT           "Voir texte"
 #define TR_FLASH_BOOTLOADER    "Flasher BootLoader"
-#define TR_FLASH_EXTERNAL_DEVICE "Flasher module externe"
-#define TR_FLASH_INTERNAL_MODULE "Flasher module interne"
+#define TR_FLASH_EXTERNAL_DEVICE TR("Flasher module ext.", "Flasher module externe")
+#define TR_FLASH_INTERNAL_MODULE TR("Flasher module int.", "Flasher module interne")
 #define TR_FIRMWARE_UPDATE_ERROR "Firmware update error"
-#define TR_WRITING             "\032Ecriture..."
+#define TR_WRITING             TR("\14Ecriture...", "\032Ecriture...")
 #define TR_CONFIRM_FORMAT      "Confirmer Formatage?"
 #define TR_INTERNALRF          "HF interne"
 #define TR_EXTERNALRF          "HF externe"
@@ -1024,7 +1031,7 @@
 #define TR_NONE                "NONE"
 #define TR_MENUSENSOR          "CAPTEUR"
 #define TR_SENSOR              "SENSOR"
-#define TR_COUNTRYCODE         TR("Zone géo.","Zone géographique")
+#define TR_COUNTRYCODE         TR("Zone géo.", "Zone géographique")
 #define TR_VOICELANG           TR("Langue voix", "Langue annonces vocales")
 #define TR_UNITSSYSTEM         "Unités"
 #define TR_EDIT                "Editer"
@@ -1085,8 +1092,8 @@
 #define TR_PT                  "pt"
 #define TR_PTS                 "pts"
 #define TR_SMOOTH              "Lissage"
-#define TR_COPY_STICKS_TO_OFS  "Manche vers subtrim"
-#define TR_COPY_TRIMS_TO_OFS   "Trim vers subtrim"
+#define TR_COPY_STICKS_TO_OFS  TR("Cpy stick->subtrim", "Manche vers subtrim")
+#define TR_COPY_TRIMS_TO_OFS   TR("Cpy trim->subtrim", "Trim vers subtrim")
 #define TR_INCDEC              "Inc/décrementer"
 #define TR_GLOBALVAR           "Var. globale"
 #define TR_MIXSOURCE           "Source mixeur"

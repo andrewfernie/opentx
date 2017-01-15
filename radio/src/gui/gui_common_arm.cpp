@@ -375,7 +375,7 @@ bool isSwitchAvailableInMixes(int swtch)
 }
 
 #if defined(COLORLCD)
-bool isSwitchWarningStateAvailable(int state)
+bool isSwitch2POSWarningStateAvailable(int state)
 {
   return (state != 2); // two pos switch - middle state not available
 }
@@ -527,7 +527,7 @@ bool isTelemetryProtocolAvailable(int protocol)
     return false;
   }
 #endif
-  
+
   if (protocol== PROTOCOL_PULSES_CROSSFIRE) {
     return false;
   }
@@ -537,7 +537,7 @@ bool isTelemetryProtocolAvailable(int protocol)
     return false;
   }
 #endif
-  
+
 #if defined(PCBHORUS)
   if (protocol == PROTOCOL_FRSKY_D_SECONDARY) {
     return false;
@@ -568,7 +568,19 @@ bool modelHasNotes()
   char filename[sizeof(MODELS_PATH)+1+sizeof(g_model.header.name)+sizeof(TEXT_EXT)] = MODELS_PATH "/";
   char *buf = strcat_currentmodelname(&filename[sizeof(MODELS_PATH)]);
   strcpy(buf, TEXT_EXT);
-  return isFileAvailable(filename);
+  if (isFileAvailable(filename)) {
+    return true;
+  }
+
+#if !defined(EEPROM)
+  buf = strAppendFilename(&filename[sizeof(MODELS_PATH)], g_eeGeneral.currModelFilename, LEN_MODEL_FILENAME);
+  strcpy(buf, TEXT_EXT);
+  if (isFileAvailable(filename)) {
+    return true;
+  }
+#endif
+
+  return false;
 }
 
 int getFirstAvailable(int min, int max, IsValueAvailable isValueAvailable)
@@ -605,6 +617,7 @@ const mm_protocol_definition multi_protocols[] = {
   { MM_RF_PROTO_OLRS,       nullptr,              0,  STR_MULTI_RFPOWER   },
   { MM_RF_PROTO_FS_AFHDS2A, STR_SUBTYPE_AFHDS2A,  3,  STR_MULTI_SERVOFREQ },
   { MM_RF_PROTO_Q2X2,       STR_SUBTYPE_Q2X2,     1,  nullptr             },
+  { MM_RF_PROTO_WK_2X01,    STR_SUBTYPE_WK2x01,   5,  nullptr             },
   { MM_RF_CUSTOM_SELECTED,  nullptr,              7,  STR_MULTI_OPTION    },
 
   //Sential and default for protocols not listed above (MM_RF_CUSTOM is 0xff()

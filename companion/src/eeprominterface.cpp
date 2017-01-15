@@ -18,11 +18,6 @@
  * GNU General Public License for more details.
  */
 
-#include <stdio.h>
-#include <list>
-#include <float.h>
-#include <QtWidgets>
-#include <stdlib.h>
 #include "eeprominterface.h"
 #include "firmwares/er9x/er9xinterface.h"
 #include "firmwares/ersky9x/ersky9xinterface.h"
@@ -32,8 +27,40 @@
 #include "helpers.h"
 #include "wizarddata.h"
 #include "firmwareinterface.h"
+#include <stdio.h>
+#include <list>
+#include <float.h>
+#include <QtWidgets>
+#include <stdlib.h>
+#include <bitset>
 
 std::list<QString> EEPROMWarnings;
+
+int getEEpromSize(BoardEnum board)
+{
+  switch (board) {
+    case BOARD_STOCK:
+      return EESIZE_STOCK;
+    case BOARD_M128:
+      return EESIZE_M128;
+    case BOARD_MEGA2560:
+    case BOARD_GRUVIN9X:
+      return EESIZE_GRUVIN9X;
+    case BOARD_SKY9X:
+      return EESIZE_SKY9X;
+    case BOARD_9XRPRO:
+    case BOARD_AR9X:
+      return EESIZE_9XRPRO;
+    case BOARD_TARANIS_X7:
+    case BOARD_TARANIS_X9D:
+    case BOARD_TARANIS_X9DP:
+    case BOARD_TARANIS_X9E:
+    case BOARD_FLAMENCO:
+      return EESIZE_TARANIS;
+    default:
+      return 0; // unlimited
+  }
+}
 
 const uint8_t chout_ar[] = { // First number is 0..23 -> template setup,  Second is relevant channel out
   1,2,3,4 , 1,2,4,3 , 1,3,2,4 , 1,3,4,2 , 1,4,2,3 , 1,4,3,2,
@@ -193,6 +220,8 @@ QString SensorData::unitString() const
       return QObject::tr("mAh");
     case UNIT_WATTS:
       return QObject::tr("W");
+    case UNIT_MILLIWATTS:
+        return QObject::tr("mW");
     case UNIT_DB:
       return QObject::tr("dB");
     case UNIT_RPMS:
@@ -201,6 +230,8 @@ QString SensorData::unitString() const
       return QObject::tr("g");
     case UNIT_DEGREE:
       return QObject::trUtf8("°");
+    case UNIT_RADIANS:
+      return QObject::trUtf8("Rad");
     case UNIT_HOURS:
       return QObject::tr("hours");
     case UNIT_MINUTES:
@@ -627,7 +658,7 @@ QString RawSwitch::toString() const
     BoardEnum board = GetEepromInterface()->getBoard();
     switch(type) {
       case SWITCH_TYPE_SWITCH:
-        if (IS_HORUS(board) || IS_TARANIS(board)) {
+        if (IS_HORUS_OR_TARANIS(board)) {
           div_t qr = div(index-1, 3);
           Firmware::Switch sw = GetCurrentFirmware()->getSwitch(qr.quot);
           const char * positions[] = { ARROW_UP, "-", ARROW_DOWN };
@@ -1061,11 +1092,11 @@ GeneralSettings::GeneralSettings()
     calibSpanNeg[i] = 0x180;
     calibSpanPos[i] = 0x180;
   }
-  
+
   for (int i=0; i<GetCurrentFirmware()->getCapability(Switches); i++) {
     switchConfig[i] = GetCurrentFirmware()->getSwitch(i).type;
   }
-  
+
   BoardEnum board = GetEepromInterface()->getBoard();
   if (board == BOARD_HORUS) {
     potConfig[0] = POT_WITH_DETENT;
@@ -1194,7 +1225,7 @@ GeneralSettings::GeneralSettings()
       }
     }
   }
-  
+
   strcpy(themeName, "default");
   ThemeOptionData option1 = { 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0 };
   memcpy(&themeOptionValue[0], option1, sizeof(ThemeOptionData));
@@ -1398,6 +1429,11 @@ void ModelData::clearMixes()
     mixData[i].clear();
 }
 
+RadioData::RadioData()
+{
+  models.resize(GetCurrentFirmware()->getCapability(Models));
+}
+
 void ModelData::clear()
 {
   memset(this, 0, sizeof(ModelData));
@@ -1408,7 +1444,7 @@ void ModelData::clear()
   moduleData[1].ppm.delay = 300;
   moduleData[2].ppm.delay = 300;
   int board = GetEepromInterface()->getBoard();
-  if (IS_TARANIS(board) || IS_HORUS(board)) {
+  if (IS_HORUS_OR_TARANIS(board)) {
     moduleData[0].protocol = PULSES_PXX_XJT_X16;
     moduleData[1].protocol = PULSES_OFF;
   }
@@ -1623,16 +1659,10 @@ int ModelData::getChannelsMax(bool forceExtendedLimits) const
 }
 
 QList<EEPROMInterface *> eepromInterfaces;
+
 void registerEEpromInterfaces()
 {
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_STOCK));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_M128));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_GRUVIN9X));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_SKY9X));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_9XRPRO));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_X9D));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_X9DP));
-  eepromInterfaces.push_back(new OpenTxEepromInterface(BOARD_TARANIS_X9E));
+  registerOpenTxEEpromInterfaces();
   // eepromInterfaces.push_back(new Ersky9xInterface());
   // eepromInterfaces.push_back(new Er9xInterface());
 }
@@ -1719,7 +1749,7 @@ QString getBoardName(BoardEnum board)
     case BOARD_TARANIS_X9DP:
       return "Taranis X9D+";
     case BOARD_TARANIS_X9E:
-      return "Taranis X9E";  
+      return "Taranis X9E";
     case BOARD_SKY9X:
       return "Sky9x";
     case BOARD_9XRPRO:
@@ -1727,7 +1757,7 @@ QString getBoardName(BoardEnum board)
     case BOARD_AR9X:
       return "AR9X";
     case BOARD_HORUS:
-      return "Horus";  
+      return "Horus";
     default:
       return "Unknown";
   }
@@ -1760,7 +1790,7 @@ const int Firmware::getFlashSize()
   }
 }
 
-Firmware * GetFirmware(QString id)
+Firmware * GetFirmware(const QString & id)
 {
   foreach(Firmware * firmware, firmwares) {
     Firmware * result = firmware->getFirmwareVariant(id);
@@ -1830,12 +1860,12 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
     case MM_RF_PROTO_SYMAX:
     case MM_RF_PROTO_KN:
     case MM_RF_PROTO_SLT:
-    case MM_RF_PROTO_Q2X2:
     case MM_RF_PROTO_FY326:
     case MM_RF_PROTO_BAYANG:
     case MM_RF_PROTO_V2X2:
       return 2;
 
+    case MM_RF_PROTO_Q2X2:
     case MM_RF_PROTO_CG023:
       return 3;
 
@@ -1850,6 +1880,9 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
     case MM_RF_PROTO_MJXQ:
     case MM_RF_PROTO_YD717:
       return 5;
+
+    case MM_RF_PROTO_WALKERA_2x01:
+      return 6;
 
     case MM_RF_PROTO_CX10:
       return 8;
