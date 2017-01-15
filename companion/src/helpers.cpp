@@ -31,10 +31,9 @@
 
 #include "appdata.h"
 #include "helpers.h"
+#include "modeledit/modeledit.h"
 #include "simulatordialog.h"
-#include "simulatorinterface.h"
-#include "firmwareinterface.h"
-#include "storage/storage_sdcard.h"
+#include "storage/sdcard.h"
 
 Stopwatch gStopwatch("global");
 
@@ -127,7 +126,7 @@ void populatePhasesCB(QComboBox *b, int value)
   b->setCurrentIndex(value + GetCurrentFirmware()->getCapability(FlightModes));
 }
 
-GVarGroup::GVarGroup(QCheckBox * weightGV, QAbstractSpinBox * weightSB, QComboBox * weightCB, int & weight, const ModelData & model, const int deflt, const int mini, const int maxi, const double step, bool allowGvars):
+GVarGroup::GVarGroup(QCheckBox * weightGV, QAbstractSpinBox * weightSB, QComboBox * weightCB, int & weight, const ModelData & model, const int deflt, const int mini, const int maxi, const double step, bool allowGvars, ModelPanel * panel):
   QObject(),
   weightGV(weightGV),
   weightSB(weightSB),
@@ -136,7 +135,8 @@ GVarGroup::GVarGroup(QCheckBox * weightGV, QAbstractSpinBox * weightSB, QComboBo
   weightCB(weightCB),
   weight(weight),
   step(step),
-  lock(true)
+  lock(true),
+  panel(panel)
 {
   if (allowGvars && GetCurrentFirmware()->getCapability(Gvars)) {
     populateGVCB(*weightCB, weight, model);
@@ -200,6 +200,9 @@ void GVarGroup::valuesChanged()
       weight = sb->value();
     else
       weight = round(dsb->value()/step);
+    if (panel)
+      emit panel->modified();
+    
   }
 }
 
@@ -373,13 +376,14 @@ void populateGvarUseCB(QComboBox *b, unsigned int phase)
 
 void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettings & generalSettings, SwitchContext context)
 {
+  BoardEnum board = GetCurrentFirmware()->getBoard();
   RawSwitch item;
 
   b->clear();
 
   if (context != MixesContext && context != GlobalFunctionsContext) {
     // !FMx
-    if (IS_ARM(GetCurrentFirmware()->getBoard())) {
+    if (IS_ARM(board)) {
       for (int i=-GetCurrentFirmware()->getCapability(FlightModes); i<0; i++) {
         item = RawSwitch(SWITCH_TYPE_FLIGHT_MODE, i);
         b->addItem(item.toString(), item.toValue());
@@ -420,7 +424,7 @@ void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettin
 
   for (int i=-GetCurrentFirmware()->getCapability(SwitchesPositions); i<0; i++) {
     item = RawSwitch(SWITCH_TYPE_SWITCH, i);
-    if (IS_TARANIS(GetCurrentFirmware()->getBoard()) && !generalSettings.switchPositionAllowedTaranis(i)){
+    if (IS_HORUS_OR_TARANIS(board) && !generalSettings.switchPositionAllowedTaranis(i)) {
       continue;
     }
     b->addItem(item.toString(), item.toValue());
@@ -442,7 +446,7 @@ void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettin
 
   for (int i=1; i<=GetCurrentFirmware()->getCapability(SwitchesPositions); i++) {
     item = RawSwitch(SWITCH_TYPE_SWITCH, i);
-    if (IS_TARANIS(GetCurrentFirmware()->getBoard()) && !generalSettings.switchPositionAllowedTaranis(i)){
+    if (IS_HORUS_OR_TARANIS(board) && !generalSettings.switchPositionAllowedTaranis(i)) {
       continue;
     }
     b->addItem(item.toString(), item.toValue());
@@ -492,7 +496,7 @@ void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettin
 
   // FMx
   if (context != MixesContext && context != GlobalFunctionsContext) {
-    if (IS_ARM(GetCurrentFirmware()->getBoard())) {
+    if (IS_ARM(board)) {
       for (int i=1; i<=GetCurrentFirmware()->getCapability(FlightModes); i++) {
         item = RawSwitch(SWITCH_TYPE_FLIGHT_MODE, i);
         b->addItem(item.toString(), item.toValue());
@@ -608,7 +612,7 @@ void populateSourceCB(QComboBox *b, const RawSource & source, const GeneralSetti
     for (int i=0; i<GetCurrentFirmware()->getCapability(Switches); i++) {
       item = RawSource(SOURCE_TYPE_SWITCH, i);
       b->addItem(item.toString(model), item.toValue());
-      if (IS_TARANIS(GetCurrentFirmware()->getBoard()) && !generalSettings.switchSourceAllowedTaranis(i)) {
+      if (IS_HORUS_OR_TARANIS(board) && !generalSettings.switchSourceAllowedTaranis(i)) {
         QModelIndex index = b->model()->index(b->count()-1, 0);
         QVariant v(0);
         b->model()->setData(index, v, Qt::UserRole - 1);
@@ -833,12 +837,13 @@ void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
 
     if (board == BOARD_HORUS && HORUS_READY_FOR_RELEASE()) {
       dialog = new SimulatorDialogHorus(parent, simulator, flags);
-      GetEepromInterface()->saveFile(*simuData, g.profile[g.id()].sdPath());
+      SdcardFormat sdcard(g.profile[g.id()].sdPath());
+      sdcard.write(*simuData);
       dialog->start(NULL);
     }
     else if (board == BOARD_FLAMENCO) {
       dialog = new SimulatorDialogFlamenco(parent, simulator, flags);
-      QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
+      QByteArray eeprom(getEEpromSize(board), 0);
       firmware->saveEEPROM((uint8_t *)eeprom.data(), *simuData);
       dialog->start(eeprom);
     }
@@ -852,19 +857,19 @@ void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
         }
       }
       dialog = new SimulatorDialogTaranis(parent, simulator, flags);
-      QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
+      QByteArray eeprom(getEEpromSize(board), 0);
       firmware->saveEEPROM((uint8_t *)eeprom.data(), *simuData);
       dialog->start(eeprom);
     }
     else {
       dialog = new SimulatorDialog9X(parent, simulator, flags);
-      QByteArray eeprom(GetEepromInterface()->getEEpromSize(), 0);
+      QByteArray eeprom(getEEpromSize(board), 0);
       firmware->saveEEPROM((uint8_t *)eeprom.data(), *simuData, 0, firmware->getCapability(SimulatorVariant));
       dialog->start(eeprom);
     }
 
     dialog->exec();
-    delete dialog;
+    dialog->deleteLater();
     delete simuData;
 #if defined(WIN32) && defined(WIN_USE_CONSOLE_STDIO)
     FreeConsole();
@@ -941,10 +946,9 @@ QString index2version(int index)
   }
 }
 
-int qunlink(const QString & fileName)
+bool qunlink(const QString & fileName)
 {
-  QByteArray ba = fileName.toLatin1();
-  return unlink(ba.constData());
+  return QFile::remove(fileName);
 }
 
 QString generateProcessUniqueTempFileName(const QString & fileName)

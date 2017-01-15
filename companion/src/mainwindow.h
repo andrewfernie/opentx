@@ -80,6 +80,7 @@ class MainWindow : public QMainWindow
     void setRULanguage()  { setLanguage("ru_RU"); };
     void setSELanguage()  { setLanguage("sv_SE"); };
     void setNLLanguage()  { setLanguage("nl_NL"); };
+    void setCNLanguage()  { setLanguage("zh_CN"); };
 
     void setTheme(int index);
     void setClassicTheme()   {setTheme(0);};
@@ -162,8 +163,7 @@ class MainWindow : public QMainWindow
     void updateIconSizeActions();
     void updateLanguageActions();
     void updateIconThemeActions();
-
-    int getFileType(const QString & fullFileName);
+    
     QString Theme;
     QString ISize;
     QString strippedName(const QString & fullFileName);
@@ -256,6 +256,7 @@ class MainWindow : public QMainWindow
     QAction *swedishLangAct;
     // QAction *russianLangAct;
     // QAction *dutchLangAct;
+    QAction *chineseLangAct;
 
     QAction *openDocURLAct;
 };

@@ -76,8 +76,8 @@
 #define LEN_SWTYPES            "\006"
 #define TR_SWTYPES             "Ingen\0""Flipp\0""2Pos\0 ""3Pos\0"
 
-#define LEN_POTTYPES           "\020"
-#define TR_POTTYPES            "Ingen\0          ""Mittläges-pot\0  ""Flerlägesväljare""Potentiometer\0"
+#define LEN_POTTYPES           TR("\013","\020")
+#define TR_POTTYPES            TR("None\0      ""Pot w. det\0""Multipos\0  ""Pot\0       ", "Ingen\0          ""Mittläges-pot\0  ""Flerlägesväljare""Potentiometer\0")
 
 #define LEN_SLIDERTYPES        "\010"
 #define TR_SLIDERTYPES         "Ingen\0  ""Skjutpot"
@@ -107,12 +107,12 @@
 #define TR_DSM_PROTOCOLS       "LP45""DSM2""DSMX"
 
 #define LEN_MULTI_PROTOCOLS    "\006"
-#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0""Q2x2\0 "
+#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0""Q2x2\0 ""Walk.\0"
 
 #define TR_MULTI_CUSTOM        "Custom"
 
 #define LEN_SUBTYPE_FLYSKY     "\004"
-#define TR_SUBTYPE_FLYSKY      "Std\0"V9x9""V6x6""V912""CX20"
+#define TR_SUBTYPE_FLYSKY      "Std\0""V9x9""V6x6""V912""CX20"
 
 #define LEN_SUBTYPE_AFHDS2A    "\010"
 #define TR_SUBTYPE_AFHDS2A     "PWM,IBUS""PPM,IBUS""PWM,SBUS""PPM,SBUS"
@@ -154,7 +154,19 @@
 #define TR_SUBTYPE_HONTAI      "Std\0   ""JJRC X1""X5C1cln"
 
 #define LEN_SUBTYPE_Q2X2       "\004"
-#define TR_SUBTYPE_Q2X2        "Q242""Q282"
+#define TR_SUBTYPE_Q2X2        "Q222""Q242""Q282"
+
+#define LEN_SUBTYPE_WK2x01     "\006"
+#define TR_SUBTYPE_WK2x01      "WK2801""WK2401""W6_5_1""W6_6_1""W6_Hel""W6_HeI"
+
+#define LEN_SUBTYPE_V2X2       "\006"
+#define TR_SUBTYPE_V2X2        "V2x2\0 ""JXD506"
+
+#define LEN_SUBTYPE_BAYANG     "\006"
+#define TR_SUBTYPE_BAYANG      "Bayang""H8S3D"
+
+#define LEN_SUBTYPE_FY326      "\005"
+#define TR_SUBTYPE_FY326       "FY326""FY319"
 
 #define LEN_VTRIMINC           TR("\006","\014")
 #define TR_VTRIMINC            TR("Expo\0 ""xFin\0 ""Fin\0  ""Medium""Grov\0 ","Exponentiell""Extra Fin\0  ""Fin\0        ""Medium\0     ""Grov\0       ")
@@ -654,7 +666,11 @@
   #define TR_ENTER             "[MENU]"
 #endif
 
-#define TR_EXIT                "[EXIT]"
+#if defined(PCBHORUS)
+  #define TR_EXIT              "[RTN]"
+#else
+  #define TR_EXIT              "[EXIT]"
+#endif
 
 #if defined(PCBFLAMENCO)
   #define TR_POPUPS            TR_EXIT "\010" TR_ENTER
@@ -1091,8 +1107,8 @@
 #define TR_PT                  "pt"
 #define TR_PTS                 "pkt"
 #define TR_SMOOTH              "Mjuk"
-#define TR_COPY_STICKS_TO_OFS  "Spara spakar som subtrim"
-#define TR_COPY_TRIMS_TO_OFS   "Spara trimmar som subtrim"
+#define TR_COPY_STICKS_TO_OFS  TR("Cpy stick->subtrim", "Spara spakar som subtrim")
+#define TR_COPY_TRIMS_TO_OFS   TR("Cpy trim->subtrim", "Spara trimmar som subtrim")
 #define TR_INCDEC              "Inkr/Dekrement"
 #define TR_GLOBALVAR           "Globala Var"
 #define TR_MIXSOURCE           "Mixer Källa"

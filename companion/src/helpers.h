@@ -21,12 +21,15 @@
 #ifndef _HELPERS_H_
 #define _HELPERS_H_
 
+#include "eeprominterface.h"
+#include "modeledit/modeledit.h"
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QGridLayout>
 #include <QDebug>
-#include "eeprominterface.h"
+#include <QTime>
+#include <QElapsedTimer>
 
 extern const QColor colors[CPN_MAX_CURVES];
 
@@ -66,7 +69,7 @@ class GVarGroup: public QObject {
   Q_OBJECT
 
   public:
-    GVarGroup(QCheckBox * weightGV, QAbstractSpinBox * weightSB, QComboBox * weightCB, int & weight, const ModelData & model, const int deflt, const int mini, const int maxi, const double step=1.0, bool allowGVars=true);
+    GVarGroup(QCheckBox * weightGV, QAbstractSpinBox * weightSB, QComboBox * weightCB, int & weight, const ModelData & model, const int deflt, const int mini, const int maxi, const double step=1.0, bool allowGVars=true, ModelPanel * panel=NULL);
 
   protected slots:
     void gvarCBChanged(int);
@@ -81,6 +84,7 @@ class GVarGroup: public QObject {
     int & weight;
     double step;
     bool lock;
+    ModelPanel * panel;
 };
 
 #define HIDE_DIFF             0x01
@@ -187,7 +191,7 @@ class QTimeS : public QTime
     int seconds() const { return hour()*3600 + minute()*60 + second(); };
 };
 
-int qunlink(const QString & fileName);
+bool qunlink(const QString & fileName);
 
 QString generateProcessUniqueTempFileName(const QString & fileName);
 bool isTempFileName(const QString & fileName);
