@@ -34,14 +34,14 @@ class TreeItem
 {
   public:
     explicit TreeItem(const QVector<QVariant> & itemData);
-    explicit TreeItem(TreeItem * parent, int modelIndex = -1);
+    explicit TreeItem(TreeItem * parent, int categoryIndex, int modelIndex);
     ~TreeItem();
     
-    TreeItem *child(int number);
+    TreeItem * child(int number);
     int childCount() const;
     int columnCount() const;
     QVariant data(int column) const;
-    TreeItem * appendChild(int modelIndex);
+    TreeItem * appendChild(int categoryIndex, int modelIndex);
     TreeItem * parent();
     bool removeChildren(int position, int count);
     
@@ -49,11 +49,13 @@ class TreeItem
     bool setData(int column, const QVariant &value);
     
     int getModelIndex() const { return modelIndex; }
+    int getCategoryIndex() const { return categoryIndex; }
   
   private:
     QList<TreeItem*> childItems;
     QVector<QVariant> itemData;
     TreeItem * parentItem;
+    int categoryIndex;
     int modelIndex;
 };
 
@@ -92,69 +94,15 @@ class TreeModel : public QAbstractItemModel
       return getItem(index)->getModelIndex();
     }
     
+    int getCategoryIndex(const QModelIndex & index) const {
+      return getItem(index)->getCategoryIndex();
+    }
+    
   private:
     TreeItem * getItem(const QModelIndex & index) const;
     TreeItem * rootItem;
     RadioData * radioData;
     int availableEEpromSize;
 };
-
-#if 0
-class ModelsListWidget : public QTreeView
-{
-    Q_OBJECT
-
-public:
-    ModelsListWidget(QWidget * parent = 0);
-
-    void setRadioData(RadioData * radioData);
-    bool hasSelection();
-    void keyPressEvent(QKeyEvent * event);
-    bool hasPasteData();
-    int currentRow() const;
-
-protected:
-    void dropEvent(QDropEvent *event);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void dragEnterEvent(QDragEnterEvent *event);
-    void dragLeaveEvent(QDragLeaveEvent *event);
-    void dragMoveEvent(QDragMoveEvent *event);
-#ifndef WIN32
-    void focusInEvent ( QFocusEvent * event );
-    void focusOutEvent ( QFocusEvent * event );
-#endif
-    
-public slots:
-    void refreshList();
-    
-    void cut();
-    void copy();
-    void paste();
-    void print();
-    void EditModel();
-    void LoadBackup();
-    void OpenWizard();
-    void duplicate();
-    
-    void deleteSelected(bool ask);
-    void confirmDelete();
-    void onCurrentItemChanged(QTreeWidgetItem *, QTreeWidgetItem *);
-
-private:
-    void doCut(QByteArray *gmData);
-    void doPaste(QByteArray *gmData, int index);
-    void doCopy(QByteArray *gmData);
-    void saveSelection();
-    void restoreSelection();
-
-    RadioData * radioData;
-    QPoint dragStartPosition;
-
-    CurrentSelection currentSelection;
-    QColor active_highlight_color;
-    
-};
-#endif
 
 #endif // _MODELSLIST_H_

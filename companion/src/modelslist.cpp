@@ -23,13 +23,15 @@
 TreeItem::TreeItem(const QVector<QVariant> & itemData):
   itemData(itemData),
   parentItem(NULL),
+  categoryIndex(-1),
   modelIndex(-1)
 {
 }
 
-TreeItem::TreeItem(TreeItem * parent, int modelIndex):
+TreeItem::TreeItem(TreeItem * parent, int categoryIndex, int modelIndex):
   itemData(parent->columnCount()),
   parentItem(parent),
+  categoryIndex(categoryIndex),
   modelIndex(modelIndex)
 {
 }
@@ -67,9 +69,9 @@ QVariant TreeItem::data(int column) const
   return itemData.value(column);
 }
 
-TreeItem * TreeItem::appendChild(int modelIndex)
+TreeItem * TreeItem::appendChild(int categoryIndex, int modelIndex)
 {
-  TreeItem * item = new TreeItem(this, modelIndex);
+  TreeItem * item = new TreeItem(this, categoryIndex, modelIndex);
   childItems.insert(childItems.size(), item);
   return item;
 }
@@ -104,7 +106,7 @@ TreeModel::TreeModel(RadioData * radioData, QObject * parent):
   radioData(radioData),
   availableEEpromSize(-1)
 {
-  BoardEnum board = GetCurrentFirmware()->getBoard();
+  BoardEnum board = getCurrentBoard();
   QVector<QVariant> labels;
   if (!IS_HORUS(board))
     labels << tr("Index");
@@ -155,10 +157,10 @@ Qt::ItemFlags TreeModel::flags(const QModelIndex &index) const
   return Qt::ItemIsEditable | QAbstractItemModel::flags(index);
 }
 
-TreeItem * TreeModel::getItem(const QModelIndex &index) const
+TreeItem * TreeModel::getItem(const QModelIndex & index) const
 {
   if (index.isValid()) {
-    TreeItem * item = static_cast<TreeItem*>(index.internalPointer());
+    TreeItem * item = static_cast<TreeItem *>(index.internalPointer());
     if (item) {
       return item;
     }
@@ -166,8 +168,7 @@ TreeItem * TreeModel::getItem(const QModelIndex &index) const
   return rootItem;
 }
 
-QVariant TreeModel::headerData(int section, Qt::Orientation orientation,
-                               int role) const
+QVariant TreeModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     return rootItem->data(section);
@@ -175,13 +176,12 @@ QVariant TreeModel::headerData(int section, Qt::Orientation orientation,
   return QVariant();
 }
 
-QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex TreeModel::index(int row, int column, const QModelIndex & parent) const
 {
   if (parent.isValid() && parent.column() != 0)
     return QModelIndex();
   
   TreeItem * parentItem = getItem(parent);
-  
   TreeItem * childItem = parentItem->child(row);
   if (childItem)
     return createIndex(row, column, childItem);
@@ -189,13 +189,13 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) con
     return QModelIndex();
 }
 
-QModelIndex TreeModel::parent(const QModelIndex &index) const
+QModelIndex TreeModel::parent(const QModelIndex & index) const
 {
   if (!index.isValid())
     return QModelIndex();
   
-  TreeItem *childItem = getItem(index);
-  TreeItem *parentItem = childItem->parent();
+  TreeItem * childItem = getItem(index);
+  TreeItem * parentItem = childItem->parent();
   
   if (parentItem == rootItem)
     return QModelIndex();
@@ -203,43 +203,47 @@ QModelIndex TreeModel::parent(const QModelIndex &index) const
   return createIndex(parentItem->childNumber(), 0, parentItem);
 }
 
-
-bool TreeModel::removeRows(int position, int rows, const QModelIndex &parent)
+bool TreeModel::removeRows(int position, int rows, const QModelIndex & parent)
 {
   TreeItem * parentItem = getItem(parent);
   bool success = true;
   
-  beginRemoveRows(parent, position, position + rows - 1);
-  success = parentItem->removeChildren(position, rows);
-  endRemoveRows();
+  if (position >= 0 && rows > 0) {
+    beginRemoveRows(parent, position, position + rows - 1);
+    success = parentItem->removeChildren(position, rows);
+    endRemoveRows();
+  }
   
   return success;
 }
 
 int TreeModel::rowCount(const QModelIndex &parent) const
 {
-  TreeItem *parentItem = getItem(parent);
-  
+  TreeItem * parentItem = getItem(parent);
   return parentItem->childCount();
 }
 
-bool TreeModel::setData(const QModelIndex &index, const QVariant &value, int role)
+bool TreeModel::setData(const QModelIndex & index, const QVariant & value, int role)
 {
   if (role != Qt::EditRole)
     return false;
   
-  TreeItem *item = getItem(index);
+  if (!index.isValid())
+    return false;
+  
+  TreeItem * item = getItem(index);
   bool result = item->setData(index.column(), value);
   
-  if (result)
+  if (result) {
     emit dataChanged(index, index);
+  }
   
   return result;
 }
 
 void TreeModel::refresh()
 {
-  EEPROMInterface * eepromInterface = GetEepromInterface();
+  EEPROMInterface * eepromInterface = getCurrentEEpromInterface();
   BoardEnum board = eepromInterface->getBoard();
   
   if (!IS_SKY9X(board) && !IS_HORUS(board)) {
@@ -252,13 +256,13 @@ void TreeModel::refresh()
   TreeItem * defaultCategoryItem = NULL;
   
   if (IS_HORUS(board)) {
-    for (unsigned int i = 0; i < radioData->categories.size(); i++) {
-      TreeItem * current = rootItem->appendChild(-1);
+    for (unsigned i = 0; i < radioData->categories.size(); i++) {
+      TreeItem * current = rootItem->appendChild(i, -1);
       current->setData(0, QString(radioData->categories[i].name));
     }
   }
     
-  for (unsigned int i=0; i<(unsigned)GetCurrentFirmware()->getCapability(Models) && i<radioData->models.size(); i++) {
+  for (unsigned i=0; i<radioData->models.size(); i++) {
     ModelData & model = radioData->models[i];
     int currentColumn = 0;
     TreeItem * current;
@@ -270,17 +274,18 @@ void TreeModel::refresh()
           categoryItem = rootItem->child(model.category);
         }
         else {
+          model.category = 0;
           if (!defaultCategoryItem) {
-            defaultCategoryItem = rootItem->appendChild(-1);
+            defaultCategoryItem = rootItem->appendChild(0, -1);
             defaultCategoryItem->setData(0, QObject::tr("Models"));
           }
           categoryItem = defaultCategoryItem;
         }
-        current = categoryItem->appendChild(i);
+        current = categoryItem->appendChild(model.category, i);
       }
     }
     else {
-      current = rootItem->appendChild(i);
+      current = rootItem->appendChild(0, i);
       current->setData(currentColumn++, QString().sprintf("%02d", i + 1));
     }
     
@@ -301,16 +306,7 @@ void TreeModel::refresh()
           availableEEpromSize -= size;
         }
       }
-      
-      /* TODO if (i == radioData->generalSettings.currModelIndex) {
-        QFont font = item->font(0);
-        font.setBold(true);
-        for (int j=0; j<columnCount(); j++) {
-          item->setFont(j, font);
-        }
-      } */
     }
-    // addTopLevelItem(item);
   }
   
   if (!IS_SKY9X(board) && !IS_HORUS(board)) {
@@ -365,7 +361,7 @@ void ModelsListWidget::mouseMoveEvent(QMouseEvent *event)
 void ModelsListWidget::saveSelection()
 {
   /*currentSelection.current_item = currentItem();
-  for (int i=0; i<GetCurrentFirmware()->getCapability(Models)+1; ++i) {
+  for (int i=0; i<getCurrentFirmware()->getCapability(Models)+1; ++i) {
     currentSelection.selected[i] = selectionModel()->isSelected(model()->index(i, 0));
   }*/
 }
@@ -373,7 +369,7 @@ void ModelsListWidget::saveSelection()
 void ModelsListWidget::restoreSelection()
 {
   /*setCurrentItem(currentSelection.current_item);
-  for (int i=0; i<GetCurrentFirmware()->getCapability(Models)+1; ++i) {
+  for (int i=0; i<getCurrentFirmware()->getCapability(Models)+1; ++i) {
     selectionModel()->select(model()->index(i, 0), currentSelection.selected[i] ? QItemSelectionModel::Select : QItemSelectionModel::Deselect);
   }*/
 }
@@ -403,7 +399,7 @@ void ModelsListWidget::dragMoveEvent(QDragMoveEvent *event)
     if (row >= 0) {
       if (header->general_settings)
         selectionModel()->select(model()->index(0, 0), QItemSelectionModel::Select);
-      for (int i=row, end=std::min(GetCurrentFirmware()->getCapability(Models)+1, row+header->models_count); i<end; i++)
+      for (int i=row, end=std::min(getCurrentFirmware()->getCapability(Models)+1, row+header->models_count); i<end; i++)
         selectionModel()->select(model()->index(i, 0), QItemSelectionModel::Select);
     }
   }
@@ -428,7 +424,7 @@ void ModelsListWidget::dropEvent(QDropEvent *event)
     DragDropHeader * header = (DragDropHeader *)gmData.data();
     if (header->general_settings)
       selectionModel()->select(model()->index(0, 0), QItemSelectionModel::Select);
-    for (int i=row, end=std::min(GetCurrentFirmware()->getCapability(Models)+1, row+header->models_count); i<end; i++)
+    for (int i=row, end=std::min(getCurrentFirmware()->getCapability(Models)+1, row+header->models_count); i<end; i++)
       selectionModel()->select(model()->index(i, 0), QItemSelectionModel::Select);
   }
   event->acceptProposedAction();
@@ -472,9 +468,9 @@ void ModelsListWidget::doCut(QByteArray * gmData)
 void ModelsListWidget::duplicate()
 {
   int i = this->currentRow();
-  if (i && i<GetCurrentFirmware()->getCapability(Models)) {
+  if (i && i<getCurrentFirmware()->getCapability(Models)) {
     ModelData * model = &radioData->models[i-1];
-    while (i<GetCurrentFirmware()->getCapability(Models)) {
+    while (i<getCurrentFirmware()->getCapability(Models)) {
       if (radioData->models[i].isEmpty()) {
         radioData->models[i] = *model;
         strcpy(radioData->models[i].filename, radioData->getNextModelFilename().toStdString().c_str());
@@ -483,7 +479,7 @@ void ModelsListWidget::duplicate()
       }
       i++;
     }
-    if (i==GetCurrentFirmware()->getCapability(Models)) {
+    if (i==getCurrentFirmware()->getCapability(Models)) {
       QMessageBox::warning(this, "Companion", tr("No free slot available, cannot duplicate"), QMessageBox::Ok);
     }
   }

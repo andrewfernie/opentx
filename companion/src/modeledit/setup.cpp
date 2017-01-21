@@ -193,6 +193,15 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
   }
   ui->label_module->setText(label);
 
+  // Antena selection for Horus
+  if (IS_HORUS(firmware->getBoard()) && moduleIdx == 0) {
+    ui->antennaMode->setCurrentIndex(module.ppm.pulsePol);
+  }
+  else {
+    ui->label_antenna->hide();
+    ui->antennaMode->hide();
+  }
+
   // The protocols available on this board
   for (int i=0; i<PULSES_PROTOCOL_LAST; i++) {
     if (firmware->isAvailable((PulsesProtocol)i, moduleIdx)) {
@@ -411,6 +420,12 @@ void ModulePanel::on_protocol_currentIndexChanged(int index)
 }
 
 void ModulePanel::on_ppmPolarity_currentIndexChanged(int index)
+{
+  module.ppm.pulsePol = index;
+  emit modified();
+}
+
+void ModulePanel::on_antennaMode_currentIndexChanged(int index)
 {
   module.ppm.pulsePol = index;
   emit modified();
@@ -659,7 +674,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     ui->centerBeepLayout->addWidget(checkbox, 0, i+1);
     connect(checkbox, SIGNAL(toggled(bool)), this, SLOT(onBeepCenterToggled(bool)));
     centerBeepCheckboxes << checkbox;
-    if (IS_TARANIS(board)) {
+    if (IS_HORUS_OR_TARANIS(board)) {
       RawSource src(SOURCE_TYPE_STICK, i);
       if (src.isPot() && !generalSettings.isPotAvailable(i-CPN_MAX_STICKS)) {
         checkbox->hide();
@@ -676,9 +691,9 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   for (int i=0; i<firmware->getCapability(Switches); i++) {
     Firmware::Switch sw = firmware->getSwitch(i);
     if (IS_HORUS_OR_TARANIS(board)) {
-      sw.type = Firmware::SwitchType(generalSettings.switchConfig[i]);
+      sw.type = GeneralSettings::SwitchConfig(generalSettings.switchConfig[i]);
     }
-    if (sw.type == Firmware::SWITCH_NONE || sw.type == Firmware::SWITCH_TOGGLE) {
+    if (sw.type == GeneralSettings::SWITCH_NONE || sw.type == GeneralSettings::SWITCH_TOGGLE) {
       continue;
     }
     QLabel * label = new QLabel(this);
@@ -695,7 +710,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     slider->setPageStep(1);
     slider->setTickInterval(1);
     label->setText(sw.name);
-    slider->setMaximum(sw.type == Firmware::SWITCH_3POS ? 2 : 1);
+    slider->setMaximum(sw.type == GeneralSettings::SWITCH_3POS ? 2 : 1);
     cb->setProperty("index", i);
     ui->switchesStartupLayout->addWidget(label, 0, i+1);
     ui->switchesStartupLayout->setAlignment(label, Qt::AlignCenter);
@@ -714,7 +729,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
 
   // Pot warnings
   prevFocus = ui->potWarningMode;
-  if (IS_TARANIS(board)) {
+  if (IS_HORUS_OR_TARANIS(board)) {
     for (int i=0; i<firmware->getCapability(Pots)+firmware->getCapability(Sliders); i++) {
       QCheckBox * cb = new QCheckBox(this);
       cb->setProperty("index", i);
@@ -867,7 +882,6 @@ void SetupPanel::populateThrottleSourceCB()
 void SetupPanel::update()
 {
   ui->name->setText(model->name);
-
   ui->throttleReverse->setChecked(model->throttleReversed);
   populateThrottleSourceCB();
   ui->throttleWarning->setChecked(!model->disableThrottleWarning);
@@ -881,7 +895,7 @@ void SetupPanel::update()
   updateBeepCenter();
   updateStartupSwitches();
 
-  if(IS_TARANIS(GetEepromInterface()->getBoard())) {
+  if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
     updatePotWarnings();
   }
 
@@ -915,9 +929,9 @@ void SetupPanel::updateStartupSwitches()
     QCheckBox * cb = startupSwitchesCheckboxes[i];
     int index = slider->property("index").toInt();
     bool enabled = !(model->switchWarningEnable & (1 << index));
-    if (IS_TARANIS(GetEepromInterface()->getBoard())) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       value = (switchStates >> 2*index) & 0x03;
-      if (generalSettings.switchConfig[index] != Firmware::SWITCH_3POS && value == 2) {
+      if (generalSettings.switchConfig[index] != GeneralSettings::SWITCH_3POS && value == 2) {
         value = 1;
       }
     }
@@ -940,7 +954,7 @@ void SetupPanel::startupSwitchEdited(int value)
     uint64_t mask;
     int index = sender()->property("index").toInt();
 
-    if (IS_TARANIS(GetEepromInterface()->getBoard())) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       shift = index * 2;
       mask = 0x03ul << shift;
     }
@@ -956,7 +970,7 @@ void SetupPanel::startupSwitchEdited(int value)
 
     model->switchWarningStates &= ~mask;
 
-    if (IS_TARANIS(GetEepromInterface()->getBoard()) && generalSettings.switchConfig[index] != Firmware::SWITCH_3POS) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard()) && generalSettings.switchConfig[index] != GeneralSettings::SWITCH_3POS) {
       if (value == 1) {
         value = 2;
       }

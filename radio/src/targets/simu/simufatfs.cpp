@@ -18,30 +18,38 @@
  * GNU General Public License for more details.
  */
 
+#include <map>
+#include <string>
+#include <vector>
+#include <algorithm>
 #include "opentx.h"
 
-#if defined _MSC_VER || !defined (__GNUC__)
-  #define WINDOWS_BUILD
+#if defined(SIMU_USE_SDCARD)  // rest of file is excluded otherwise
+
+#if defined(_MSC_VER) || !defined (__GNUC__)
+  #define MSVC_BUILD    1
+#else
+  #define MSVC_BUILD    0
 #endif
 
-#if defined(SIMU_USE_SDCARD)
-#if defined(WINDOWS_BUILD)
+// NOTE: the #include order is important here, sensitive on different platoforms.
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <sys/stat.h>
+
+#if MSVC_BUILD
   #include <direct.h>
   #include <stdlib.h>
   #include <sys/utime.h>
   #define mkdir(s, f) _mkdir(s)
 #else
+  #include <sys/time.h>
   #include <utime.h>
 #endif
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include "ff.h"
-#include <map>
-#include <string>
-#include <vector>
 
 namespace simu {
 #include <dirent.h>
@@ -55,10 +63,10 @@ std::string simuSettingsDirectory;    // path to the root of the models and sett
 
 bool isPathDelimiter(char delimiter)
 {
-  return (delimiter == '/' || delimiter == '\\');
+  return delimiter == '/';
 }
 
-std::string removeTrailingPathDelimiter(const char * path)
+std::string removeTrailingPathDelimiter(const std::string & path)
 {
   std::string result = path;
   while (!result.empty() && isPathDelimiter(result.back())) {
@@ -67,19 +75,30 @@ std::string removeTrailingPathDelimiter(const char * path)
   return result;
 }
 
+std::string fixPathDelimiters(const char * path)
+{
+  // replace all '\' characters with '/'
+  std::string result(path);
+  std::replace(result.begin(), result.end(), '\\', '/');
+  // TRACE_SIMPGMSPACE("fixPathDelimiters(): %s -> %s", path, result.c_str());
+  return result;
+}
+
 void simuFatfsSetPaths(const char * sdPath, const char * settingsPath)
 {
   if (sdPath) {
-    simuSdDirectory = removeTrailingPathDelimiter(sdPath);
+    simuSdDirectory = removeTrailingPathDelimiter(fixPathDelimiters(sdPath));
   }
   else {
     char buff[1024];
     f_getcwd(buff, sizeof(buff)-1);
-    simuSdDirectory = removeTrailingPathDelimiter(buff);
+    simuSdDirectory = removeTrailingPathDelimiter(fixPathDelimiters(buff));
   }
   if (settingsPath) {
-    simuSettingsDirectory = removeTrailingPathDelimiter(settingsPath);
+    simuSettingsDirectory = removeTrailingPathDelimiter(fixPathDelimiters(settingsPath));
   }
+  TRACE_SIMPGMSPACE("simuFatfsSetPaths(): simuSdDirectory: \"\"", simuSdDirectory.c_str());
+  TRACE_SIMPGMSPACE("simuFatfsSetPaths(): simuSettingsDirectory: \"\"", simuSettingsDirectory.c_str());
 }
 
 bool startsWith(const char *path, const char * start)
@@ -87,7 +106,7 @@ bool startsWith(const char *path, const char * start)
   return strncasecmp(path, start, strlen(start)) == 0;
 }
 
-std::string convertToSimuPath(const char *path)
+std::string convertToSimuPath(const char * path)
 {
   std::string result;
   if (isPathDelimiter(path[0])) {
@@ -101,11 +120,11 @@ std::string convertToSimuPath(const char *path)
   else {
     result = std::string(path);
   }
-  TRACE("convertToSimuPath(): %s -> %s", path, result.c_str());
+  TRACE_SIMPGMSPACE("convertToSimuPath(): %s -> %s", path, result.c_str());
   return result;
 }
 
-std::string convertFromSimuPath(const char *path)
+std::string convertFromSimuPath(const char * path)
 {
   std::string result;
   if (startsWith(path, simuSdDirectory.c_str())) {
@@ -120,7 +139,7 @@ std::string convertFromSimuPath(const char *path)
       result = "/" + result;
     }
   }
-  TRACE("convertFromSimuPath(): %s -> %s", path, result.c_str());
+  TRACE_SIMPGMSPACE("convertFromSimuPath(): %s -> %s", path, result.c_str());
   return result;
 }
 
@@ -130,15 +149,14 @@ filemap_t fileMap;
 
 void splitPath(const std::string & path, std::string & dir, std::string & name)
 {
-#if defined(WINDOWS_BUILD)
+#if MSVC_BUILD
   char drive[_MAX_DRIVE];
-  char dir[_MAX_DIR];
+  char directory[_MAX_DIR];
   char fname[_MAX_FNAME];
   char ext[_MAX_EXT];
-  _splitpath(path.c_str(), drive, dir, fname, ext);
+  _splitpath(path.c_str(), drive, directory, fname, ext);
   name = std::string(fname) + std::string(ext);
-  dir = std::string(drive) + std::string(dir);
-  std::string searchName = dirName + "*";
+  dir = std::string(drive) + std::string(directory);
 #else
   char * buff = new char[path.length()+1];
   strcpy(buff, path.c_str());
@@ -150,7 +168,8 @@ void splitPath(const std::string & path, std::string & dir, std::string & name)
 }
 
 
-bool isFile(const std::string & fullName, unsigned char d_type)
+#if !MSVC_BUILD
+bool isFile(const std::string & fullName, unsigned int d_type)
 {
 #if defined(WIN32) || defined(__APPLE__) || defined(__FreeBSD__)
   #define REGULAR_FILE DT_REG
@@ -170,12 +189,13 @@ bool isFile(const std::string & fullName, unsigned char d_type)
   }
   return false;
 }
+#endif
 
 std::vector<std::string> listDirectoryFiles(const std::string & dirName)
 {
   std::vector<std::string> result;
 
-#if defined (WINDOWS_BUILD)
+#if MSVC_BUILD
     std::string searchName = dirName + "*";
     // TRACE_SIMPGMSPACE("\tsearching for: %s", fileName.c_str());
     WIN32_FIND_DATA ffd;
@@ -183,12 +203,9 @@ std::vector<std::string> listDirectoryFiles(const std::string & dirName)
     if (INVALID_HANDLE_VALUE != hFind) {
       do {
         if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-          //TRACE_SIMPGMSPACE("comparing with: %s", ffd.cFileName);
-          if (!strcasecmp(fileName.c_str(), ffd.cFileName)) {
-            std::string fullName = dirName + std::string(ffd.cFileName);
-            // TRACE_SIMPGMSPACE("listDirectoryFiles(): %s", fullName.c_str());
-            result.push_back(fullName);
-          }
+          std::string fullName = dirName + std::string(ffd.cFileName);
+          // TRACE_SIMPGMSPACE("listDirectoryFiles(): %s", fullName.c_str());
+          result.push_back(fullName);
         }
       }
       while (FindNextFile(hFind, &ffd) != 0);
@@ -528,7 +545,7 @@ FRESULT f_getcwd (TCHAR *path, UINT sz_path)
     return FR_NO_PATH;
   }
 
-  std::string result = convertFromSimuPath(cwd);
+  std::string result = convertFromSimuPath(fixPathDelimiters(cwd).c_str());
   if (result.length() > sz_path) {
     //TRACE_SIMPGMSPACE("f_getcwd(): buffer too short");
     return FR_NOT_ENOUGH_CORE;

@@ -80,8 +80,6 @@ enum Capability {
   Mixes,
   Timers,
   TimersName,
-  CustomFunctions,
-  SafetyChannelCustomFunction,
   VoicesAsNumbers,
   VoicesMaxLength,
   MultiLangVoice,
@@ -89,7 +87,11 @@ enum Capability {
   Pots,
   Sliders,
   Switches,
+  FactoryInstalledSwitches,
   SwitchesPositions,
+  NumTrimSwitches,
+  CustomFunctions,
+  SafetyChannelCustomFunction,
   LogicalSwitches,
   CustomAndSwitches,
   HasNegAndSwitches,
@@ -196,7 +198,7 @@ class EEPROMInterface
     virtual unsigned long load(RadioData &radioData, const uint8_t * eeprom, int size) = 0;
 
     virtual unsigned long loadBackup(RadioData & radioData, const uint8_t * eeprom, int esize, int index) = 0;
-    
+
     virtual int save(uint8_t * eeprom, const RadioData & radioData, uint8_t version=0, uint32_t variant=0) = 0;
 
     virtual int getSize(const ModelData &) = 0;
@@ -286,42 +288,35 @@ struct Option {
 class Firmware {
 
   public:
-    Firmware(const QString & id, const QString & name, const BoardEnum board, EEPROMInterface * eepromInterface):
+    Firmware(const QString & id, const QString & name, BoardEnum board):
       id(id),
       name(name),
       board(board),
-      eepromInterface(eepromInterface),
       variantBase(0),
-      base(NULL)
+      base(NULL),
+      eepromInterface(NULL)
     {
     }
 
-    Firmware(Firmware * base, const QString & id, const QString & name, const BoardEnum board, EEPROMInterface * eepromInterface):
+    Firmware(Firmware * base, const QString & id, const QString & name, BoardEnum board):
       id(id),
       name(name),
       board(board),
-      eepromInterface(eepromInterface),
       variantBase(0),
-      base(base)
+      base(base),
+      eepromInterface(NULL)
     {
     }
 
     virtual ~Firmware()
     {
-      delete eepromInterface;
     }
 
     inline const Firmware * getFirmwareBase() const
     {
       return base ? base : this;
     }
-
-    // TODO needed?
-    inline void setVariantBase(unsigned int variant)
-    {
-      variantBase = variant;
-    }
-
+    
     virtual Firmware * getFirmwareVariant(const QString & id) { return NULL; }
 
     unsigned int getVariantNumber();
@@ -334,48 +329,41 @@ class Firmware {
 
     virtual void addOptions(Option options[]);
 
-    inline int saveEEPROM(uint8_t * eeprom, RadioData & radioData, uint8_t version=0, uint32_t variant=0)
-    {
-      return eepromInterface->save(eeprom, radioData, version, variant);
-    }
-
     virtual QString getStampUrl() = 0;
 
     virtual QString getReleaseNotesUrl() = 0;
 
     virtual QString getFirmwareUrl() = 0;
 
-    inline BoardEnum getBoard() const
+    BoardEnum getBoard() const
     {
       return board;
     }
-
-    inline QString getName() const
+    
+    void setEEpromInterface(EEPROMInterface * eeprom)
     {
-      return name;
+      eepromInterface = eeprom;
     }
-
-    inline QString getId() const
-    {
-      return id;
-    }
-
-    inline EEPROMInterface * getEepromInterface()
+    
+    EEPROMInterface * getEEpromInterface()
     {
       return eepromInterface;
     }
 
+    QString getName() const
+    {
+      return name;
+    }
+
+    QString getId() const
+    {
+      return id;
+    }
+
     virtual int getCapability(Capability) = 0;
 
-    enum SwitchType {
-      SWITCH_NONE,
-      SWITCH_TOGGLE,
-      SWITCH_2POS,
-      SWITCH_3POS
-    };
-
     struct Switch {
-      SwitchType type;
+      GeneralSettings::SwitchConfig type;
       const char * name;
     };
 
@@ -384,8 +372,6 @@ class Firmware {
     virtual QString getAnalogInputName(unsigned int index) = 0;
 
     virtual QTime getMaxTimerStart() = 0;
-
-    virtual bool isTelemetrySourceAvailable(int source) = 0;
 
     virtual int isAvailable(PulsesProtocol proto, int port=0) = 0;
 
@@ -400,9 +386,9 @@ class Firmware {
     QString id;
     QString name;
     BoardEnum board;
-    EEPROMInterface * eepromInterface;
     unsigned int variantBase;
     Firmware * base;
+    EEPROMInterface * eepromInterface;
 
   private:
     Firmware();
@@ -413,18 +399,23 @@ extern QList<Firmware *> firmwares;
 extern Firmware * default_firmware_variant;
 extern Firmware * current_firmware_variant;
 
-Firmware * GetFirmware(const QString & id);
+Firmware * getFirmware(const QString & id);
 
-inline Firmware * GetCurrentFirmware()
+inline Firmware * getCurrentFirmware()
 {
   return current_firmware_variant;
 }
 
-SimulatorInterface *getCurrentFirmwareSimulator();
+SimulatorInterface * getCurrentSimulator();
 
-inline EEPROMInterface * GetEepromInterface()
+inline EEPROMInterface * getCurrentEEpromInterface()
 {
-  return GetCurrentFirmware()->getEepromInterface();
+  return getCurrentFirmware()->getEEpromInterface();
+}
+
+inline BoardEnum getCurrentBoard()
+{
+  return getCurrentFirmware()->getBoard();
 }
 
 inline int divRoundClosest(const int n, const int d)
@@ -433,8 +424,6 @@ inline int divRoundClosest(const int n, const int d)
 }
 
 #define CHECK_IN_ARRAY(T, index) ((unsigned int)index < (unsigned int)(sizeof(T)/sizeof(T[0])) ? T[(unsigned int)index] : "???")
-
-SimulatorInterface * GetCurrentFirmwareSimulator();
 
 extern QList<EEPROMInterface *> eepromInterfaces;
 
