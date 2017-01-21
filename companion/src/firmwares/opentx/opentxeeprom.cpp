@@ -18,12 +18,11 @@
  * GNU General Public License for more details.
  */
 
-#include <stdlib.h>
-#include <algorithm>
 #include "helpers.h"
 #include "opentxeeprom.h"
-#include <QObject>
 #include "customdebug.h"
+#include <stdlib.h>
+#include <algorithm>
 
 #define IS_DBLEEPROM(board, version)          ((IS_2560(board) || board==BOARD_M128) && version >= 213)
 // Macro used for Gruvin9x board and M128 board between versions 213 and 214 (when there were stack overflows!)
@@ -35,13 +34,14 @@
 #define MAX_SLIDERS(board)                    (IS_HORUS(board) ? 4 : (board == BOARD_TARANIS_X7 ? 0 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 4 : 2) : 0)))
 #define MAX_MOUSE_ANALOGS(board)              (IS_HORUS(board) ? 2 : 0)
 #define MAX_SWITCHES(board, version)          (IS_HORUS(board) ? 8 : (board == BOARD_TARANIS_X7 ? 6 : (IS_TARANIS(board) ? (IS_TARANIS_X9E(board) ? 18 : 8) : 7)))
-#define MAX_SWITCHES_POSITION(board, version) (IS_HORUS(board) ? 24 : (board == BOARD_TARANIS_X7 ? 6*3 : (IS_TARANIS_X9E(board) ? 18*3 : (IS_TARANIS(board) ? 8*3 : 9))))
+#define MAX_SWITCHES_POSITION(board, version) (IS_TARANIS_X7(board) ? 6*3 : (IS_TARANIS_X9E(board) ? 18*3 : (IS_HORUS_OR_TARANIS(board) ? 8*3 : 9)))
 #define MAX_ROTARY_ENCODERS(board)            (IS_2560(board) ? 2 : (IS_SKY9X(board) ? 1 : 0))
 #define MAX_FLIGHT_MODES(board, version)      (IS_ARM(board) ? 9 :  (IS_DBLRAM(board, version) ? 6 :  5))
 #define MAX_TIMERS(board, version)            ((IS_ARM(board) && version >= 217) ? 3 : 2)
 #define MAX_MIXERS(board, version)            (IS_ARM(board) ? 64 : 32)
 #define MAX_CHANNELS(board, version)          (IS_ARM(board) ? 32 : 16)
-#define MAX_EXPOS(board, version)             (IS_ARM(board) ? ((IS_TARANIS(board) && version >= 216) ? 64 : 32) : (IS_DBLRAM(board, version) ? 16 : 14))
+#define MAX_TRIMS(board)                      (IS_HORUS(board) ? 6 : 4)
+#define MAX_EXPOS(board, version)             (IS_ARM(board) ? ((IS_HORUS_OR_TARANIS(board) && version >= 216) ? 64 : 32) : (IS_DBLRAM(board, version) ? 16 : 14))
 #define MAX_LOGICAL_SWITCHES(board, version)  (IS_ARM(board) ? (version >= 218 ? 64 : 32) : ((IS_DBLEEPROM(board, version) && version<217) ? 15 : 12))
 #define MAX_CUSTOM_FUNCTIONS(board, version)  (IS_ARM(board) ? (version >= 216 ? 64 : 32) : (IS_DBLEEPROM(board, version) ? 24 : 16))
 #define MAX_CURVES(board, version)            (IS_ARM(board) ? ((HAS_LARGE_LCD(board) && version >= 216) ? 32 : 16) : 8)
@@ -58,7 +58,7 @@
 inline int switchIndex(int i, BoardEnum board, unsigned int version)
 {
   bool afterrelease21March2013 = IS_AFTER_RELEASE_21_MARCH_2013(board, version);
-  if (!IS_TARANIS(board) && afterrelease21March2013)
+  if (!IS_HORUS_OR_TARANIS(board) && afterrelease21March2013)
     return (i<=3 ? i+3 : (i<=6 ? i-3 : i));
   else
     return i;
@@ -102,7 +102,7 @@ class SwitchesConversionTable: public ConversionTable {
         val++;
       }
 
-      if (IS_TARANIS(board) && version >= 216) {
+      if (IS_HORUS_OR_TARANIS(board) && version >= 216) {
         for (int i=1; i<=MAX_POTS(board, version)*6; i++) {
           addConversion(RawSwitch(SWITCH_TYPE_MULTIPOS_POT, -i), -val+offset);
           addConversion(RawSwitch(SWITCH_TYPE_MULTIPOS_POT, i), val++);
@@ -110,7 +110,7 @@ class SwitchesConversionTable: public ConversionTable {
       }
 
       if (version >= 216) {
-        for (int i=1; i<=8; i++) {
+        for (int i=1; i<=2*MAX_TRIMS(board); i++) {
           addConversion(RawSwitch(SWITCH_TYPE_TRIM, -i), -val+offset);
           addConversion(RawSwitch(SWITCH_TYPE_TRIM, i), val++);
         }
@@ -245,7 +245,7 @@ class SourcesConversionTable: public ConversionTable {
         }
       }
 
-      for (int i=0; i<CPN_MAX_STICKS+MAX_POTS(board, version)+MAX_SLIDERS(board); i++) {
+      for (int i=0; i<CPN_MAX_STICKS+MAX_POTS(board, version)+MAX_SLIDERS(board)+MAX_MOUSE_ANALOGS(board); i++) {
         addConversion(RawSource(SOURCE_TYPE_STICK, i), val++);
       }
 
@@ -267,7 +267,7 @@ class SourcesConversionTable: public ConversionTable {
       }
 
       if (afterrelease21March2013) {
-        for (int i=0; i<CPN_MAX_STICKS; i++)
+        for (int i=0; i<MAX_TRIMS(board); i++)
           addConversion(RawSource(SOURCE_TYPE_TRIM, i), val++);
       }
 
@@ -871,7 +871,7 @@ class FlightModeField: public TransformedField {
     virtual void beforeExport()
     {
       for (int i=0; i<CPN_MAX_STICKS+MAX_AUX_TRIMS(board); i++) {
-        if (IS_TARANIS(board) && version >= 216) {
+        if (IS_HORUS_OR_TARANIS(board) && version >= 216) {
           if (phase.trimMode[i] < 0)
             trimMode[i] = TRIM_MODE_NONE;
           else
@@ -899,7 +899,7 @@ class FlightModeField: public TransformedField {
     virtual void afterImport()
     {
       for (int i=0; i<CPN_MAX_STICKS+MAX_AUX_TRIMS(board); i++) {
-        if (IS_TARANIS(board) && version >= 216) {
+        if (IS_HORUS_OR_TARANIS(board) && version >= 216) {
           if (trimMode[i] == TRIM_MODE_NONE) {
             phase.trimMode[i] = -1;
           }
@@ -2935,6 +2935,7 @@ class SensorField: public TransformedField {
       TransformedField(internalField),
       internalField("Sensor"),
       sensor(sensor),
+      version(version),
       _param(0)
     {
       internalField.Append(new UnsignedField<16>(_id, "id/persistentValue"));
@@ -2997,12 +2998,21 @@ class SensorField: public TransformedField {
         else if (sensor.formula == SensorData::TELEM_FORMULA_CONSUMPTION || sensor.formula == SensorData::TELEM_FORMULA_TOTALIZE)
           sensor.amps = _sources[0];
       }
+      
+      if (version < 218) {
+        if (sensor.unit > SensorData::UNIT_WATTS)
+          sensor.unit++;
+        if (sensor.unit > SensorData::UNIT_DEGREE)
+          sensor.unit++;
+      }
+        
       eepromImportDebug() << QString("imported %1").arg(internalField.getName());
     }
 
   protected:
     StructField internalField;
     SensorData & sensor;
+    unsigned int version;
     unsigned int _id;
     unsigned int _subid;
     unsigned int _instance;
@@ -3406,22 +3416,36 @@ void OpenTxModelData::beforeExport()
   // qDebug() << QString("before export model") << modelData.name;
 
   for (int module=0; module<3; module++) {
-    if (modelData.moduleData[module].protocol >= PULSES_PXX_XJT_X16 && modelData.moduleData[module].protocol <= PULSES_PXX_XJT_LR12)
+    if (modelData.moduleData[module].protocol >= PULSES_PXX_XJT_X16 && modelData.moduleData[module].protocol <= PULSES_PXX_XJT_LR12) {
       subprotocols[module] = modelData.moduleData[module].protocol - PULSES_PXX_XJT_X16;
-    else if (modelData.moduleData[module].protocol >= PULSES_LP45 && modelData.moduleData[module].protocol <= PULSES_DSMX)
+    }
+    else if (modelData.moduleData[module].protocol >= PULSES_LP45 && modelData.moduleData[module].protocol <= PULSES_DSMX) {
       subprotocols[module] = modelData.moduleData[module].protocol - PULSES_LP45;
+    }
     else if (modelData.moduleData[module].protocol == PULSES_MULTIMODULE) {
       // copy multi settings to ppm settings to get them written to the eeprom
       // (reverse the int => ms logic of the ppm delay) since only ppm is written
-
       subprotocols[module] = modelData.moduleData[module].multi.rfProtocol & (0x1f);
       int multiByte = ((modelData.moduleData[module].multi.rfProtocol >> 4) & 0x03) | (modelData.moduleData[module].multi.customProto << 7);
       modelData.moduleData[module].ppm.delay = 300 + 50 * multiByte;
       modelData.moduleData[module].ppm.frameLength = modelData.moduleData[module].multi.optionValue;
       modelData.moduleData[module].ppm.outputType = modelData.moduleData[module].multi.lowPowerMode;
       modelData.moduleData[module].ppm.pulsePol = modelData.moduleData[module].multi.autoBindMode;
-    } else
-      subprotocols[module] = (module==0 ? -1 : 0);
+    }
+    else {
+      subprotocols[module] = (module == 0 ? -1 : 0);
+    }
+  }
+  
+  if (IS_HORUS(board)) {
+    uint32_t newSwitchWarningStates = 0;
+    for (int i = 0; i < MAX_SWITCHES(board, version); i++) {
+      uint8_t value = (modelData.switchWarningStates >> (2*i)) & 0x03;
+      if (!(modelData.switchWarningEnable & (1 << i))) {
+        newSwitchWarningStates |= (value + 1) << (3*i);
+      }
+    }
+    modelData.switchWarningStates = newSwitchWarningStates;
   }
 }
 
@@ -3444,7 +3468,7 @@ void OpenTxModelData::afterImport()
           break;
         }
       }
-      strncpy(modelData.inputNames[i], GetCurrentFirmware()->getAnalogInputName(i).toLatin1().constData(), sizeof(modelData.inputNames[i])-1);
+      strncpy(modelData.inputNames[i], getCurrentFirmware()->getAnalogInputName(i).toLatin1().constData(), sizeof(modelData.inputNames[i])-1);
     }
   }
 
@@ -3454,11 +3478,11 @@ void OpenTxModelData::afterImport()
         modelData.moduleData[module].protocol += subprotocols[module];
       else
         modelData.moduleData[module].protocol = PULSES_OFF;
-    } else if (modelData.moduleData[module].protocol == PULSES_MULTIMODULE) {
+    }
+    else if (modelData.moduleData[module].protocol == PULSES_MULTIMODULE) {
       // Copy data from ppm struct to multi struct
       unsigned int multiByte = (unsigned  int)((modelData.moduleData[module].ppm.delay - 300) / 50);
       modelData.moduleData[module].multi.rfProtocol = subprotocols[module]  | ((multiByte & 0x3) << 4);
-
       modelData.moduleData[module].multi.customProto = (multiByte & 0x80) == 0x80;
       modelData.moduleData[module].multi.optionValue = modelData.moduleData[module].ppm.frameLength;
       modelData.moduleData[module].multi.lowPowerMode = modelData.moduleData[module].ppm.outputType;
@@ -3468,6 +3492,18 @@ void OpenTxModelData::afterImport()
 
   if (IS_TARANIS(board) && version < 217 && modelData.moduleData[1].protocol != PULSES_OFF) {
     modelData.moduleData[1].modelId = modelData.moduleData[0].modelId;
+  }
+  
+  if (IS_HORUS(board)) {
+    uint32_t newSwitchWarningStates = 0;
+    for (int i = 0; i < MAX_SWITCHES(board, version); i++) {
+      uint8_t value = (modelData.switchWarningStates >> (3*i)) & 0x07;
+      if (value == 0)
+        modelData.switchWarningEnable |= (1 << i);
+      else
+        newSwitchWarningStates |= ((value & 0x03) - 1) << (2*i);
+    }
+    modelData.switchWarningStates = newSwitchWarningStates;
   }
 }
 

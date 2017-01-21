@@ -246,6 +246,8 @@ void generalDefault()
   #endif
   g_eeGeneral.slidersConfig = 0x0f; // 4 sliders
   g_eeGeneral.blOffBright = 20;
+#elif defined(PCBX7)
+  g_eeGeneral.potsConfig = 0x07;    // S1 = pot without detent, S2 = pot with detent
 #elif defined(PCBTARANIS)
   g_eeGeneral.potsConfig = 0x05;    // S1 and S2 = pots with detent
   g_eeGeneral.slidersConfig = 0x03; // LS and RS = sliders with detent
@@ -1785,7 +1787,11 @@ void doMixerCalculations()
 #if defined(PXX) || defined(DSM2)
     static uint8_t countRangecheck = 0;
     for (uint8_t i=0; i<NUM_MODULES; ++i) {
+#if defined(MULTIMODULE)
+      if (moduleFlag[i] != MODULE_NORMAL_MODE || (i == EXTERNAL_MODULE && multiModuleStatus.isBinding())) {
+#else
       if (moduleFlag[i] != MODULE_NORMAL_MODE) {
+#endif
         if (++countRangecheck >= 250) {
           countRangecheck = 0;
           AUDIO_PLAY(AU_SPECIAL_SOUND_CHEEP);

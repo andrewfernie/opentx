@@ -21,6 +21,7 @@
 #include "helpers.h"
 #include "modelprinter.h"
 #include <QPainter>
+#include <QFile>
 
 QString changeColor(const QString & input, const QString & to, const QString & from)
 {
@@ -66,7 +67,7 @@ QString addFont(const QString & input, const QString & color, const QString & si
 
 QString ModelPrinter::printEEpromSize()
 {
-  return tr("%1 bytes").arg(GetEepromInterface()->getSize(model));
+  return tr("%1 bytes").arg(getCurrentEEpromInterface()->getSize(model));
 }
 
 QString ModelPrinter::printChannelName(int idx)
@@ -158,7 +159,8 @@ QString ModelPrinter::printMultiSubType(int rfProtocol, bool custom, int subType
   static const char *fy326_strings[] = {"FY326", "FY319"};
   static const char *hontai_strings[] = {"Standard", "JJRC X1", "X5C1 Clone"};
   static const char *afhds2a_strings[] = {"PWM and IBUS", "PPM and IBUS", "PWM and SBUS", "PPM and SBUS"};
-  static const char *q2x2_strings[] = {"Q242", "Q282"};
+  static const char *q2x2_strings[] = {"Q222", "Q242", "Q282"};
+  static const char *walkera_wk2x01_strings[] = {"WK2801", "WK2401", "W6_5_1", "W6_6_1", "W6_HEL", "W6_HEL_I"};
   
   if (custom)
     return CHECK_IN_ARRAY(custom_subtype_strings, subType);
@@ -200,6 +202,8 @@ QString ModelPrinter::printMultiSubType(int rfProtocol, bool custom, int subType
       return CHECK_IN_ARRAY(afhds2a_strings, subType);
     case MM_RF_PROTO_Q2X2:
       return CHECK_IN_ARRAY(q2x2_strings, subType);
+    case MM_RF_PROTO_WK_2X01:
+      return CHECK_IN_ARRAY(walkera_wk2x01_strings, subType);
     default:
         return "DEFAULT";
   }
