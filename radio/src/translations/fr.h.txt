@@ -77,7 +77,7 @@
 #define TR_SWTYPES             "Rien\0 ""Levier""2-POS\0""3-POS\0"
 
 #define LEN_POTTYPES           TR("\013","\017")
-#define TR_POTTYPES            TR("Rien       ""Pot w. det ""Multipos   ""Pot        ", "Rien\0          ""Pot avec centre""Inter multi-pos""Potentiomètre\0")
+#define TR_POTTYPES            TR("Rien\0      ""Pot av. ctr""Multipos\0  ""Pot\0       ", "Rien\0          ""Pot avec centre""Inter multi-pos""Potentiomètre\0")
 
 #define LEN_SLIDERTYPES        "\006"
 #define TR_SLIDERTYPES         "Rien\0 ""Slider"
@@ -107,7 +107,7 @@
 #define TR_DSM_PROTOCOLS       "LP45""DSM2""DSMX"
 
 #define LEN_MULTI_PROTOCOLS    "\006"
-#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0""Q2x2\0 ""Walk.\0"
+#define TR_MULTI_PROTOCOLS     "FlySky""Hubsan""FrSky\0""Hisky\0""V2x2\0 ""DSM\0  ""Devo\0 ""YD717\0""KN\0   ""SymaX\0""SLT\0  ""CX10\0 ""CG023\0""Bayang""ESky\0 ""MT99XX""MJXQ\0 ""Shenqi""FY326\0""SFHSS\0""J6 PRO""FQ777\0""Assan\0""Hontai""OLRS\0 ""FS 2A\0""Q2x2\0 ""Walk.\0""Q303\0 "
 
 #define TR_MULTI_CUSTOM        "Perso"
 
@@ -118,7 +118,7 @@
 #define TR_SUBTYPE_AFHDS2A     "PWM,IBUS""PPM,IBUS""PWM,SBUS""PPM,SBUS"
 
 #define LEN_SUBTYPE_FRSKY      "\007"
-#define TR_SUBTYPE_FRSKY       "D16\0   ""D8\0    ""D16 8ch""V8\0    "
+#define TR_SUBTYPE_FRSKY       "D16\0   ""D8\0    ""D16 8ch""V8\0    ""LBT(EU)""LBT 8ch"
 
 #define LEN_SUBTYPE_HISKY      "\005"
 #define TR_SUBTYPE_HISKY       "HiSky""HK310"
@@ -158,6 +158,9 @@
 
 #define LEN_SUBTYPE_WK2x01     "\006"
 #define TR_SUBTYPE_WK2x01      "WK2801""WK2401""W6_5_1""W6_6_1""W6_Hel""W6_HeI"
+
+#define LEN_SUBTYPE_Q303       "\006"
+#define TR_SUBTYPE_Q303        "Q303\0 ""CX35\0 ""CX10D\0""CX10WD"
 
 #define LEN_SUBTYPE_V2X2       "\006"
 #define TR_SUBTYPE_V2X2        "V2x2\0 ""JXD506"
@@ -745,7 +748,7 @@
 #define TR_SLOWUP              "Ralenti haut"
 #define TR_MIXER               "MIXEUR"
 #define TR_CV                  "CB"
-#define TR_GV                  "VG"
+#define TR_GV                  TR("G", "VG")
 #define TR_ACHANNEL            "A"
 #define TR_RANGE               INDENT "Plage"
 #define TR_CENTER              INDENT "Centre"
@@ -786,11 +789,11 @@
 #define TR_SLIDERWARNING       TR(IF_CPUARM(INDENT) "Slid. pos.", INDENT "Slider positions")
 #define TR_POTWARNING          TR(IF_CPUARM(INDENT) "Alerte pot", INDENT "Pos. potentios")
 #define TR_TIMEZONE            "Fuseau horaire"
-#define TR_ADJUST_RTC          INDENT "Ajust. heure auto"
+#define TR_ADJUST_RTC          TR("Ajust. RTC", INDENT "Ajust. heure auto")
 #define TR_GPS                 "GPS"
 #define TR_RXCHANNELORD        TR("Ordre voies RX","Ordre des voies préféré")
 #define TR_STICKS              "Manches"
-#define TR_POTS                TR("Potentios", "Potentiomètres")
+#define TR_POTS                "Potentiomètres"
 #define TR_SWITCHES            "Inters"
 #define TR_SWITCHES_DELAY      "Délai inters son"
 #define TR_SLAVE               "Elève"
@@ -1107,9 +1110,9 @@
 #define TR_SCRIPT              "Script"
 #define TR_INPUTS              "Entrées"
 #define TR_OUTPUTS             "Sorties"
-#define TR_EEBACKUP            "\004[ENTER Long]: Sauvegarder l'EEPROM"
-#define TR_FACTORYRESET        "\016[MENU Long]: RAZ d'usine"
-#define TR_CONFIRMRESET        "Effacer TOUS modèles/réglages?"
+#define TR_EEBACKUP            TR("[ENTER Long]:Sauvegarde", "\004[ENTER Long]: Sauvegarder l'EEPROM")
+#define TR_FACTORYRESET        TR("\001[MENU Long]: RAZ d'usine", "\016[MENU Long]: RAZ d'usine")
+#define TR_CONFIRMRESET        TR("Effacer TOUT?","Effacer TOUS modèles/réglages?")
 #define TR_TO_MANY_LUA_SCRIPTS "Trop de scripts lua!"
 
 #if defined(TELEMETRY_MAVLINK)

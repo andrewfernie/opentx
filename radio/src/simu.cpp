@@ -30,6 +30,7 @@
 
 #if defined(SIMU_AUDIO)
   #include <SDL.h>
+  #undef main
 #endif
 
 #if LCD_W > 212
@@ -333,7 +334,7 @@ void Open9xSim::updateKeysAndSwitches(bool start)
   SWITCH_KEY(E, 4, 3);
   SWITCH_KEY(F, 5, 2);
   SWITCH_KEY(G, 6, 3);
-SWITCH_KEY(H, 7, 2);
+  SWITCH_KEY(H, 7, 2);
 #else
   SWITCH_KEY(1, 0, 2);
   SWITCH_KEY(2, 1, 2);
@@ -366,7 +367,7 @@ long Open9xSim::onTimeout(FXObject*, FXSelector, void*)
       if (!rotencAction) ROTARY_ENCODER_NAVIGATION_VALUE += ROTARY_ENCODER_GRANULARITY;
       rotencAction = true;
     }
-    else if (getApp()->getKeyState(KEY_W)) {    
+    else if (getApp()->getKeyState(KEY_W)) {
       if (!rotencAction) ROTARY_ENCODER_NAVIGATION_VALUE -= ROTARY_ENCODER_GRANULARITY;
       rotencAction = true;
     }
@@ -399,10 +400,15 @@ long Open9xSim::onTimeout(FXObject*, FXSelector, void*)
     SWITCH_KEY(B, 1, 3);
     SWITCH_KEY(C, 2, 3);
     SWITCH_KEY(D, 3, 3);
+#if defined(PCBX7)
+    SWITCH_KEY(F, 4, 2);
+    SWITCH_KEY(H, 5, 2);
+#else
     SWITCH_KEY(E, 4, 3);
     SWITCH_KEY(F, 5, 2);
     SWITCH_KEY(G, 6, 3);
     SWITCH_KEY(H, 7, 2);
+#endif
 #else
     SWITCH_KEY(1, 0, 2);
     SWITCH_KEY(2, 1, 2);

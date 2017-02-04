@@ -51,14 +51,17 @@ class MdiChild : public QWidget
     QString userFriendlyCurrentFile() const;
     QString currentFile() const { return curFile; }
     void viableModelSelected(bool viable);
-    int getCurrentRow() const;
+    int getCurrentModel() const;
+    int getCurrentCategory() const;
     void refresh(bool expand=false);
     void keyPressEvent(QKeyEvent * event);
-  
+
   signals:
     void copyAvailable(bool val);
 
   protected:
+    void convertStorage(Board::Type from, Board::Type to);
+    void forceNewFilename(const QString & suffix, const QString & ext);
     void closeEvent(QCloseEvent * event);
 
   protected slots:
@@ -67,22 +70,24 @@ class MdiChild : public QWidget
     void on_radioSettings_clicked();
     void setDefault();
     void onFirmwareChanged();
-  
+
   public slots:
     void showModelsListContextMenu(const QPoint & pos);
     void checkAndInitModel(int row);
     void generalEdit();
     void categoryAdd();
+    void categoryRename();
     void categoryDelete();
     void modelAdd();
     void modelEdit();
+    void modelDuplicate();
     void wizardEdit();
     void openModelEditWindow();
     bool loadBackup();
     void confirmDelete();
     void deleteSelectedModels();
     void onDataChanged(const QModelIndex & index);
-    
+
     void cut();
     void copy();
     void paste();
@@ -97,13 +102,13 @@ class MdiChild : public QWidget
     bool maybeSave();
     void setCurrentFile(const QString & fileName);
     void doCopy(QByteArray * gmData);
-    void doPaste(QByteArray * gmData, int index);
+    void doPaste(QByteArray * gmData, QModelIndex row);
     void initModelsList();
-    
+
     MainWindow * parent;
     Ui::MdiChild * ui;
     TreeModel * modelsListModel;
-    
+
     QString curFile;
 
     Firmware * firmware;

@@ -24,6 +24,7 @@
 #include <string>
 
 #if !defined _MSC_VER || defined __GNUC__
+  #include <chrono>
   #include <sys/time.h>
 #endif
 
@@ -95,6 +96,16 @@ uint16_t getTmr2MHz()
 #endif
 }
 
+U64 CoGetOSTime(void)
+{
+#if defined(_MSC_VER)
+  return GetTickCount()/2;
+#else
+  auto now = std::chrono::steady_clock::now();
+  return (U64) std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() / 2;
+#endif
+}
+
 void simuInit()
 {
 #if defined(STM32)
@@ -117,7 +128,10 @@ void simuInit()
       break;
 
 #if defined(CPUARM)
-  #if defined(PCBTARANIS) && !defined(PCBX9E)
+  #if defined(PCBHORUS)
+    #define SWITCH_CASE NEG_CASE
+    #define SWITCH_CASE_NEGATIVE POS_CASE
+  #elif defined(PCBTARANIS) && !defined(PCBX9E)
     #define SWITCH_CASE NEG_CASE
   #else
     #define SWITCH_CASE POS_CASE
@@ -225,14 +239,19 @@ void simuSetSwitch(uint8_t swtch, int8_t state)
     SWITCH_3_CASE(1,  SWITCHES_GPIO_REG_B_L, SWITCHES_GPIO_REG_B_H, SWITCHES_GPIO_PIN_B_L, SWITCHES_GPIO_PIN_B_H)
     SWITCH_3_CASE(2,  SWITCHES_GPIO_REG_C_L, SWITCHES_GPIO_REG_C_H, SWITCHES_GPIO_PIN_C_L, SWITCHES_GPIO_PIN_C_H)
     SWITCH_3_CASE(3,  SWITCHES_GPIO_REG_D_L, SWITCHES_GPIO_REG_D_H, SWITCHES_GPIO_PIN_D_L, SWITCHES_GPIO_PIN_D_H)
-#if !defined(PCBX7)
+#if defined(PCBX7)
+    SWITCH_CASE(4, SWITCHES_GPIO_REG_F, SWITCHES_GPIO_PIN_F)
+    SWITCH_CASE(5, SWITCHES_GPIO_REG_H, SWITCHES_GPIO_PIN_H)
+#else
     SWITCH_3_CASE(4,  SWITCHES_GPIO_REG_E_L, SWITCHES_GPIO_REG_E_H, SWITCHES_GPIO_PIN_E_L, SWITCHES_GPIO_PIN_E_H)
-#endif
+#if defined(PCBHORUS)
+    SWITCH_CASE_NEGATIVE(5, SWITCHES_GPIO_REG_F, SWITCHES_GPIO_PIN_F)
+#else
     SWITCH_CASE(5, SWITCHES_GPIO_REG_F, SWITCHES_GPIO_PIN_F)
-#if !defined(PCBX7)
-    SWITCH_3_CASE(6,  SWITCHES_GPIO_REG_G_L, SWITCHES_GPIO_REG_G_H, SWITCHES_GPIO_PIN_G_L, SWITCHES_GPIO_PIN_G_H)
 #endif
+    SWITCH_3_CASE(6,  SWITCHES_GPIO_REG_G_L, SWITCHES_GPIO_REG_G_H, SWITCHES_GPIO_PIN_G_L, SWITCHES_GPIO_PIN_G_H)
     SWITCH_CASE(7, SWITCHES_GPIO_REG_H, SWITCHES_GPIO_PIN_H)
+#endif
 #if defined(PCBX9E)
     SWITCH_3_CASE(8,  SWITCHES_GPIO_REG_I_L, SWITCHES_GPIO_REG_I_H, SWITCHES_GPIO_PIN_I_L, SWITCHES_GPIO_PIN_I_H)
     SWITCH_3_CASE(9,  SWITCHES_GPIO_REG_J_L, SWITCHES_GPIO_REG_J_H, SWITCHES_GPIO_PIN_J_L, SWITCHES_GPIO_PIN_J_H)

@@ -202,7 +202,7 @@ void GVarGroup::valuesChanged()
       weight = round(dsb->value()/step);
     if (panel)
       emit panel->modified();
-    
+
   }
 }
 
@@ -374,9 +374,9 @@ void populateGvarUseCB(QComboBox *b, unsigned int phase)
   }
 }
 
-void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettings & generalSettings, SwitchContext context)
+void populateSwitchCB(QComboBox * b, const RawSwitch & value, const GeneralSettings & generalSettings, SwitchContext context)
 {
-  BoardEnum board = getCurrentBoard();
+  Board::Type board = getCurrentBoard();
   RawSwitch item;
 
   b->clear();
@@ -413,7 +413,7 @@ void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettin
   }
 
   for (int i=getCurrentFirmware()->getCapability(MultiposPots)-1; i>=0; i--) {
-    if (generalSettings.potConfig[i] == GeneralSettings::POT_MULTIPOS_SWITCH) {
+    if (generalSettings.potConfig[i] == Board::POT_MULTIPOS_SWITCH) {
       for (int j=-getCurrentFirmware()->getCapability(MultiposPotsPositions); j<0; j++) {
         item = RawSwitch(SWITCH_TYPE_MULTIPOS_POT, -i*getCurrentFirmware()->getCapability(MultiposPotsPositions)+j);
         b->addItem(item.toString(), item.toValue());
@@ -454,7 +454,7 @@ void populateSwitchCB(QComboBox *b, const RawSwitch & value, const GeneralSettin
   }
 
   for (int i=0; i<getCurrentFirmware()->getCapability(MultiposPots); i++) {
-    if (generalSettings.potConfig[i] == GeneralSettings::POT_MULTIPOS_SWITCH) {
+    if (generalSettings.potConfig[i] == Board::POT_MULTIPOS_SWITCH) {
       for (int j=1; j<=getCurrentFirmware()->getCapability(MultiposPotsPositions); j++) {
         item = RawSwitch(SWITCH_TYPE_MULTIPOS_POT, i*getCurrentFirmware()->getCapability(MultiposPotsPositions)+j);
         b->addItem(item.toString(), item.toValue());
@@ -546,7 +546,7 @@ void populateGVCB(QComboBox & b, int value, const ModelData & model)
 
 void populateSourceCB(QComboBox *b, const RawSource & source, const GeneralSettings generalSettings, const ModelData * model, unsigned int flags)
 {
-  BoardEnum board = getCurrentBoard();
+  Board::Type board = getCurrentBoard();
   RawSource item;
 
   b->clear();
@@ -813,83 +813,30 @@ CompanionIcon::CompanionIcon(const QString &baseimage)
 
 void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx)
 {
-  QString settingsPath;
-  Firmware * firmware = getCurrentFirmware();
   SimulatorInterface * simulator = getCurrentSimulator();
   if (simulator) {
-#if defined(WIN32) && defined(WIN_USE_CONSOLE_STDIO)
-    AllocConsole();
-    SetConsoleTitle("Companion Console");
-    freopen("conin$", "r", stdin);
-    freopen("conout$", "w", stdout);
-    freopen("conout$", "w", stderr);
-#endif
     RadioData * simuData = new RadioData(radioData);
     unsigned int flags = 0;
+
     if (modelIdx >= 0) {
       flags |= SIMULATOR_FLAGS_NOTX;
       simuData->setCurrentModel(modelIdx);
     }
-    if (radioData.generalSettings.stickMode & 1) {
-      flags |= SIMULATOR_FLAGS_STICK_MODE_LEFT;
-    }
-    BoardEnum board = getCurrentBoard();
-    SimulatorDialog * dialog;
 
-    if (board == BOARD_HORUS) {
-      dialog = new SimulatorDialogHorus(parent, simulator, flags);
-      QTemporaryDir tmpDir(QDir::tempPath() + "/otx-XXXXXX");
-      settingsPath = tmpDir.path();
-      tmpDir.setAutoRemove(false);
-      SdcardFormat sdcard(settingsPath);
-      sdcard.write(*simuData);
-      qDebug() << "Starting Horus simulation with SD path" << g.profile[g.id()].sdPath() << "and models/settings path" << settingsPath;
-      simulator->setSdPath(g.profile[g.id()].sdPath(), settingsPath);
-      dialog->start(NULL);
+    SimulatorDialog * dialog = new SimulatorDialog(parent, simulator, flags);
+    if (IS_HORUS(getCurrentBoard()) && !dialog->useTempDataPath(true)) {
+      QMessageBox::critical(NULL, QObject::tr("Data Load Error"), QObject::tr("Error: Could not create temporary directory in '%1'").arg(QDir::tempPath()));
+      delete dialog;
+      delete simuData;
+      return;
     }
-    else if (board == BOARD_FLAMENCO) {
-      dialog = new SimulatorDialogFlamenco(parent, simulator, flags);
-      QByteArray eeprom(getEEpromSize(board), 0);
-      firmware->getEEpromInterface()->save((uint8_t *)eeprom.data(), *simuData);
-      simulator->setSdPath(g.profile[g.id()].sdPath(), "");
-      dialog->start(eeprom);
-    }
-    else if (board == BOARD_TARANIS_X9D || board == BOARD_TARANIS_X9DP || board == BOARD_TARANIS_X9E) {
-      for (int i=0; i<getCurrentFirmware()->getCapability(Pots); i++) {
-        if (radioData.generalSettings.isPotAvailable(i)) {
-          flags |= (SIMULATOR_FLAGS_S1 << i);
-          if (radioData.generalSettings.potConfig[1] == GeneralSettings::POT_MULTIPOS_SWITCH ) {
-            flags |= (SIMULATOR_FLAGS_S1_MULTI << i);
-          }
-        }
-      }
-      dialog = new SimulatorDialogTaranis(parent, simulator, flags);
-      QByteArray eeprom(getEEpromSize(board), 0);
-      firmware->getEEpromInterface()->save((uint8_t *)eeprom.data(), *simuData);
-      qDebug() << "Starting Taranis simulation with SD path" << g.profile[g.id()].sdPath();
-      simulator->setSdPath(g.profile[g.id()].sdPath(), "");
-      dialog->start(eeprom);
-    }
-    else {
-      dialog = new SimulatorDialog9X(parent, simulator, flags);
-      QByteArray eeprom(getEEpromSize(board), 0);
-      firmware->getEEpromInterface()->save((uint8_t *)eeprom.data(), *simuData, 0, firmware->getCapability(SimulatorVariant));
-      simulator->setSdPath(g.profile[g.id()].sdPath(), "");  // does 9X need SD card path? I think not.
-      dialog->start(eeprom);
-    }
-
+    dialog->setRadioData(simuData);
+    qDebug() << __FILE__ << __LINE__ << "Starting" << getCurrentFirmware()->getName() << "simulation with SD path" << dialog->getSdPath() << "and models/settings path" << dialog->getDataPath();
+    dialog->start();
     dialog->exec();
-    dialog->deleteLater();
-    if (!settingsPath.isEmpty()) {
-      // TODO either delete tmp directory and its contents OR use it to get back data from the simulation
-      qDebug() << "Simulation finished, deleting temporary settings directory" << settingsPath;
-      QDir tmp(settingsPath);
-      tmp.removeRecursively();
-    }
-    delete simuData;
-#if defined(WIN32) && defined(WIN_USE_CONSOLE_STDIO)
-    FreeConsole();
-#endif
+    delete dialog;
+    // TODO Horus tmp directory is deleted on simulator close OR we could use it to get back data from the simulation
+    delete simuData;  // TODO same with simuData, could read it back and update the file data
   }
   else {
     QMessageBox::warning(NULL,

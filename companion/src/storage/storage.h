@@ -44,7 +44,8 @@ class StorageFormat
   public:
     StorageFormat(const QString & filename, uint8_t version=0):
       filename(filename),
-      version(version)
+      version(version),
+      board(Board::BOARD_UNKNOWN)
     {
     }
     
@@ -60,6 +61,22 @@ class StorageFormat
     }
 
     virtual QString name() = 0;
+
+    virtual Board::Type getBoard()
+    {
+      return board;
+    }
+
+    virtual bool isBoardCompatible(Board::Type board)
+    {
+      if (this->board == board)
+        return true;
+
+      if (IS_TARANIS_X9D(this->board) && IS_TARANIS_X9D(board))
+        return true;
+
+      return false;
+    }
 
   protected:
     void setError(const QString & error)
@@ -78,6 +95,7 @@ class StorageFormat
     uint8_t version;
     QString _error;
     QString _warning;
+    Board::Type board;
 };
 
 class StorageFactory

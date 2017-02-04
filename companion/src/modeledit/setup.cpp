@@ -31,7 +31,7 @@ TimerPanel::TimerPanel(QWidget *parent, ModelData & model, TimerData & timer, Ge
   timer(timer),
   ui(new Ui::Timer)
 {
-  BoardEnum board = firmware->getBoard();
+  Board::Type board = firmware->getBoard();
 
   ui->setupUi(this);
 
@@ -161,6 +161,10 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
   QString label;
   if (moduleIdx < 0) {
     label = tr("Trainer Port");
+    if (IS_HORUS(firmware->getBoard())) {
+      ui->trainerMode->setItemData(TRAINER_MODE_MASTER_CPPM_EXTERNAL_MODULE, 0, Qt::UserRole - 1);
+      ui->trainerMode->setItemData(TRAINER_MODE_MASTER_SBUS_EXTERNAL_MODULE, 0, Qt::UserRole - 1);
+    }
     if (generalSettings.hw_uartMode != UART_MODE_SBUS_TRAINER) {
       ui->trainerMode->setItemData(TRAINER_MODE_MASTER_BATTERY_COMPARTMENT, 0, Qt::UserRole - 1);
     }
@@ -192,15 +196,6 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
     }
   }
   ui->label_module->setText(label);
-
-  // Antena selection for Horus
-  if (IS_HORUS(firmware->getBoard()) && moduleIdx == 0) {
-    ui->antennaMode->setCurrentIndex(module.ppm.pulsePol);
-  }
-  else {
-    ui->label_antenna->hide();
-    ui->antennaMode->hide();
-  }
 
   // The protocols available on this board
   for (int i=0; i<PULSES_PROTOCOL_LAST; i++) {
@@ -260,6 +255,7 @@ ModulePanel::~ModulePanel()
 #define MASK_FAILSAFES      32
 #define MASK_OPEN_DRAIN     64
 #define MASK_MULTIMODULE    128
+#define MASK_ANTENNA        256
 
 void ModulePanel::update()
 {
@@ -277,6 +273,7 @@ void ModulePanel::update()
         mask |= MASK_CHANNELS_RANGE | MASK_CHANNELS_COUNT;
         if (protocol==PULSES_PXX_XJT_X16) mask |= MASK_FAILSAFES | MASK_RX_NUMBER;
         if (protocol==PULSES_PXX_XJT_LR12) mask |= MASK_RX_NUMBER;
+        if (IS_HORUS(firmware->getBoard()) && moduleIdx==0) mask |= MASK_ANTENNA;
         break;
       case PULSES_LP45:
       case PULSES_DSM2:
@@ -299,6 +296,7 @@ void ModulePanel::update()
         mask |= MASK_CHANNELS_RANGE | MASK_RX_NUMBER | MASK_MULTIMODULE;
         break;
       case PULSES_OFF:
+        break;
       default:
         break;
     }
@@ -342,6 +340,11 @@ void ModulePanel::update()
   ui->ppmFrameLength->setMinimum(module.channelsCount*(model->extendedLimits ? 2.250 : 2)+3.5);
   ui->ppmFrameLength->setMaximum(firmware->getCapability(PPMFrameLength));
   ui->ppmFrameLength->setValue(22.5+((double)module.ppm.frameLength)*0.5);
+
+  // Antenna slection on Horus
+  ui->label_antenna->setVisible(mask & MASK_ANTENNA);
+  ui->antennaMode->setVisible(mask & MASK_ANTENNA);
+  ui->antennaMode->setCurrentIndex(module.ppm.pulsePol);
 
   // Multi settings fields
   ui->label_multiProtocol->setVisible(mask & MASK_MULTIMODULE);
@@ -569,7 +572,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   ModelPanel(parent, model, generalSettings, firmware),
   ui(new Ui::Setup)
 {
-  BoardEnum board = firmware->getBoard();
+  Board::Type board = firmware->getBoard();
 
   lock = true;
 
@@ -589,12 +592,24 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     QDir qd(path);
     if (qd.exists()) {
       QStringList filters;
-      filters << "*.bmp" << "*.bmp";
-      foreach ( QString file, qd.entryList(filters, QDir::Files) ) {
-        QFileInfo fi(file);
-        QString temp = fi.completeBaseName();
-        if (!items.contains(temp) && temp.length() <= 10+4) {
-          items.append(temp);
+      if(IS_HORUS(board)) {
+        filters << "*.bmp" << "*.jpg" << "*.png";
+        foreach ( QString file, qd.entryList(filters, QDir::Files) ) {
+          QFileInfo fi(file);
+          QString temp = fi.fileName();
+          if (!items.contains(temp) && temp.length() <= 6+4) {
+            items.append(temp);
+          }
+        }
+      }
+      else {
+        filters << "*.bmp";
+        foreach (QString file, qd.entryList(filters, QDir::Files)) {
+          QFileInfo fi(file);
+          QString temp = fi.completeBaseName();
+          if (!items.contains(temp) && temp.length() <= 10+4) {
+            items.append(temp);
+          }
         }
       }
     }
@@ -602,22 +617,30 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
       items.append(model.bitmap);
     }
     items.sort();
-    foreach ( QString file, items ) {
+    foreach (QString file, items) {
       ui->image->addItem(file);
       if (file == model.bitmap) {
         ui->image->setCurrentIndex(ui->image->count()-1);
         QString fileName = path;
         fileName.append(model.bitmap);
-        fileName.append(".bmp");
+        if (!IS_HORUS(board))
+          fileName.append(".bmp");
         QImage image(fileName);
-        if (image.isNull()) {
+        if (image.isNull() && !IS_HORUS(board)) {
           fileName = path;
           fileName.append(model.bitmap);
           fileName.append(".BMP");
           image.load(fileName);
         }
         if (!image.isNull()) {
-          ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled( 64,32)));;
+          if (IS_HORUS(board)) {
+            ui->imagePreview->setFixedSize(QSize(192, 114));
+            ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(192, 114)));
+          }
+          else {
+            ui->imagePreview->setFixedSize(QSize(64, 32));
+            ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(64, 32)));
+          }
         }
       }
     }
@@ -689,11 +712,11 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
 
   // Startup switches warnings
   for (int i=0; i<firmware->getCapability(Switches); i++) {
-    Firmware::Switch sw = firmware->getSwitch(i);
+    Board::SwitchInfo switchInfo = getSwitchInfo(board, i);
     if (IS_HORUS_OR_TARANIS(board)) {
-      sw.type = GeneralSettings::SwitchConfig(generalSettings.switchConfig[i]);
+      switchInfo.config = Board::SwitchType(generalSettings.switchConfig[i]);
     }
-    if (sw.type == GeneralSettings::SWITCH_NONE || sw.type == GeneralSettings::SWITCH_TOGGLE) {
+    if (switchInfo.config == Board::SWITCH_NOT_AVAILABLE || switchInfo.config == Board::SWITCH_TOGGLE) {
       continue;
     }
     QLabel * label = new QLabel(this);
@@ -709,8 +732,8 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     slider->setSingleStep(1);
     slider->setPageStep(1);
     slider->setTickInterval(1);
-    label->setText(sw.name);
-    slider->setMaximum(sw.type == GeneralSettings::SWITCH_3POS ? 2 : 1);
+    label->setText(switchInfo.name);
+    slider->setMaximum(switchInfo.config == Board::SWITCH_3POS ? 2 : 1);
     cb->setProperty("index", i);
     ui->switchesStartupLayout->addWidget(label, 0, i+1);
     ui->switchesStartupLayout->setAlignment(label, Qt::AlignCenter);
@@ -835,6 +858,7 @@ void SetupPanel::on_name_editingFinished()
 void SetupPanel::on_image_currentIndexChanged(int index)
 {
   if (!lock) {
+    Board::Type board = firmware->getBoard();
     strncpy(model->bitmap, ui->image->currentText().toLatin1(), 10);
     QString path = g.profile[g.id()].sdPath();
     path.append("/IMAGES/");
@@ -842,16 +866,24 @@ void SetupPanel::on_image_currentIndexChanged(int index)
     if (qd.exists()) {
       QString fileName=path;
       fileName.append(model->bitmap);
-      fileName.append(".bmp");
+      if (!IS_HORUS(board))
+        fileName.append(".bmp");
       QImage image(fileName);
-      if (image.isNull()) {
+      if (image.isNull() && !IS_HORUS(board)) {
         fileName=path;
         fileName.append(model->bitmap);
         fileName.append(".BMP");
         image.load(fileName);
       }
       if (!image.isNull()) {
-        ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(64, 32)));;
+        if (IS_HORUS(board)) {
+          ui->imagePreview->setFixedSize(QSize(192, 114));
+          ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(192, 114)));
+        }
+        else {
+          ui->imagePreview->setFixedSize(QSize(64, 32));
+          ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(64, 32)));
+        }
       }
       else {
         ui->imagePreview->clear();
@@ -931,7 +963,7 @@ void SetupPanel::updateStartupSwitches()
     bool enabled = !(model->switchWarningEnable & (1 << index));
     if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       value = (switchStates >> 2*index) & 0x03;
-      if (generalSettings.switchConfig[index] != GeneralSettings::SWITCH_3POS && value == 2) {
+      if (generalSettings.switchConfig[index] != Board::SWITCH_3POS && value == 2) {
         value = 1;
       }
     }
@@ -970,7 +1002,7 @@ void SetupPanel::startupSwitchEdited(int value)
 
     model->switchWarningStates &= ~mask;
 
-    if (IS_HORUS_OR_TARANIS(firmware->getBoard()) && generalSettings.switchConfig[index] != GeneralSettings::SWITCH_3POS) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard()) && generalSettings.switchConfig[index] != Board::SWITCH_3POS) {
       if (value == 1) {
         value = 2;
       }
