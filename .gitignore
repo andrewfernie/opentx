@@ -11,6 +11,7 @@ radio/src/bootloader/bootloader_ramBoot*
 radio/src/lua/lua_fields_*.txt
 radio/src/lua/lua_exports_*.txt
 build*/
+cmake-build-*/
 .vscode/
 /companion-build/
 CMakeFiles/

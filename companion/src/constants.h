@@ -21,22 +21,6 @@
 #ifndef _CONSTANTS_H_
 #define _CONSTANTS_H_
 
-enum BoardEnum {
-  BOARD_STOCK,
-  BOARD_M128,
-  BOARD_MEGA2560,
-  BOARD_GRUVIN9X,
-  BOARD_SKY9X,
-  BOARD_9XRPRO,
-  BOARD_AR9X,
-  BOARD_TARANIS_X7,
-  BOARD_TARANIS_X9D,
-  BOARD_TARANIS_X9DP,
-  BOARD_TARANIS_X9E,
-  BOARD_FLAMENCO,
-  BOARD_HORUS
-};
-
 #define CPN_MAX_MODELS                 60
 #define CPN_MAX_TIMERS                 3
 #define CPN_MAX_FLIGHT_MODES           9
@@ -71,9 +55,9 @@ enum BoardEnum {
 #define EEPE_EEPROM_FILE_HEADER       "EEPE EEPROM FILE"
 #define EEPE_MODEL_FILE_HEADER        "EEPE MODEL FILE"
 
-const char * const ARROW_LEFT = "\xE2\x86\x90";
-const char * const ARROW_UP = "\xE2\x86\x91";
+const char * const ARROW_LEFT  = "\xE2\x86\x90";
+const char * const ARROW_UP    = "\xE2\x86\x91";
 const char * const ARROW_RIGHT = "\xE2\x86\x92";
-const char * const ARROW_DOWN = "\xE2\x86\x93";
+const char * const ARROW_DOWN  = "\xE2\x86\x93";
 
 #endif // _CONSTANTS_H_

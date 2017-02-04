@@ -71,9 +71,14 @@ endif()
 
 if(WIN32)
   include_directories(SYSTEM ${WIN_INCLUDE_DIRS})
+  if(NOT WIN_USE_CONSOLE)
+    set(WIN_EXECUTABLE_TYPE WIN32)  # GUI (WinMain) app
+  endif()
   if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /LD /MP")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS,5.01")
+    if(NOT WIN_USE_CONSOLE)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS,5.01")  # is this even needed?
+    endif()
   elseif(MINGW)
     # struct packing breaks on MinGW w/out -mno-ms-bitfields: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52991 & http://stackoverflow.com/questions/24015852/struct-packing-and-alignment-with-mingw
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-ms-bitfields")
@@ -112,6 +117,7 @@ add_subdirectory(thirdparty/qxtcommandoptions)
 ############# Common lib ###############
 
 set(common_SRCS
+  boards.cpp
   eeprominterface.cpp
   radiodata.cpp
   firmwares/er9x/er9xeeprom.cpp
@@ -193,6 +199,7 @@ set(companion_MOC_HDRS
   wizarddialog.h
   modelprinter.h
   multimodelprinter.h
+  modelslist.h
   )
 
 set(companion_UIS
@@ -245,7 +252,7 @@ add_custom_target(gen_qrc DEPENDS ${companion_RCC})
 
 add_definitions(-DQT_TRANSLATIONS_DIR="${QT_TRANSLATIONS_DIR}")
 
-add_executable(${COMPANION_NAME} MACOSX_BUNDLE WIN32 ${companion_SRCS} ${companion_RCC} ${companion_QM})
+add_executable(${COMPANION_NAME} MACOSX_BUNDLE ${WIN_EXECUTABLE_TYPE} ${companion_SRCS} ${companion_RCC} ${companion_QM})
 
 add_dependencies(${COMPANION_NAME} gen_qrc)
 qt5_use_modules(${COMPANION_NAME} Core Widgets Network)
@@ -259,11 +266,13 @@ PrintTargetReport("${COMPANION_NAME}")
 set(simu_SRCS
   modeledit/node.cpp
   modeledit/edge.cpp
+  helpers.cpp
   simulator.cpp
   )
 
 set(simu_MOC_HDRS
   modeledit/node.h
+  helpers.h
   )
 
 qt5_wrap_cpp(simu_SRCS ${simu_MOC_HDRS} )
@@ -272,12 +281,12 @@ if(WIN32)
   list(APPEND simu_SRCS icon.rc)
 endif()
 
-add_executable(${SIMULATOR_NAME} MACOSX_BUNDLE WIN32 ${simu_SRCS} ${companion_RCC})
+add_executable(${SIMULATOR_NAME} MACOSX_BUNDLE ${WIN_EXECUTABLE_TYPE} ${simu_SRCS} ${companion_RCC})
 
 add_dependencies(${SIMULATOR_NAME} gen_qrc)
 qt5_use_modules(${SIMULATOR_NAME} Core Widgets Multimedia)
 
-target_link_libraries(${SIMULATOR_NAME} PRIVATE simulation common storage qxtcommandoptions ${PTHREAD_LIBRARY} ${SDL_LIBRARY} ${WIN_LINK_LIBRARIES})
+target_link_libraries(${SIMULATOR_NAME} PRIVATE simulation common shared storage qxtcommandoptions ${PTHREAD_LIBRARY} ${SDL_LIBRARY} ${WIN_LINK_LIBRARIES})
 
 ############# Translations ####################
 
@@ -294,12 +303,22 @@ endif()
 
 ############# Install ####################
 
+# Generate list of simulator plugins, used by all platforms
+file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/*opentx-*simulator${CMAKE_SHARED_LIBRARY_SUFFIX}")
+# the current flavour is not automatically added if build in the current cmake iteration, so always
+# add its library name to be sure
+string(TOLOWER ${PCB} FLAVOUR)
+if(POLICY CMP0026)
+  cmake_policy(SET CMP0026 OLD)  # https://cmake.org/cmake/help/v3.0/policy/CMP0026.html
+endif()
+get_property(current_plugin TARGET opentx-${FLAVOUR}-simulator PROPERTY LOCATION)
+list(APPEND simulator_plugins "${current_plugin}")
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
   message(STATUS "install " ${CMAKE_BINARY_DIR} " to " ${CMAKE_INSTALL_PREFIX}/bin)
   install(TARGETS ${COMPANION_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
   install(TARGETS ${SIMULATOR_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-  file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/libopentx-*${CMAKE_SHARED_LIBRARY_SUFFIX}")
   install(FILES ${simulator_plugins} DESTINATION "${SIMULATOR_LIB_PATH}")
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/companion.desktop DESTINATION share/applications RENAME companion${C9X_NAME_SUFFIX}.desktop)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/simulator.desktop DESTINATION share/applications RENAME simulator${C9X_NAME_SUFFIX}.desktop)
@@ -341,7 +360,6 @@ elseif(WIN32)
     # companion & simulator binaries
     install(TARGETS ${COMPANION_NAME} DESTINATION ${INSTALL_DESTINATION})
     install(TARGETS ${SIMULATOR_NAME} DESTINATION ${INSTALL_DESTINATION})
-    file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/*opentx-*-simulator${CMAKE_SHARED_LIBRARY_SUFFIX}")
     install(FILES ${simulator_plugins} DESTINATION "${INSTALL_DESTINATION}")
     # supporting utilities
     set(INSTALL_TEMP_FILES avrdude.exe avrdude.conf dfu-util.exe libusb0.dll libusb-1.0.dll)
@@ -443,6 +461,8 @@ IF(APPLE)
   set(plugin_dest_dir ${COMPANION_NAME}.app/Contents/Plugins)
   set(qtconf_dest_dir ${COMPANION_NAME}.app/Contents/Resources)
   set(APPS "\${CMAKE_INSTALL_PREFIX}/${COMPANION_NAME}.app")
+  set(companion_res_dir ${COMPANION_NAME}.app/Contents/Resources)
+
   set_target_properties(${COMPANION_NAME} PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Companion ${VERSION_MAJOR}.${VERSION_MINOR}")
   set_target_properties(${SIMULATOR_NAME} PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Simulator ${VERSION_MAJOR}.${VERSION_MINOR}")
 
@@ -455,8 +475,7 @@ IF(APPLE)
       RUNTIME DESTINATION bin COMPONENT Runtime
       )
 
-  file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/libopentx-*${CMAKE_SHARED_LIBRARY_SUFFIX}")
-  set(companion_res_dir ${COMPANION_NAME}.app/Contents/Resources)
+
   install(FILES ${simulator_plugins} DESTINATION "${companion_res_dir}" COMPONENT Runtime)
 
   # Write qt.conf to tell qt where to find it plugins

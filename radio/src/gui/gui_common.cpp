@@ -18,28 +18,20 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _DIALWIDGET_H_
-#define _DIALWIDGET_H_
+#include "opentx.h"
 
-class DialWidget : public QDial
+#if defined(PCBTARANIS) || defined(PCBHORUS) || defined(PCBFLAMENCO)
+uint8_t switchToMix(uint8_t source)
 {
-  public:
-
-    explicit DialWidget(QWidget * parent = 0):
-      QDial(parent)
-    {
-    }
- 
-  protected:
-
-    void mousePressEvent(QMouseEvent * event)
-    {
-        if (event->button() == Qt::RightButton && event->type() == QEvent::MouseButtonDblClick) {
-          setValue(0);
-          event->accept();
-        } 
-        QDial::mousePressEvent(event);
-    }    
-};
-
-#endif // _DIALWIDGET_H_
+  div_t qr = div(source-1, 3);
+  return qr.quot+MIXSRC_FIRST_SWITCH;
+}
+#else
+uint8_t switchToMix(uint8_t source)
+{
+  if (source <= 3)
+    return MIXSRC_3POS;
+  else
+    return MIXSRC_FIRST_SWITCH - 3 + source;
+}
+#endif

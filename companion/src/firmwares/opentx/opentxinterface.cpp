@@ -27,6 +27,8 @@
 #include <QTime>
 #include <QUrl>
 
+using namespace Board;
+
 #define OPENTX_FIRMWARE_DOWNLOADS        "http://downloads-22.open-tx.org/firmware"
 #define OPENTX_NIGHT_FIRMWARE_DOWNLOADS  "http://downloads-22.open-tx.org/nightly/firmware"
 
@@ -153,7 +155,8 @@ bool OpenTxEepromInterface::saveToByteArray(const T & src, QByteArray & data, ui
     version = getLastDataVersion(getBoard());
   }
   QByteArray raw;
-  M manager((T&)src, board, version, 0);
+  T srcCopy(src); // work on a copy of radio data, because Export() will modify it!
+  M manager(srcCopy, board, version, 0);
   // manager.Dump();
   manager.Export(raw);
   data.resize(8);
@@ -169,7 +172,9 @@ template <class T, class M>
 bool OpenTxEepromInterface::loadFromByteArray(T & dest, const QByteArray & data, uint8_t version, uint32_t variant)
 {
   M manager(dest, board, version, variant);
-  manager.Import(data);
+  if (manager.Import(data) != 0) {
+    return false;
+  }
   // manager.Dump(); // Dumps the structure so that it's easy to check with firmware datastructs.h
   return true;
 }
@@ -195,7 +200,7 @@ bool OpenTxEepromInterface::loadFromByteArray(T & dest, const QByteArray & data)
 
 template<class T>
 bool
-OpenTxEepromInterface::saveRadioSettings(GeneralSettings &settings, BoardEnum board, uint8_t version, uint32_t variant)
+OpenTxEepromInterface::saveRadioSettings(GeneralSettings &settings, Board::Type board, uint8_t version, uint32_t variant)
 {
   T open9xSettings(settings, board, version, variant);
   // open9xSettings.Dump();
@@ -302,7 +307,7 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * 
   return errors.to_ulong();
 }
 
-uint8_t OpenTxEepromInterface::getLastDataVersion(BoardEnum board)
+uint8_t OpenTxEepromInterface::getLastDataVersion(Board::Type board)
 {
   switch (board) {
     case BOARD_STOCK:
@@ -490,7 +495,7 @@ int OpenTxFirmware::getCapability(Capability capability)
     case FlightModesName:
       return (IS_HORUS_OR_TARANIS(board) ? 10 : 6);
     case GvarsName:
-      return (IS_9X(board) ? 0 : 6);
+      return (IS_9X(board) ? 0 : 3);
     case GvarsInCS:
     case HasFAIMode:
       return 1;
@@ -618,9 +623,9 @@ int OpenTxFirmware::getCapability(Capability capability)
     case NumCurves:
       return (HAS_LARGE_LCD(board) ? 32 : (IS_ARM(board) ? 16 : 8));
     case HasMixerNames:
-      return (IS_ARM(board) ? (IS_HORUS_OR_TARANIS(board) ? 8 : 6) : false);
+      return (IS_ARM(board) ? (IS_TARANIS_X9(board) ? 8 : 6) : false);
     case HasExpoNames:
-      return (IS_ARM(board) ? (IS_HORUS_OR_TARANIS(board) ? 8 : 6) : false);
+      return (IS_ARM(board) ? (IS_TARANIS_X9(board) ? 8 : 6) : false);
     case HasNoExpo:
       return (IS_HORUS_OR_TARANIS(board) ? false : true);
     case ChannelsName:
@@ -714,6 +719,8 @@ int OpenTxFirmware::getCapability(Capability capability)
       return IS_ARM(board) ? 64 : 0;
     case VirtualInputs:
       return IS_ARM(board) ? 64 : 0;
+    case InputsLength:
+      return HAS_LARGE_LCD(board) ? 4 : 3;
     case TrainerInputs:
       return IS_ARM(board) ? 16 : 8;
     case RtcTime:
@@ -759,6 +766,8 @@ int OpenTxFirmware::getCapability(Capability capability)
       return (IS_HORUS_OR_TARANIS(board) ? true : id.contains("battgraph"));
     case DangerousFunctions:
       return id.contains("danger") ? 1 : 0;
+    case HasModelCategories:
+      return IS_HORUS(board);
     default:
       return 0;
   }
@@ -813,51 +822,6 @@ QString OpenTxFirmware::getAnalogInputName(unsigned int index)
   }
   else {
     return "???";
-  }
-}
-
-Firmware::Switch OpenTxFirmware::getSwitch(unsigned int index)
-{
-  typedef GeneralSettings::SwitchConfig sc;
-  if (board == BOARD_TARANIS_X7) {
-    const Switch switches[] = {{sc::SWITCH_3POS,   "SA"},
-                               {sc::SWITCH_3POS,   "SB"},
-                               {sc::SWITCH_3POS,   "SC"},
-                               {sc::SWITCH_3POS,   "SD"},
-                               {sc::SWITCH_2POS,   "SF"},
-                               {sc::SWITCH_TOGGLE, "SH"}};
-    return switches[index];
-  }
-  else if (IS_HORUS_OR_TARANIS(board)) {
-    const Switch switches[] = {{sc::SWITCH_3POS,   "SA"},
-                               {sc::SWITCH_3POS,   "SB"},
-                               {sc::SWITCH_3POS,   "SC"},
-                               {sc::SWITCH_3POS,   "SD"},
-                               {sc::SWITCH_3POS,   "SE"},
-                               {sc::SWITCH_2POS,   "SF"},
-                               {sc::SWITCH_3POS,   "SG"},
-                               {sc::SWITCH_TOGGLE, "SH"},
-                               {sc::SWITCH_3POS,   "SI"},
-                               {sc::SWITCH_3POS,   "SJ"},
-                               {sc::SWITCH_3POS,   "SK"},
-                               {sc::SWITCH_3POS,   "SL"},
-                               {sc::SWITCH_3POS,   "SM"},
-                               {sc::SWITCH_3POS,   "SN"},
-                               {sc::SWITCH_3POS,   "SO"},
-                               {sc::SWITCH_3POS,   "SP"},
-                               {sc::SWITCH_3POS,   "SQ"},
-                               {sc::SWITCH_3POS,   "SR"}};
-    return switches[index];
-  }
-  else {
-    const Switch switches[] = {{sc::SWITCH_2POS,   "THR"},
-                               {sc::SWITCH_2POS,   "RUD"},
-                               {sc::SWITCH_2POS,   "ELE"},
-                               {sc::SWITCH_3POS,   "3POS"},
-                               {sc::SWITCH_2POS,   "AIL"},
-                               {sc::SWITCH_2POS,   "GEA"},
-                               {sc::SWITCH_TOGGLE, "TRN"}};
-    return switches[index];
   }
 }
 
@@ -1098,7 +1062,7 @@ unsigned long OpenTxEepromInterface::loadBackup(RadioData &radioData, const uint
     return errors.to_ulong();
   }
 
-  BoardEnum backupBoard = (BoardEnum) -1;
+  Type backupBoard = (Type) -1;
   switch (eeprom[3]) {
     case 0x33:
       backupBoard = BOARD_TARANIS_X9D;
@@ -1214,6 +1178,7 @@ void addOpenTxFrskyOptions(OpenTxFirmware * firmware)
   firmware->addOption("noheli", QObject::tr("Disable HELI menu and cyclic mix support"));
   firmware->addOption("nogvars", QObject::tr("Disable Global variables"));
   firmware->addOption("lua", QObject::tr("Support for Lua model scripts"));
+  firmware->addOption("luac", QObject::tr("Enable Lua compiler"));
   Option usb_options[] = {{"massstorage", QObject::tr("Instead of Joystick emulation, USB connection is Mass Storage (as in the Bootloader)")},
                           {"cli",         QObject::tr("Instead of Joystick emulation, USB connection is Command Line Interface")},
                           {NULL}};
@@ -1312,10 +1277,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
   firmware->addOption("templates", QObject::tr("Enable TEMPLATES menu"));
   firmware->addOption("nofp", QObject::tr("No flight modes"));
-  firmware->addOption("nocurves", QObject::tr("Disable curves menus"));
-  firmware->addOption("ppmca", QObject::tr("PPM center adjustment in limits"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
-  firmware->addOption("symlimits", QObject::tr("Symetrical Limits"));
   firmware->addOption("potscroll", QObject::tr("Pots use in menus navigation"));
   firmware->addOption("autosource", QObject::tr("In model setup menus automatically set source by moving the control"));
   firmware->addOption("autoswitch", QObject::tr("In model setup menus automatically set switch by moving the control"));
@@ -1463,10 +1425,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
   firmware->addOption("templates", QObject::tr("Enable TEMPLATES menu"));
   firmware->addOption("nofp", QObject::tr("No flight modes"));
-  firmware->addOption("nocurves", QObject::tr("Disable curves menus"));
-  firmware->addOption("ppmca", QObject::tr("PPM center adjustment in limits"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
-  firmware->addOption("symlimits", QObject::tr("Symetrical Limits"));
   firmware->addOption("potscroll", QObject::tr("Pots use in menus navigation"));
   firmware->addOption("autosource", QObject::tr("In model setup menus automatically set source by moving the control"));
   firmware->addOption("autoswitch", QObject::tr("In model setup menus automatically set switch by moving the control"));
@@ -1486,10 +1445,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
   firmware->addOption("templates", QObject::tr("Enable TEMPLATES menu"));
   firmware->addOption("nofp", QObject::tr("No flight modes"));
-  firmware->addOption("nocurves", QObject::tr("Disable curves menus"));
-  firmware->addOption("ppmca", QObject::tr("PPM center adjustment in limits"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
-  firmware->addOption("symlimits", QObject::tr("Symetrical Limits"));
   firmware->addOption("potscroll", QObject::tr("Pots use in menus navigation"));
   firmware->addOption("autosource", QObject::tr("In model setup menus automatically set source by moving the control"));
   firmware->addOption("autoswitch", QObject::tr("In model setup menus automatically set switch by moving the control"));
@@ -1571,20 +1527,20 @@ void unregisterOpenTxFirmwares()
 }
 
 template <class T, class M>
-bool loadFromByteArray(T & dest, const QByteArray & data)
+OpenTxEepromInterface * loadFromByteArray(T & dest, const QByteArray & data)
 {
   foreach(OpenTxEepromInterface * eepromInterface, opentxEEpromInterfaces) {
     if (eepromInterface->loadFromByteArray<T, M>(dest, data)) {
-      return true;
+      return eepromInterface;
     }
   }
-  return false;
+  return NULL;
 }
 
 template <class T, class M>
 bool saveToByteArray(const T & dest, QByteArray & data)
 {
-  BoardEnum board = getCurrentBoard();
+  Board::Type board = getCurrentBoard();
   foreach(OpenTxEepromInterface * eepromInterface, opentxEEpromInterfaces) {
     if (eepromInterface->getBoard() == board) {
       return eepromInterface->saveToByteArray<T, M>(dest, data);
@@ -1593,12 +1549,12 @@ bool saveToByteArray(const T & dest, QByteArray & data)
   return false;
 }
 
-bool loadModelFromByteArray(ModelData & model, const QByteArray & data)
+OpenTxEepromInterface * loadModelFromByteArray(ModelData & model, const QByteArray & data)
 {
   return loadFromByteArray<ModelData, OpenTxModelData>(model, data);
 }
 
-bool loadRadioSettingsFromByteArray(GeneralSettings & settings, const QByteArray & data)
+OpenTxEepromInterface * loadRadioSettingsFromByteArray(GeneralSettings & settings, const QByteArray & data)
 {
   return loadFromByteArray<GeneralSettings, OpenTxGeneralData>(settings, data);
 }

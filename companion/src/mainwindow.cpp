@@ -220,7 +220,9 @@ void MainWindow::checkForUpdates()
     // TODO why create each time a network manager?
     networkManager = new QNetworkAccessManager(this);
     connect(networkManager, SIGNAL(finished(QNetworkReply*)),this, SLOT(checkForCompanionUpdateFinished(QNetworkReply*)));
-    QNetworkRequest request(QUrl(QString("%1/%2").arg(getCompanionUpdateBaseUrl()).arg(COMPANION_STAMP)));
+    QUrl url(QString("%1/%2").arg(getCompanionUpdateBaseUrl()).arg(COMPANION_STAMP));
+    qDebug() << "Checking for Companion update " << url.url();
+    QNetworkRequest request(url);
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
     networkManager->get(request);
   }
@@ -231,6 +233,7 @@ void MainWindow::checkForUpdates()
       networkManager = new QNetworkAccessManager(this);
       connect(networkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(checkForFirmwareUpdateFinished(QNetworkReply*)));
       QUrl url(stamp);
+      qDebug() << "Checking for firmware update " << url.url();
       QNetworkRequest request(url);
       request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
       networkManager->get(request);
@@ -493,7 +496,7 @@ void MainWindow::checkForFirmwareUpdateFinished(QNetworkReply * reply)
 void MainWindow::startFirmwareDownload()
 {
   QString url = current_firmware_variant->getFirmwareUrl();
-  qDebug() << url;
+  qDebug() << "Downloading firmware" << url;
   QString ext = url.mid(url.lastIndexOf("."));
   QString defaultFilename = g.flashDir() + "/" + current_firmware_variant->getId();
   if (g.profile[g.id()].renameFwFiles()) {
@@ -629,8 +632,6 @@ void MainWindow::fwPrefs()
 {
   FirmwarePreferencesDialog * dialog = new FirmwarePreferencesDialog(this);
   dialog->exec();
-  emit FirmwareChanged();
-  updateMenus();
 }
 
 void MainWindow::contributors()
@@ -727,37 +728,23 @@ void MainWindow::loadBackup()
 
 void MainWindow::readEeprom()
 {
-  BoardEnum board = getCurrentBoard();
-  if (board == BOARD_HORUS) {
-    QString radioPath = findMassstoragePath("RADIO", true);
-    qDebug() << "Searching for SD card, found" << radioPath;
-    if (radioPath.isEmpty()) {
-      qDebug() << "MainWindow::readEeprom(): Horus radio not found";
-      QMessageBox::critical(this, tr("Error"), tr("Unable to find Horus radio SD card!"));
-      return;
-    }
-    MdiChild *child = createMdiChild();
-    if (child->loadFile(radioPath)) {
-      statusBar()->showMessage(tr("Models and Settings read"), 2000);
-      child->show();
-    }
-  }
-  else {
-    QString tempFile;
-    if (IS_ARM(board))
-      tempFile = generateProcessUniqueTempFileName("temp.bin");
-    else
-      tempFile += generateProcessUniqueTempFileName("temp.hex");
+  Board::Type board = getCurrentBoard();
+  QString tempFile;
+  if (IS_HORUS(board))
+    tempFile = generateProcessUniqueTempFileName("temp.otx");
+  else if (IS_ARM(board))
+    tempFile = generateProcessUniqueTempFileName("temp.bin");
+  else
+    tempFile = generateProcessUniqueTempFileName("temp.hex");
 
-    qDebug() << "MainWindow::readEeprom(): using temp file: " << tempFile;
+  qDebug() << "MainWindow::readEeprom(): using temp file: " << tempFile;
 
-    if (readEepromFromRadio(tempFile)) {
-      MdiChild * child = createMdiChild();
-      child->newFile();
-      child->loadFile(tempFile, false);
-      child->show();
-      qunlink(tempFile);
-    }
+  if (readEepromFromRadio(tempFile)) {
+    MdiChild * child = createMdiChild();
+    child->newFile();
+    child->loadFile(tempFile, false);
+    child->show();
+    qunlink(tempFile);
   }
 }
 
@@ -765,7 +752,7 @@ bool MainWindow::readFirmwareFromRadio(const QString & filename)
 {
   ProgressDialog progressDialog(this, tr("Read Firmware from Radio"), CompanionIcon("read_flash.png"));
   bool result = readFirmware(filename, progressDialog.progress());
-  if (!result) {
+  if (!result && !progressDialog.isEmpty()) {
     progressDialog.exec();
   }
   return result;
@@ -776,13 +763,23 @@ bool MainWindow::readEepromFromRadio(const QString & filename)
   ProgressDialog progressDialog(this, tr("Read Models and Settings from Radio"), CompanionIcon("read_eeprom.png"));
   bool result = ::readEeprom(filename, progressDialog.progress());
   if (!result) {
-    progressDialog.exec();
+    if (!progressDialog.isEmpty()) {
+      progressDialog.exec();
+    }
+  }
+  else {
+    statusBar()->showMessage(tr("Models and Settings read"), 2000);
   }
   return result;
 }
 
 void MainWindow::writeBackup()
 {
+  if (IS_HORUS(getCurrentBoard())) {
+    QMessageBox::information(this, "Companion", tr("This function is not yet implemented"));
+    return;
+    // TODO implementation
+  }
   FlashEEpromDialog *cd = new FlashEEpromDialog(this);
   cd->exec();
 }
@@ -795,6 +792,11 @@ void MainWindow::writeFlash(QString fileToFlash)
 
 void MainWindow::readBackup()
 {
+  if (IS_HORUS(getCurrentBoard())) {
+    QMessageBox::information(this, "Companion", tr("This function is not yet implemented"));
+    return;
+    // TODO implementation
+  }
   QString fileName = QFileDialog::getSaveFileName(this, tr("Save Radio Backup to File"), g.eepromDir(), tr(EXTERNAL_EEPROM_FILES_FILTER));
   if (!fileName.isEmpty()) {
     if (!readEepromFromRadio(fileName))

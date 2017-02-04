@@ -1,6 +1,7 @@
 #ifndef _RADIODATA_H_
 #define _RADIODATA_H_
 
+#include "boards.h"
 #include "constants.h"
 #include <QString>
 #include <QComboBox>
@@ -48,7 +49,6 @@ enum Switches {
   SWITCH_SJ2,
   SWITCH_SK0,
   SWITCH_SK2,
-
 };
 
 enum TimerModes {
@@ -289,7 +289,7 @@ class RawSwitch {
       return index >= 0 ? (type * 256 + index) : -(type * 256 - index);
     }
 
-    QString toString() const;
+    QString toString(Board::Type board = Board::BOARD_UNKNOWN) const;
 
     bool operator== ( const RawSwitch& other) {
       return (this->type == other.type) && (this->index == other.index);
@@ -794,7 +794,8 @@ enum MultiModuleRFProtocols {
   MM_RF_PROTO_AFHDS2A,
   MM_RF_PROTO_Q2X2,
   MM_RF_PROTO_WK_2X01,
-  MM_RF_PROTO_LAST=MM_RF_PROTO_WK_2X01
+  MM_RF_PROTO_Q303,
+  MM_RF_PROTO_LAST=MM_RF_PROTO_Q303
 };
 
 unsigned int getNumSubtypes(MultiModuleRFProtocols type);
@@ -841,7 +842,7 @@ class ModuleData {
     QString polarityToString() const { return ppm.pulsePol ? QObject::tr("Positive") : QObject::tr("Negative"); } // TODO ModelPrinter
 };
 
-#define CPN_MAX_SCRIPTS       7
+#define CPN_MAX_SCRIPTS       9
 #define CPN_MAX_SCRIPT_INPUTS 10
 class ScriptData {
   public:
@@ -1007,7 +1008,7 @@ class ModelData {
     ModelData(const ModelData & src);
     ModelData & operator = (const ModelData & src);
     
-    void convert(Firmware * before, Firmware * after);
+    void convert(Board::Type before, Board::Type after);
     
     ExpoData * insertInput(const int idx);
     void removeInput(const int idx);
@@ -1128,27 +1129,8 @@ class GeneralSettings {
       BEEPER_ALL = 1
     };
 
-    enum PotConfig {
-      POT_NONE,
-      POT_WITH_DETENT,
-      POT_MULTIPOS_SWITCH,
-      POT_WITHOUT_DETENT
-    };
-
-    enum SliderConfig {
-      SLIDER_NONE,
-      SLIDER_WITH_DETENT
-    };
-
-    enum SwitchConfig {
-      SWITCH_NONE,
-      SWITCH_TOGGLE,
-      SWITCH_2POS,
-      SWITCH_3POS
-    };
-
     GeneralSettings();
-    void convert(Firmware * before, Firmware * after);
+    void convert(Board::Type before, Board::Type after);
 
     int getDefaultStick(unsigned int channel) const;
     RawSource getDefaultSource(unsigned int channel) const;
@@ -1242,17 +1224,6 @@ class GeneralSettings {
     typedef uint8_t ThemeOptionData[8+1];
     ThemeOptionData themeOptionValue[5];
 
-    struct SwitchInfo {
-      SwitchInfo(unsigned int index, unsigned int position):
-        index(index),
-        position(position)
-      {
-      }
-      unsigned int index;
-      unsigned int position;
-    };
-
-    static SwitchInfo switchInfoFromSwitchPositionTaranis(unsigned int index);
     bool switchPositionAllowedTaranis(int index) const;
     bool switchSourceAllowedTaranis(int index) const;
     bool isPotAvailable(int index) const;
@@ -1275,61 +1246,14 @@ class RadioData {
     std::vector<CategoryData> categories;
     std::vector<ModelData> models;
     
-    void convert(Firmware * before, Firmware * after);
+    void convert(Board::Type before, Board::Type after);
 
-    void setCurrentModel(unsigned int index)
-    {
-      generalSettings.currModelIndex = index;
-      strcpy(generalSettings.currModelFilename, models[index].filename);
-    }
+    void setCurrentModel(unsigned int index);
+    void fixModelFilenames();
+    QString getNextModelFilename();
 
-    void fixModelFilename(unsigned int index)
-    {
-      ModelData & model = models[index];
-      QString filename(model.filename);
-      bool ok = filename.endsWith(".bin");
-      if (ok) {
-        if (filename.startsWith("model") && filename.mid(5, filename.length()-9).toInt() > 0) {
-          ok = false;
-        }
-      }
-      if (ok) {
-        for (unsigned i=0; i<index; i++) {
-          if (strcmp(models[i].filename, model.filename) == 0) {
-            ok = false;
-            break;
-          }
-        }
-      }
-      if (!ok) {
-        sprintf(model.filename, "model%d.bin", index+1);
-      }
-    }
-
-    void fixModelFilenames()
-    {
-      for (unsigned int i=0; i<models.size(); i++) {
-        fixModelFilename(i);
-      }
-    }
-
-    QString getNextModelFilename()
-    {
-      char filename[sizeof(ModelData::filename)];
-      int index = 0;
-      bool found = true;
-      while (found) {
-        sprintf(filename, "model%d.bin", ++index);
-        found = false;
-        for (unsigned int i=0; i<models.size(); i++) {
-          if (strcmp(filename, models[i].filename) == 0) {
-            found = true;
-            break;
-          }
-        }
-      }
-      return filename;
-    }
+  protected:
+    void fixModelFilename(unsigned int index);
 };
 
 #endif // _RADIODATA_H_

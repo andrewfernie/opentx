@@ -38,7 +38,9 @@
 
 class OpenTxGeneralData: public TransformedField {
   public:
-    OpenTxGeneralData(GeneralSettings & generalData, BoardEnum board, unsigned int version, unsigned int variant=0);
+    OpenTxGeneralData(GeneralSettings & generalData, Board::Type board, unsigned int version, unsigned int variant=0);
+
+    virtual const char * getName() { return internalField.getName(); }
 
   protected:
     virtual void beforeExport();
@@ -46,7 +48,7 @@ class OpenTxGeneralData: public TransformedField {
 
     StructField internalField;
     GeneralSettings & generalData;
-    BoardEnum board;
+    Board::Type board;
     unsigned int version;
     int inputsCount;
     unsigned int chkSum;
@@ -56,7 +58,7 @@ class OpenTxGeneralData: public TransformedField {
 class ProtocolsConversionTable: public ConversionTable
 {
   public:
-    ProtocolsConversionTable(BoardEnum board)
+    ProtocolsConversionTable(Board::Type board)
     {
       int val = 0;
       if (IS_ARM(board)) {
@@ -85,8 +87,8 @@ class ProtocolsConversionTable: public ConversionTable
         addConversion(PULSES_DSM2, val++);
         addConversion(PULSES_DSMX, val++);
       }
-      if (IS_TARANIS(board)) {
-    	addConversion(PULSES_CROSSFIRE, val++);
+      if (IS_HORUS_OR_TARANIS(board)) {
+    	  addConversion(PULSES_CROSSFIRE, val++);
         addConversion(PULSES_MULTIMODULE, val++);
       }
     }
@@ -105,9 +107,9 @@ class ChannelsConversionTable: public ConversionTable
 
 class OpenTxModelData: public TransformedField {
   public:
-    OpenTxModelData(ModelData & modelData, BoardEnum board, unsigned int version, unsigned int variant);
+    OpenTxModelData(ModelData & modelData, Board::Type board, unsigned int version, unsigned int variant);
 
-    const char * getName() { return name; }
+    virtual const char * getName() { return internalField.getName(); }
 
   protected:
     virtual void beforeExport();
@@ -115,7 +117,7 @@ class OpenTxModelData: public TransformedField {
 
     StructField internalField;
     ModelData & modelData;
-    BoardEnum board;
+    Board::Type board;
     unsigned int version;
     unsigned int variant;
 

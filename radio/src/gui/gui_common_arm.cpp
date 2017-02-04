@@ -20,23 +20,6 @@
 
 #include "opentx.h"
 
-#if defined(PCBTARANIS) || defined(PCBHORUS) || defined(PCBFLAMENCO)
-uint8_t switchToMix(uint8_t source)
-{
-  div_t qr = div(source-1, 3);
-  return qr.quot+MIXSRC_FIRST_SWITCH;
-}
-#else
-uint8_t switchToMix(uint8_t source)
-{
-  if (source <= 3)
-    return MIXSRC_3POS;
-  else
-    return MIXSRC_FIRST_SWITCH - 3 + source;
-}
-#endif
-
-#if defined(CPUARM)
 int circularIncDec(int current, int inc, int min, int max, IsValueAvailable isValueAvailable)
 {
   do {
@@ -595,10 +578,11 @@ int getFirstAvailable(int min, int max, IsValueAvailable isValueAvailable)
   return retval;
 }
 #if defined(MULTIMODULE)
+// Third row is number of subtypes -1 (max valid subtype)
 const mm_protocol_definition multi_protocols[] = {
   { MM_RF_PROTO_FLYSKY,     STR_SUBTYPE_FLYSKY,   4,  nullptr             },
   { MM_RF_PROTO_HUBSAN,     nullptr,              0,  STR_MULTI_VIDFREQ   },
-  { MM_RF_PROTO_FRSKY,      STR_SUBTYPE_FRSKY,    3,  STR_MULTI_RFTUNE    },
+  { MM_RF_PROTO_FRSKY,      STR_SUBTYPE_FRSKY,    5,  STR_MULTI_RFTUNE    },
   { MM_RF_PROTO_HISKY,      STR_SUBTYPE_HISKY,    1,  nullptr             },
   { MM_RF_PROTO_V2X2,       STR_SUBTYPE_V2X2,     1,  nullptr             },
   { MM_RF_PROTO_DSM2,       STR_SUBTYPE_DSM,      3,  nullptr             },
@@ -618,6 +602,7 @@ const mm_protocol_definition multi_protocols[] = {
   { MM_RF_PROTO_FS_AFHDS2A, STR_SUBTYPE_AFHDS2A,  3,  STR_MULTI_SERVOFREQ },
   { MM_RF_PROTO_Q2X2,       STR_SUBTYPE_Q2X2,     1,  nullptr             },
   { MM_RF_PROTO_WK_2X01,    STR_SUBTYPE_WK2x01,   5,  nullptr             },
+  { MM_RF_PROTO_Q303,       STR_SUBTYPE_Q303,     3,  nullptr             },
   { MM_RF_CUSTOM_SELECTED,  nullptr,              7,  STR_MULTI_OPTION    },
 
   //Sential and default for protocols not listed above (MM_RF_CUSTOM is 0xff()
@@ -634,7 +619,13 @@ const mm_protocol_definition *getMultiProtocolDefinition (uint8_t protocol)
   // Return the empty last protocol
   return pdef;
 }
-
 #endif
 
-#endif
+void editStickHardwareSettings(coord_t x, coord_t y, int idx, event_t event, LcdFlags flags)
+{
+  lcdDrawTextAtIndex(INDENT_WIDTH, y, STR_VSRCRAW, idx+1, 0);
+  if (ZEXIST(g_eeGeneral.anaNames[idx]) || (flags && s_editMode > 0))
+    editName(x, y, g_eeGeneral.anaNames[idx], LEN_ANA_NAME, event, flags);
+  else
+    lcdDrawMMM(x, y, flags);
+}

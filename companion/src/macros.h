@@ -18,34 +18,9 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _SLIDERWIDGET_H_
-#define _SLIDERWIDGET_H_
+#ifndef _MACROS_H_
+#define _MACROS_H_
 
-#include <QSlider>
-#include <QtGui>
-#include <QFrame>
+#define DIM(arr) (sizeof((arr))/sizeof((arr)[0]))
 
-class SliderWidget : public QSlider
-{
-  Q_OBJECT
-
-  public:
-
-    explicit SliderWidget(QWidget * parent = 0):
-      QSlider(parent)
-    {
-    }
-
-   protected:
-
-     void mousePressEvent(QMouseEvent * event)
-     {
-       if (event->button() == Qt::RightButton && event->type() == QEvent::MouseButtonDblClick) {
-         setValue(0);
-         event->accept();
-       }
-       QSlider::mousePressEvent(event);
-     }
-};
-
-#endif // _SLIDERWIDGET_H_
+#endif // _MACROS_H_

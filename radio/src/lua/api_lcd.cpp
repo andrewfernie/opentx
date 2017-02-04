@@ -449,7 +449,7 @@ Draw a bitmap at (x,y)
 
 @param name (string) full path to the bitmap on SD card (i.e. “/IMAGES/test.bmp”)
 
-@notice Only available on Taranis
+@notice Only available on Taranis X9 series. Maximum image size if 106 x 64 pixels (width x height).
 
 @status current Introduced in 2.0.0
 */
@@ -571,7 +571,7 @@ static int luaLcdDrawGauge(lua_State *L)
 }
 
 
-#if LCD_DEPTH > 1 && !defined(COLORLCD)
+#if !defined(COLORLCD)
 /*luadoc
 @function lcd.drawScreenTitle(title, page, pages)
 
@@ -596,14 +596,16 @@ static int luaLcdDrawScreenTitle(lua_State *L)
   int cnt = luaL_checkinteger(L, 3);
 
   if (cnt) drawScreenIndex(idx-1, cnt, 0);
+#if LCD_DEPTH > 1
   lcdDrawFilledRect(0, 0, LCD_W, FH, SOLID, FILL_WHITE|GREY_DEFAULT);
+#endif
   title(str);
 
   return 0;
 }
 #endif
 
-#if LCD_DEPTH > 1 && !defined(COLORLCD)
+#if !defined(COLORLCD)
 /*luadoc
 @function lcd.drawCombobox(x, y, w, list, idx [, flags])
 
@@ -788,7 +790,9 @@ const luaL_Reg lcdLib[] = {
   { "drawScreenTitle", luaLcdDrawScreenTitle },
   { "drawCombobox", luaLcdDrawCombobox },
 #else
+  { "drawScreenTitle", luaLcdDrawScreenTitle },
   { "getLastPos", luaLcdGetLastPos },
+  { "drawCombobox", luaLcdDrawCombobox },
 #endif
   { NULL, NULL }  /* sentinel */
 };
