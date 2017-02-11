@@ -269,7 +269,7 @@ bool menuModelSetup(event_t event)
           lcdDrawTextAtIndex(MODEL_SETUP_2ND_COLUMN, y, STR_VCSWFUNC, 0, attr);
         if (attr && event==EVT_KEY_BREAK(KEY_ENTER) && READ_ONLY_UNLOCKED()) {
           s_editMode = 0;
-          if (sdListFiles(BITMAPS_PATH, BITMAPS_EXT, sizeof(g_model.header.bitmap), g_model.header.bitmap, LIST_NONE_SD_FILE | LIST_SD_FILE_EXT)) {
+          if (sdListFiles(BITMAPS_PATH, BITMAPS_EXT, sizeof(g_model.header.bitmap)-LEN_BITMAPS_EXT, g_model.header.bitmap, LIST_NONE_SD_FILE | LIST_SD_FILE_EXT)) {
             POPUP_MENU_START(onModelSetupBitmapMenu);
           }
           else {
@@ -847,7 +847,7 @@ bool menuModelSetup(event_t event)
         else if (IS_MODULE_MULTIMODULE(moduleIdx)) {
           int optionValue =  g_model.moduleData[moduleIdx].multi.optionValue;
 
-          const uint8_t multi_proto = g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(false);
+          const uint8_t multi_proto = g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(true);
           const mm_protocol_definition* pdef = getMultiProtocolDefinition(multi_proto);
           if (pdef->optionsstr)
             lcdDrawText(MENUS_MARGIN_LEFT, y, pdef->optionsstr);
@@ -857,9 +857,9 @@ bool menuModelSetup(event_t event)
 
           lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, optionValue, LEFT | attr);
           if (attr) {
-            if (g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(true) == MM_RF_PROTO_FS_AFHDS2A) {
+            if (multi_proto == MM_RF_PROTO_FS_AFHDS2A) {
               CHECK_INCDEC_MODELVAR(event, g_model.moduleData[moduleIdx].multi.optionValue, 0, 70);
-            } else if (g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(true) == MM_RF_PROTO_OLRS) {
+            } else if (multi_proto == MM_RF_PROTO_OLRS) {
               CHECK_INCDEC_MODELVAR(event, g_model.moduleData[moduleIdx].multi.optionValue, -1, 7);
             } else {
               CHECK_INCDEC_MODELVAR(event, g_model.moduleData[moduleIdx].multi.optionValue, -128, 127);

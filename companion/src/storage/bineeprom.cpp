@@ -49,13 +49,18 @@ bool BinEepromFormat::load(RadioData & radioData)
 bool BinEepromFormat::write(const RadioData & radioData)
 {
   bool result;
-  EEPROMInterface * eepromInterface = GetEepromInterface();
-  uint8_t * eeprom = (uint8_t *)malloc(getEEpromSize(eepromInterface->getBoard()));
-  int eeprom_size = eepromInterface->save(eeprom, radioData, 0, GetCurrentFirmware()->getVariantNumber());
+  EEPROMInterface * eepromInterface = getCurrentEEpromInterface();
+  int size = getEEpromSize(eepromInterface->getBoard());
+  if (size == 0) {
+    return false;
+  }
+  uint8_t * eeprom = (uint8_t *)malloc(size);
+  int eeprom_size = eepromInterface->save(eeprom, radioData, 0, getCurrentFirmware()->getVariantNumber());
   if (eeprom_size) {
     result = writeToFile(eeprom, eeprom_size);
   }
   else {
+    // TODO here we could call setError(eepromInterface->errors())
     setError(QObject::tr("Cannot save EEPROM"));
     result = false;
   }
@@ -91,6 +96,7 @@ bool BinEepromFormat::extract(RadioData & radioData, const QByteArray & eeprom)
       if (errors.test(HAS_WARNINGS)) {
         // TODO ShowEepromWarnings(this, QObject::tr("Warning"), errors.to_ulong());
       }
+      board = eepromInterface->getBoard();
       return true;
     }
     else {
@@ -98,6 +104,6 @@ bool BinEepromFormat::extract(RadioData & radioData, const QByteArray & eeprom)
     }
   }
 
-  setError(QObject::tr("Invalid EEPROM File %1: %2").arg(filename).arg(errors.to_ulong()));
+  setError(QObject::tr("Invalid binary EEPROM file %1").arg(filename));
   return false;
 }

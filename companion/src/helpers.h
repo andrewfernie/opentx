@@ -33,7 +33,7 @@
 
 extern const QColor colors[CPN_MAX_CURVES];
 
-#define TMR_NUM_OPTION  (TMRMODE_COUNT+2*9+2*GetCurrentFirmware()->getCapability(LogicalSwitches)-1)
+#define TMR_NUM_OPTION  (TMRMODE_COUNT+2*9+2*getCurrentFirmware()->getCapability(LogicalSwitches)-1)
 
 //convert from mode 1 to mode generalSettings.stickMode
 //NOTICE!  =>  1..4 -> 1..4
@@ -140,8 +140,8 @@ void populateGvarUseCB(QComboBox *b, unsigned int phase);
 #define POPULATE_VIRTUAL_INPUTS (1<<7)
 #define POPULATE_SCRIPT_OUTPUTS (1<<8)
 
-#define GVARS_VARIANT 0x0001
-#define FRSKY_VARIANT 0x0002
+#define GVARS_VARIANT           0x0001
+#define FRSKY_VARIANT           0x0002
 
 void populateGVCB(QComboBox & b, int value, const ModelData & model);
 void populateSourceCB(QComboBox *b, const RawSource &source, const GeneralSettings generalSettings, const ModelData * model, unsigned int flags);

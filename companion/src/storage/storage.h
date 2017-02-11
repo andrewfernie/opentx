@@ -44,7 +44,8 @@ class StorageFormat
   public:
     StorageFormat(const QString & filename, uint8_t version=0):
       filename(filename),
-      version(version)
+      version(version),
+      board(Board::BOARD_UNKNOWN)
     {
     }
     
@@ -58,18 +59,35 @@ class StorageFormat
     QString warning() {
       return _warning;
     }
-    
+
+    virtual QString name() = 0;
+
+    virtual Board::Type getBoard()
+    {
+      return board;
+    }
+
+    virtual bool isBoardCompatible(Board::Type board)
+    {
+      if (this->board == board)
+        return true;
+
+      if (IS_TARANIS_X9D(this->board) && IS_TARANIS_X9D(board))
+        return true;
+
+      return false;
+    }
+
   protected:
     void setError(const QString & error)
     {
-      qDebug() << "error:" << error;
+      qDebug() << qPrintable(QString("[%1] error: %2").arg(name()).arg(error));
       _error = error;
     }
     
     void setWarning(const QString & warning)
     {
-      if (!warning.isEmpty())
-        qDebug() << "warning:" << warning;
+      qDebug() << qPrintable(QString("[%1] warning: %2").arg(name()).arg(warning));
       _warning = warning;
     }
     
@@ -77,6 +95,7 @@ class StorageFormat
     uint8_t version;
     QString _error;
     QString _warning;
+    Board::Type board;
 };
 
 class StorageFactory
@@ -124,6 +143,18 @@ class Storage : public StorageFormat
     Storage(const QString & filename):
       StorageFormat(filename)
     {
+    }
+    
+    virtual QString name() { return "storage"; };
+    
+    void setError(const QString & error)
+    {
+      _error = error;
+    }
+    
+    void setWarning(const QString & warning)
+    {
+      _warning = warning;
     }
     
     virtual bool load(RadioData & radioData);

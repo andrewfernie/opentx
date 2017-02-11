@@ -75,6 +75,7 @@ bool Storage::load(RadioData & radioData)
   foreach(StorageFactory * factory, registeredStorageFactories) {
     StorageFormat * format = factory->instance(filename);
     if (format->load(radioData)) {
+      board = format->getBoard();
       setWarning(format->warning());
       return true;
     }
@@ -98,7 +99,6 @@ bool Storage::write(const RadioData & radioData)
 
 bool convertEEprom(const QString & sourceEEprom, const QString & destinationEEprom, const QString & firmwareFilename)
 {
-  Firmware * currentFirmware = GetCurrentFirmware();
   FirmwareInterface firmware(firmwareFilename);
   if (!firmware.isValid())
     return false;
@@ -112,14 +112,15 @@ bool convertEEprom(const QString & sourceEEprom, const QString & destinationEEpr
     return false;
   
   QByteArray eeprom(EESIZE_MAX, 0);
-  int size = currentFirmware->saveEEPROM((uint8_t *)eeprom.data(), *radioData, version, variant);
+  int size = getCurrentEEpromInterface()->save((uint8_t *)eeprom.data(), *radioData, version, variant);
   if (size == 0) {
     return false;
   }
   
   QFile destinationFile(destinationEEprom);
-  if (!destinationFile.open(QIODevice::WriteOnly))
+  if (!destinationFile.open(QIODevice::WriteOnly)) {
     return false;
+  }
   
   int result = destinationFile.write(eeprom.constData(), size);
   destinationFile.close();

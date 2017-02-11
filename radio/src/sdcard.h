@@ -69,6 +69,7 @@ const char RADIO_SETTINGS_PATH[] = RADIO_PATH "/radio.bin";
 
 #if defined(PCBHORUS)
 #define BITMAPS_EXT         BMP_EXT JPG_EXT PNG_EXT
+#define LEN_BITMAPS_EXT     4
 #else
 #define BITMAPS_EXT         BMP_EXT
 #endif
@@ -117,9 +118,15 @@ const char * getFileExtension(const char * filename, uint8_t size=0, uint8_t ext
 #if defined(PCBHORUS)
   #define OTX_FOURCC 0x3478746F // otx for Horus
   #define O9X_FOURCC 0x3178396F // we forgot it in 2.2 RC ..
+#elif defined(PCBX9E)
+  #define OTX_FOURCC 0x3578746F // otx for Taranis X9E
+  #define O9X_FOURCC 0x3378396F // o9x for Taranis X9E
+#elif defined(PCBX7)
+  #define OTX_FOURCC 0x3678746F // otx for Taranis X7
+  #define O9X_FOURCC 0x3378396F // o9x for Taranis X7
 #elif defined(PCBTARANIS)
-  #define OTX_FOURCC 0x3378746F // otx for Taranis
-  #define O9X_FOURCC 0x3378396F // o9x for Taranis
+  #define OTX_FOURCC 0x3378746F // otx for Taranis X9D
+  #define O9X_FOURCC 0x3378396F // o9x for Taranis X9D
 #elif defined(PCBSKY9X)
   #define OTX_FOURCC 0x3278746F // otx for sky9x
   #define O9X_FOURCC 0x3278396F // o9x for sky9x

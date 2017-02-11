@@ -56,7 +56,7 @@ class FirmwareInterface
     int getSplashWidth();
     uint getSplashHeight();
     QImage::Format getSplashFormat();
-    unsigned int save(QString fileName);
+    unsigned int save(const QString & fileName);
     bool isValid();
 
   private:
@@ -64,9 +64,9 @@ class FirmwareInterface
     uint flashSize;
     QString seekString(const QString & string);
     QString seekLabel(const QString & label);
-    void SeekSplash();
-    bool SeekSplash(QByteArray sps, QByteArray spe, int size);
-    bool SeekSplash(QByteArray splash);
+    void seekSplash();
+    bool seekSplash(QByteArray sps, QByteArray spe, int size);
+    bool seekSplash(QByteArray splash);
     QString filename;
     QString date;
     QString time;

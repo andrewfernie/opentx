@@ -28,35 +28,48 @@
 
 #define GVARS_VARIANT                  0x0001
 #define FRSKY_VARIANT                  0x0002
-#define POS3_VARIANT                   0x0004
 #define MAVLINK_VARIANT                0x0008
 #define M128_VARIANT                   0x8000
 #define TARANIS_X9E_VARIANT            0x8000
+#define TARANIS_X7_VARIANT             0x4000
 
 #define SIMU_STOCK_VARIANTS            (GVARS_VARIANT|FRSKY_VARIANT)
 #define SIMU_M128_VARIANTS             (M128_VARIANT|SIMU_STOCK_VARIANTS)
 
 class OpenTxGeneralData: public TransformedField {
   public:
-    OpenTxGeneralData(GeneralSettings & generalData, BoardEnum board, unsigned int version, unsigned int variant=0);
+    OpenTxGeneralData(GeneralSettings & generalData, Board::Type board, unsigned int version, unsigned int variant=0);
+
+    virtual const char * getName() { return internalField.getName(); }
+
+    QStringList errors()
+    {
+      return _errors;
+    }
 
   protected:
     virtual void beforeExport();
     virtual void afterImport();
 
+    virtual void setError(const QString & error)
+    {
+      qWarning() << error;
+      _errors << error;
+    }
+
     StructField internalField;
     GeneralSettings & generalData;
-    BoardEnum board;
+    Board::Type board;
     unsigned int version;
     int inputsCount;
     unsigned int chkSum;
-    // unsigned int potsType[4];
+    QStringList _errors;
 };
 
 class ProtocolsConversionTable: public ConversionTable
 {
   public:
-    ProtocolsConversionTable(BoardEnum board)
+    ProtocolsConversionTable(Board::Type board)
     {
       int val = 0;
       if (IS_ARM(board)) {
@@ -85,8 +98,8 @@ class ProtocolsConversionTable: public ConversionTable
         addConversion(PULSES_DSM2, val++);
         addConversion(PULSES_DSMX, val++);
       }
-      if (IS_TARANIS(board)) {
-    	addConversion(PULSES_CROSSFIRE, val++);
+      if (IS_HORUS_OR_TARANIS(board)) {
+    	  addConversion(PULSES_CROSSFIRE, val++);
         addConversion(PULSES_MULTIMODULE, val++);
       }
     }
@@ -105,25 +118,35 @@ class ChannelsConversionTable: public ConversionTable
 
 class OpenTxModelData: public TransformedField {
   public:
-    OpenTxModelData(ModelData & modelData, BoardEnum board, unsigned int version, unsigned int variant);
+    OpenTxModelData(ModelData & modelData, Board::Type board, unsigned int version, unsigned int variant);
 
-    const char * getName() { return name; }
+    virtual const char * getName() { return internalField.getName(); }
+
+    QStringList errors()
+    {
+      return _errors;
+    }
 
   protected:
     virtual void beforeExport();
     virtual void afterImport();
 
+    virtual void setError(const QString & error)
+    {
+      qWarning() << error;
+      _errors << error;
+    }
+
     StructField internalField;
     ModelData & modelData;
-    BoardEnum board;
+    Board::Type board;
     unsigned int version;
     unsigned int variant;
-
-  private:
     char name[256];
     int subprotocols[CPN_MAX_MODULES+1/*trainer*/];
     ProtocolsConversionTable protocolsConversionTable;
     ChannelsConversionTable channelsConversionTable;
+    QStringList _errors;
 };
 
 void OpenTxEepromCleanup(void);

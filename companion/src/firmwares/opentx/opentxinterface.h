@@ -24,12 +24,13 @@
 #include "eeprominterface.h"
 
 class RleFile;
+class OpenTxFirmware;
 
 class OpenTxEepromInterface : public EEPROMInterface
 {
   public:
 
-    OpenTxEepromInterface(BoardEnum board);
+    OpenTxEepromInterface(OpenTxFirmware * firmware);
 
     virtual ~OpenTxEepromInterface();
 
@@ -66,18 +67,16 @@ class OpenTxEepromInterface : public EEPROMInterface
     bool loadRadioSettingsFromRLE(GeneralSettings & settings, RleFile * rleFile, uint8_t version);
     
     bool loadModelFromRLE(ModelData & model, RleFile * rleFile, unsigned int index, uint8_t version, uint32_t variant);
+
+    void showErrors(const QString & title, const QStringList & errors);
     
-    template <class T>
-    bool saveModel(unsigned int index, ModelData & model, uint8_t version, uint32_t variant);
-    
-    template <class T>
-    bool saveRadioSettings(GeneralSettings & settings, BoardEnum board, uint8_t version, uint32_t variant);
-    
-    uint8_t getLastDataVersion(BoardEnum board);
+    uint8_t getLastDataVersion(Board::Type board);
     
     uint32_t getFourCC();
     
     RleFile * efile;
+    
+    OpenTxFirmware * firmware;
 
 };
 
@@ -85,12 +84,13 @@ class OpenTxFirmware: public Firmware
 {
   public:
     OpenTxFirmware(const QString & id, OpenTxFirmware * parent):
-      Firmware(parent, id, parent->getName(), parent->getBoard(), parent->eepromInterface)
+      Firmware(parent, id, parent->getName(), parent->getBoard())
     {
+      setEEpromInterface(parent->getEEpromInterface());
     }
 
-    OpenTxFirmware(const QString & id, const QString & name, const BoardEnum board):
-      Firmware(id, name, board, new OpenTxEepromInterface(board))
+    OpenTxFirmware(const QString & id, const QString & name, const Board::Type board):
+      Firmware(id, name, board)
     {
       addLanguage("en");
       addLanguage("cz");
@@ -127,13 +127,9 @@ class OpenTxFirmware: public Firmware
 
     virtual int getCapability(Capability);
     
-    virtual Switch getSwitch(unsigned int index);
-    
     virtual QString getAnalogInputName(unsigned int index);
     
     virtual QTime getMaxTimerStart();
-
-    virtual bool isTelemetrySourceAvailable(int source);
 
     virtual int isAvailable(PulsesProtocol proto, int port=0);
 
@@ -145,12 +141,11 @@ class OpenTxFirmware: public Firmware
 
 void registerOpenTxFirmwares();
 void unregisterOpenTxFirmwares();
-void registerOpenTxEEpromInterfaces();
 
 extern QList<OpenTxEepromInterface *> opentxEEpromInterfaces;
 
-bool loadModelFromByteArray(ModelData & model, const QByteArray & data);
-bool loadRadioSettingsFromByteArray(GeneralSettings & settings, const QByteArray & data);
+OpenTxEepromInterface * loadModelFromByteArray(ModelData & model, const QByteArray & data);
+OpenTxEepromInterface * loadRadioSettingsFromByteArray(GeneralSettings & settings, const QByteArray & data);
 
 bool writeModelToByteArray(const ModelData & model, QByteArray & data);
 bool writeRadioSettingsToByteArray(const GeneralSettings & settings, QByteArray & data);

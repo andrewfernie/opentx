@@ -483,6 +483,11 @@ void menuModelSetup(event_t event)
                 g_model.switchWarningState = switches_states;
                 AUDIO_WARNING1();
                 storageDirty(EE_MODEL);
+#elif defined(PCBX7)
+                getMovedSwitch();
+                g_model.switchWarningState = switches_states;
+                AUDIO_WARNING1();
+                storageDirty(EE_MODEL);
 #else
                 if (menuHorizontalPosition == NUM_SWITCHES-1) {
                   START_NO_HIGHLIGHT();
@@ -499,7 +504,19 @@ void menuModelSetup(event_t event)
         }
 
         LcdFlags line = attr;
-
+#if defined(PCBX7)
+        int current = 0;
+        for (int i=0; i<NUM_SWITCHES-1; i++) {
+          if (SWITCH_WARNING_ALLOWED(i)) {
+            uint8_t swactive = !(g_model.switchWarningEnable & (1<<i));
+            c = "\300-\301"[states & 0x03];
+            lcdDrawChar(MODEL_SETUP_2ND_COLUMN+(2*FW*i), y, (i < 4 ? 'A'+i : 'B'+i), line && (menuHorizontalPosition==current) ? INVERS : 0);
+            if (swactive) lcdDrawChar(lcdNextPos, y, c);
+            ++current;
+          }
+          states >>= 2;
+        }
+#else // PCBX7
         for (uint8_t i=0; i<NUM_SWITCHES-1/*not on TRN switch*/; i++) {
           uint8_t swactive = !(g_model.switchWarningEnable & 1 << i);
           attr = 0;
@@ -515,15 +532,18 @@ void menuModelSetup(event_t event)
             states >>= 1;
           }
           if (line && (menuHorizontalPosition == i)) {
-            attr = BLINK;
-            if (swactive)
-              attr |= INVERS;
+            attr = BLINK | INVERS;
           }
+#if defined(CPUARM)
+          lcdDrawChar(MODEL_SETUP_2ND_COLUMN+i*FW, y, (swactive) ? c : '-', attr);
+#else
           lcdDrawChar(MODEL_SETUP_2ND_COLUMN+i*FW, y, (swactive || (attr & BLINK)) ? c : '-', attr);
+#endif
 #if !defined(CPUM64)
           lcdDrawText(MODEL_SETUP_2ND_COLUMN+(NUM_SWITCHES*FW), y, PSTR("<]"), (menuHorizontalPosition == NUM_SWITCHES-1 && !NO_HIGHLIGHT()) ? line : 0);
 #endif
         }
+#endif // PCBX7
         break;
       }
 
@@ -665,7 +685,7 @@ void menuModelSetup(event_t event)
                 g_model.moduleData[EXTERNAL_MODULE].setMultiProtocol(checkIncDec(event, g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(false), 0, 63, EE_MODEL));
               else if (pdef->maxSubtype > 0)
                 CHECK_INCDEC_MODELVAR(event, g_model.moduleData[EXTERNAL_MODULE].subType, 0, pdef->maxSubtype);
-
+              break;
             case 1:
               // Custom protocol, third column is subtype
               CHECK_INCDEC_MODELVAR(event, g_model.moduleData[EXTERNAL_MODULE].subType, 0, 7);
@@ -859,7 +879,7 @@ void menuModelSetup(event_t event)
         else if (IS_MODULE_MULTIMODULE(moduleIdx)) {
           int optionValue =  g_model.moduleData[moduleIdx].multi.optionValue;
 
-          const uint8_t multi_proto = g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(false);
+          const uint8_t multi_proto = g_model.moduleData[EXTERNAL_MODULE].getMultiProtocol(true);
           const mm_protocol_definition* pdef = getMultiProtocolDefinition(multi_proto);
           if (pdef->optionsstr)
             lcdDrawTextAlignedLeft(y, pdef->optionsstr);

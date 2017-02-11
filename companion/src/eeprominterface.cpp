@@ -27,40 +27,13 @@
 #include "helpers.h"
 #include "wizarddata.h"
 #include "firmwareinterface.h"
+#include "macros.h"
 #include <stdio.h>
 #include <list>
 #include <float.h>
 #include <QtWidgets>
 #include <stdlib.h>
 #include <bitset>
-
-std::list<QString> EEPROMWarnings;
-
-int getEEpromSize(BoardEnum board)
-{
-  switch (board) {
-    case BOARD_STOCK:
-      return EESIZE_STOCK;
-    case BOARD_M128:
-      return EESIZE_M128;
-    case BOARD_MEGA2560:
-    case BOARD_GRUVIN9X:
-      return EESIZE_GRUVIN9X;
-    case BOARD_SKY9X:
-      return EESIZE_SKY9X;
-    case BOARD_9XRPRO:
-    case BOARD_AR9X:
-      return EESIZE_9XRPRO;
-    case BOARD_TARANIS_X7:
-    case BOARD_TARANIS_X9D:
-    case BOARD_TARANIS_X9DP:
-    case BOARD_TARANIS_X9E:
-    case BOARD_FLAMENCO:
-      return EESIZE_TARANIS;
-    default:
-      return 0; // unlimited
-  }
-}
 
 const uint8_t chout_ar[] = { // First number is 0..23 -> template setup,  Second is relevant channel out
   1,2,3,4 , 1,2,4,3 , 1,3,2,4 , 1,3,4,2 , 1,4,2,3 , 1,4,3,2,
@@ -247,7 +220,7 @@ QString SensorData::unitString() const
 
 bool RawSource::isTimeBased() const
 {
-  if (IS_ARM(GetCurrentFirmware()->getBoard()))
+  if (IS_ARM(getCurrentBoard()))
     return (type == SOURCE_TYPE_SPECIAL && index > 0);
   else
     return (type==SOURCE_TYPE_TELEMETRY && (index==TELEMETRY_SOURCE_TX_TIME || index==TELEMETRY_SOURCE_TIMER1 || index==TELEMETRY_SOURCE_TIMER2 || index==TELEMETRY_SOURCE_TIMER3));
@@ -255,7 +228,7 @@ bool RawSource::isTimeBased() const
 
 float RawSourceRange::getValue(int value)
 {
-  if (IS_ARM(GetCurrentFirmware()->getBoard()))
+  if (IS_ARM(getCurrentBoard()))
     return float(value) * step;
   else
     return min + float(value) * step;
@@ -265,7 +238,7 @@ RawSourceRange RawSource::getRange(const ModelData * model, const GeneralSetting
 {
   RawSourceRange result;
 
-  Firmware * firmware = GetCurrentFirmware();
+  Firmware * firmware = getCurrentFirmware();
   int board = firmware->getBoard();
   bool singleprec = (flags & RANGE_SINGLE_PRECISION);
 
@@ -567,7 +540,7 @@ QString RawSource::toString(const ModelData * model) const
     case SOURCE_TYPE_LUA_OUTPUT:
       return QObject::tr("LUA%1%2").arg(index/16+1).arg(QChar('a'+index%16));
     case SOURCE_TYPE_STICK:
-      return GetCurrentFirmware()->getAnalogInputName(index);
+      return getCurrentFirmware()->getAnalogInputName(index);
     case SOURCE_TYPE_TRIM:
       return CHECK_IN_ARRAY(trims, index);
     case SOURCE_TYPE_ROTARY_ENCODER:
@@ -575,7 +548,7 @@ QString RawSource::toString(const ModelData * model) const
     case SOURCE_TYPE_MAX:
       return QObject::tr("MAX");
     case SOURCE_TYPE_SWITCH:
-      return GetCurrentFirmware()->getSwitch(index).name;
+      return getSwitchInfo(getCurrentBoard(), index).name;
     case SOURCE_TYPE_CUSTOM_SWITCH:
       return QObject::tr("L%1").arg(index+1);
     case SOURCE_TYPE_CYC:
@@ -587,7 +560,7 @@ QString RawSource::toString(const ModelData * model) const
     case SOURCE_TYPE_SPECIAL:
       return CHECK_IN_ARRAY(special, index);
     case SOURCE_TYPE_TELEMETRY:
-      if (IS_ARM(GetEepromInterface()->getBoard())) {
+      if (IS_ARM(getCurrentBoard())) {
         div_t qr = div(index, 3);
         QString result = QString(model ? model->sensorData[qr.quot].label : QString("[T%1]").arg(qr.quot+1));
         if (qr.rem) result += qr.rem == 1 ? "-" : "+";
@@ -607,18 +580,22 @@ bool RawSource::isPot() const
 {
   return (type == SOURCE_TYPE_STICK &&
           index >= CPN_MAX_STICKS &&
-          index < CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots));
+          index < CPN_MAX_STICKS + getBoardCapability(getCurrentBoard(), Board::Pots));
 }
 
 bool RawSource::isSlider() const
 {
   return (type == SOURCE_TYPE_STICK &&
-          index >= CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots) &&
-          index < CPN_MAX_STICKS+GetCurrentFirmware()->getCapability(Pots)+GetCurrentFirmware()->getCapability(Sliders));
+          index >= CPN_MAX_STICKS + getBoardCapability(getCurrentBoard(), Board::Pots) &&
+          index < CPN_MAX_STICKS + getBoardCapability(getCurrentBoard(), Board::Pots) + getBoardCapability(getCurrentBoard(), Board::Sliders));
 }
 
-QString RawSwitch::toString() const
+QString RawSwitch::toString(Board::Type board) const
 {
+  if (board == Board::BOARD_UNKNOWN) {
+    board = getCurrentBoard();
+  }
+
   static const QString switches9X[] = {
     QString("THR"), QString("RUD"), QString("ELE"),
     QString("ID0"), QString("ID1"), QString("ID2"),
@@ -655,14 +632,13 @@ QString RawSwitch::toString() const
     return QString("!") + RawSwitch(type, -index).toString();
   }
   else {
-    BoardEnum board = GetEepromInterface()->getBoard();
     switch(type) {
       case SWITCH_TYPE_SWITCH:
         if (IS_HORUS_OR_TARANIS(board)) {
           div_t qr = div(index-1, 3);
-          Firmware::Switch sw = GetCurrentFirmware()->getSwitch(qr.quot);
+          Board::SwitchInfo switchInfo = getSwitchInfo(board, qr.quot);
           const char * positions[] = { ARROW_UP, "-", ARROW_DOWN };
-          return QString(sw.name) + QString(positions[qr.rem]);
+          return QString(switchInfo.name) + QString(positions[qr.rem]);
         }
         else {
           return CHECK_IN_ARRAY(switches9X, index - 1);
@@ -791,7 +767,7 @@ QString LogicalSwitchData::funcToString() const
 void CustomFunctionData::clear()
 {
   memset(this, 0, sizeof(CustomFunctionData));
-  if (!GetCurrentFirmware()->getCapability(SafetyChannelCustomFunction)) {
+  if (!getCurrentFirmware()->getCapability(SafetyChannelCustomFunction)) {
     func = FuncTrainer;
   }
 }
@@ -864,8 +840,8 @@ QString CustomFunctionData::funcToString() const
 void CustomFunctionData::populateResetParams(const ModelData * model, QComboBox * b, unsigned int value = 0)
 {
   int val = 0;
-  Firmware * firmware = GetCurrentFirmware();
-  BoardEnum board = GetEepromInterface()->getBoard();
+  Firmware * firmware = getCurrentFirmware();
+  Board::Type board = firmware->getBoard();
 
   b->addItem(QObject::tr("Timer1"), val++);
   b->addItem(QObject::tr("Timer2"), val++);
@@ -946,7 +922,7 @@ QString CustomFunctionData::paramToString(const ModelData * model) const
     return item.toString(model);
   }
   else if ((func==FuncPlayPrompt) || (func==FuncPlayBoth)) {
-    if ( GetCurrentFirmware()->getCapability(VoicesAsNumbers)) {
+    if ( getCurrentFirmware()->getCapability(VoicesAsNumbers)) {
       return QString("%1").arg(param);
     }
     else {
@@ -977,7 +953,7 @@ QString CustomFunctionData::repeatToString() const
     return "";
   }
   else {
-    unsigned int step = IS_ARM(GetEepromInterface()->getBoard()) ? 1 : 10;
+    unsigned int step = IS_ARM(getCurrentBoard()) ? 1 : 10;
     return QObject::tr("repeat(%1s)").arg(step*repeatParam);
   }
 }
@@ -1045,39 +1021,36 @@ void LimitData::clear()
   max = +1000;
 }
 
-GeneralSettings::SwitchInfo GeneralSettings::switchInfoFromSwitchPositionTaranis(unsigned int index)
-{
-  return SwitchInfo((index-1)/3, (index-1)%3);
-}
-
 bool GeneralSettings::switchPositionAllowedTaranis(int index) const
 {
   if (index == 0)
     return true;
-  SwitchInfo info = switchInfoFromSwitchPositionTaranis(abs(index));
-  if (index < 0 && switchConfig[info.index] != Firmware::SWITCH_3POS)
+
+  div_t qr = div(abs(index)-1, 3);
+
+  if (index < 0 && switchConfig[qr.quot] != Board::SWITCH_3POS)
     return false;
-  else if (info.position == 1)
-    return switchConfig[info.index] == Firmware::SWITCH_3POS;
+  else if (qr.rem == 1)
+    return switchConfig[qr.quot] == Board::SWITCH_3POS;
   else
-    return switchConfig[info.index] != Firmware::SWITCH_NONE;
+    return switchConfig[qr.quot] != Board::SWITCH_NOT_AVAILABLE;
 }
 
 bool GeneralSettings::switchSourceAllowedTaranis(int index) const
 {
-  return switchConfig[index] != Firmware::SWITCH_NONE;
+  return switchConfig[index] != Board::SWITCH_NOT_AVAILABLE;
 }
 
 bool GeneralSettings::isPotAvailable(int index) const
 {
-  if (index<0 || index>GetCurrentFirmware()->getCapability(Pots)) return false;
-  return potConfig[index] != POT_NONE;
+  if (index<0 || index>getBoardCapability(getCurrentBoard(), Board::Pots)) return false;
+  return potConfig[index] != Board::POT_NONE;
 }
 
 bool GeneralSettings::isSliderAvailable(int index) const
 {
-  if (index<0 || index>GetCurrentFirmware()->getCapability(Sliders)) return false;
-  return sliderConfig[index] != SLIDER_NONE;
+  if (index<0 || index>getBoardCapability(getCurrentBoard(), Board::Sliders)) return false;
+  return sliderConfig[index] != Board::SLIDER_NONE;
 }
 
 GeneralSettings::GeneralSettings()
@@ -1093,30 +1066,48 @@ GeneralSettings::GeneralSettings()
     calibSpanPos[i] = 0x180;
   }
 
-  for (int i=0; i<GetCurrentFirmware()->getCapability(Switches); i++) {
-    switchConfig[i] = GetCurrentFirmware()->getSwitch(i).type;
+  Firmware * firmware = getCurrentFirmware();
+  Board::Type board = firmware->getBoard();
+
+  for (int i=0; i<getBoardCapability(board, Board::FactoryInstalledSwitches); i++) {
+    switchConfig[i] = getSwitchInfo(board, i).config;
   }
 
-  BoardEnum board = GetEepromInterface()->getBoard();
-  if (board == BOARD_HORUS) {
-    potConfig[0] = POT_WITH_DETENT;
-    potConfig[1] = POT_MULTIPOS_SWITCH;
-    potConfig[2] = POT_WITH_DETENT;
-    sliderConfig[0] = SLIDER_WITH_DETENT;
-    sliderConfig[1] = SLIDER_WITH_DETENT;
-    sliderConfig[2] = SLIDER_WITH_DETENT;
-    sliderConfig[3] = SLIDER_WITH_DETENT;
+  backlightMode = 3; // keys and sticks
+  // backlightBright = 0; // 0 = 100%
+
+  if (IS_HORUS(board)) {
+    backlightOffBright = 20;
+  }
+
+  if (IS_HORUS(board)) {
+    potConfig[0] = Board::POT_WITH_DETENT;
+    potConfig[1] = Board::POT_MULTIPOS_SWITCH;
+    potConfig[2] = Board::POT_WITH_DETENT;
+  }
+  else if (IS_TARANIS_X7(board)) {
+    potConfig[0] = Board::POT_WITHOUT_DETENT;
+    potConfig[1] = Board::POT_WITH_DETENT;
   }
   else if (IS_TARANIS(board)) {
-    potConfig[0] = POT_WITH_DETENT;
-    potConfig[1] = POT_WITH_DETENT;
-    sliderConfig[0] = SLIDER_WITH_DETENT;
-    sliderConfig[1] = SLIDER_WITH_DETENT;
+    potConfig[0] = Board::POT_WITH_DETENT;
+    potConfig[1] = Board::POT_WITH_DETENT;
   }
   else {
-    for (int i=0; i<3; i++) {
-      potConfig[i] = POT_WITHOUT_DETENT;
-    }
+    potConfig[0] = Board::POT_WITHOUT_DETENT;
+    potConfig[1] = Board::POT_WITHOUT_DETENT;
+    potConfig[2] = Board::POT_WITHOUT_DETENT;
+  }
+
+  if (IS_HORUS(board) || IS_TARANIS_X9E(board)) {
+    sliderConfig[0] = Board::SLIDER_WITH_DETENT;
+    sliderConfig[1] = Board::SLIDER_WITH_DETENT;
+    sliderConfig[2] = Board::SLIDER_WITH_DETENT;
+    sliderConfig[3] = Board::SLIDER_WITH_DETENT;
+  }
+  else if (IS_TARANIS(board) && !IS_TARANIS_X7(board)) {
+    sliderConfig[0] = Board::SLIDER_WITH_DETENT;
+    sliderConfig[1] = Board::SLIDER_WITH_DETENT;
   }
 
   if (IS_ARM(board)) {
@@ -1127,23 +1118,23 @@ GeneralSettings::GeneralSettings()
     strcpy(bluetoothName, "Taranis");
   }
 
-  templateSetup = g.profile[g.id()].channelOrder();
-  stickMode = g.profile[g.id()].defaultMode();
+  templateSetup = g.profile[g.sessionId()].channelOrder();
+  stickMode = g.profile[g.sessionId()].defaultMode();
 
-  QString t_calib = g.profile[g.id()].stickPotCalib();
-  int potsnum = GetCurrentFirmware()->getCapability(Pots);
+  QString t_calib = g.profile[g.sessionId()].stickPotCalib();
+  int potsnum = getBoardCapability(getCurrentBoard(), Board::Pots);
   if (!t_calib.isEmpty()) {
-    QString t_trainercalib=g.profile[g.id()].trainerCalib();
-    int8_t t_txVoltageCalibration=(int8_t)g.profile[g.id()].txVoltageCalibration();
-    int8_t t_txCurrentCalibration=(int8_t)g.profile[g.id()].txCurrentCalibration();
-    int8_t t_PPM_Multiplier=(int8_t)g.profile[g.id()].ppmMultiplier();
-    uint8_t t_stickMode=(uint8_t)g.profile[g.id()].gsStickMode();
-    uint8_t t_vBatWarn=(uint8_t)g.profile[g.id()].vBatWarn();
-    QString t_DisplaySet=g.profile[g.id()].display();
-    QString t_BeeperSet=g.profile[g.id()].beeper();
-    QString t_HapticSet=g.profile[g.id()].haptic();
-    QString t_SpeakerSet=g.profile[g.id()].speaker();
-    QString t_CountrySet=g.profile[g.id()].countryCode();
+    QString t_trainercalib=g.profile[g.sessionId()].trainerCalib();
+    int8_t t_txVoltageCalibration=(int8_t)g.profile[g.sessionId()].txVoltageCalibration();
+    int8_t t_txCurrentCalibration=(int8_t)g.profile[g.sessionId()].txCurrentCalibration();
+    int8_t t_PPM_Multiplier=(int8_t)g.profile[g.sessionId()].ppmMultiplier();
+    uint8_t t_stickMode=(uint8_t)g.profile[g.sessionId()].gsStickMode();
+    uint8_t t_vBatWarn=(uint8_t)g.profile[g.sessionId()].vBatWarn();
+    QString t_DisplaySet=g.profile[g.sessionId()].display();
+    QString t_BeeperSet=g.profile[g.sessionId()].beeper();
+    QString t_HapticSet=g.profile[g.sessionId()].haptic();
+    QString t_SpeakerSet=g.profile[g.sessionId()].speaker();
+    QString t_CountrySet=g.profile[g.sessionId()].countryCode();
 
     if ((t_calib.length()==(CPN_MAX_STICKS+potsnum)*12) && (t_trainercalib.length()==16)) {
       QString Byte;
@@ -1285,7 +1276,7 @@ RawSourceRange FrSkyChannelData::getRange() const
 void FrSkyScreenData::clear()
 {
   memset(this, 0, sizeof(FrSkyScreenData));
-  if (!IS_ARM(GetCurrentFirmware()->getBoard())) {
+  if (!IS_ARM(getCurrentBoard())) {
     type = TELEMETRY_SCREEN_NUMBERS;
   }
 }
@@ -1416,7 +1407,7 @@ void ModelData::clearInputs()
     expoData[i].clear();
 
   //clear all input names
-  if (GetCurrentFirmware()->getCapability(VirtualInputs)) {
+  if (getCurrentFirmware()->getCapability(VirtualInputs)) {
     for (int i=0; i<CPN_MAX_INPUTS; i++) {
       inputNames[i][0] = 0;
     }
@@ -1431,7 +1422,7 @@ void ModelData::clearMixes()
 
 RadioData::RadioData()
 {
-  models.resize(GetCurrentFirmware()->getCapability(Models));
+  models.resize(getCurrentFirmware()->getCapability(Models));
 }
 
 void ModelData::clear()
@@ -1443,7 +1434,7 @@ void ModelData::clear()
   moduleData[0].ppm.delay = 300;
   moduleData[1].ppm.delay = 300;
   moduleData[2].ppm.delay = 300;
-  int board = GetEepromInterface()->getBoard();
+  int board = getCurrentBoard();
   if (IS_HORUS_OR_TARANIS(board)) {
     moduleData[0].protocol = PULSES_PXX_XJT_X16;
     moduleData[1].protocol = PULSES_OFF;
@@ -1477,6 +1468,9 @@ void ModelData::clear()
   frsky.clear();
   for (int i=0; i<CPN_MAX_SENSORS; i++)
     sensorData[i].clear();
+
+  static const uint8_t blob[] = { 0x4c, 0x61, 0x79, 0x6f, 0x75, 0x74, 0x32, 0x50, 0x31, 0x00, 0x4d, 0x6f, 0x64, 0x65, 0x6c, 0x42, 0x6d, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+  memcpy(customScreenData[0], blob, sizeof(blob));
 }
 
 bool ModelData::isEmpty() const
@@ -1514,7 +1508,7 @@ QString removeAccents(const QString & str)
 
 void ModelData::setDefaultInputs(const GeneralSettings & settings)
 {
-  BoardEnum board = GetEepromInterface()->getBoard();
+  Board::Type board = getCurrentBoard();
   if (IS_ARM(board)) {
     for (int i=0; i<CPN_MAX_STICKS; i++) {
       ExpoData * expo = &expoData[i];
@@ -1529,7 +1523,7 @@ void ModelData::setDefaultInputs(const GeneralSettings & settings)
 
 void ModelData::setDefaultMixes(const GeneralSettings & settings)
 {
-  BoardEnum board = GetEepromInterface()->getBoard();
+  Board::Type board = getCurrentBoard();
   if (IS_ARM(board)) {
     setDefaultInputs(settings);
   }
@@ -1653,19 +1647,12 @@ ModelData ModelData::removeGlobalVars()
 int ModelData::getChannelsMax(bool forceExtendedLimits) const
 {
   if (forceExtendedLimits || extendedLimits)
-    return IS_TARANIS(GetCurrentFirmware()->getBoard()) ? 150 : 125;
+    return IS_HORUS_OR_TARANIS(getCurrentBoard()) ? 150 : 125;
   else
     return 100;
 }
 
 QList<EEPROMInterface *> eepromInterfaces;
-
-void registerEEpromInterfaces()
-{
-  registerOpenTxEEpromInterfaces();
-  // eepromInterfaces.push_back(new Ersky9xInterface());
-  // eepromInterfaces.push_back(new Er9xInterface());
-}
 
 void unregisterEEpromInterfaces()
 {
@@ -1731,33 +1718,35 @@ void ShowEepromWarnings(QWidget *parent, const QString &title, unsigned long err
   msgBox.exec();
 }
 
-QString getBoardName(BoardEnum board)
+QString getBoardName(Board::Type board)
 {
   switch (board) {
-    case BOARD_STOCK:
+    case Board::BOARD_STOCK:
       return "9X";
-    case BOARD_M128:
+    case Board::BOARD_M128:
       return "9X128";
-    case BOARD_GRUVIN9X:
+    case Board::BOARD_GRUVIN9X:
       return "Gruvin9x";
-    case BOARD_MEGA2560:
+    case Board::BOARD_MEGA2560:
       return "MEGA2560";
-    case BOARD_TARANIS_X7:
+    case Board::BOARD_TARANIS_X7:
       return "Taranis X7";
-    case BOARD_TARANIS_X9D:
+    case Board::BOARD_TARANIS_X9D:
       return "Taranis X9D";
-    case BOARD_TARANIS_X9DP:
+    case Board::BOARD_TARANIS_X9DP:
       return "Taranis X9D+";
-    case BOARD_TARANIS_X9E:
+    case Board::BOARD_TARANIS_X9E:
       return "Taranis X9E";
-    case BOARD_SKY9X:
+    case Board::BOARD_SKY9X:
       return "Sky9x";
-    case BOARD_9XRPRO:
+    case Board::BOARD_9XRPRO:
       return "9XR-PRO";
-    case BOARD_AR9X:
+    case Board::BOARD_AR9X:
       return "AR9X";
-    case BOARD_HORUS:
+    case Board::BOARD_X12S:
       return "Horus";
+    case Board::BOARD_X10:
+      return "X10";
     default:
       return "Unknown";
   }
@@ -1766,31 +1755,32 @@ QString getBoardName(BoardEnum board)
 const int Firmware::getFlashSize()
 {
   switch (board) {
-    case BOARD_STOCK:
+    case Board::BOARD_STOCK:
       return FSIZE_STOCK;
-    case BOARD_M128:
+    case Board::BOARD_M128:
       return FSIZE_M128;
-    case BOARD_MEGA2560:
-    case BOARD_GRUVIN9X:
+    case Board::BOARD_MEGA2560:
+    case Board::BOARD_GRUVIN9X:
       return FSIZE_GRUVIN9X;
-    case BOARD_SKY9X:
+    case Board::BOARD_SKY9X:
       return FSIZE_SKY9X;
-    case BOARD_9XRPRO:
-    case BOARD_AR9X:
+    case Board::BOARD_9XRPRO:
+    case Board::BOARD_AR9X:
       return FSIZE_9XRPRO;
-    case BOARD_TARANIS_X9D:
-    case BOARD_TARANIS_X9DP:
-    case BOARD_TARANIS_X9E:
-    case BOARD_FLAMENCO:
+    case Board::BOARD_TARANIS_X9D:
+    case Board::BOARD_TARANIS_X9DP:
+    case Board::BOARD_TARANIS_X9E:
+    case Board::BOARD_FLAMENCO:
       return FSIZE_TARANIS;
-    case BOARD_HORUS:
+    case Board::BOARD_X12S:
+    case Board::BOARD_X10:
       return FSIZE_HORUS;
     default:
       return 0;
   }
 }
 
-Firmware * GetFirmware(const QString & id)
+Firmware * getFirmware(const QString & id)
 {
   foreach(Firmware * firmware, firmwares) {
     Firmware * result = firmware->getFirmwareVariant(id);
@@ -1844,17 +1834,18 @@ void Firmware::addOptions(Option options[])
   this->opts.push_back(opts);
 }
 
-SimulatorInterface *GetCurrentFirmwareSimulator()
+SimulatorInterface * getCurrentSimulator()
 {
-  QString firmwareId = GetCurrentFirmware()->getId();
-  SimulatorFactory *factory = getSimulatorFactory(firmwareId);
+  QString firmwareId = getCurrentFirmware()->getId();
+  SimulatorFactory * factory = getSimulatorFactory(firmwareId);
   if (factory)
     return factory->create();
   else
     return NULL;
 }
 
-unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
+unsigned int getNumSubtypes(MultiModuleRFProtocols type)
+{
   switch (type) {
     case MM_RF_PROTO_HISKY:
     case MM_RF_PROTO_SYMAX:
@@ -1869,11 +1860,11 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
     case MM_RF_PROTO_CG023:
       return 3;
 
-    case MM_RF_PROTO_FRSKY:
     case MM_RF_PROTO_DSM2:
     case MM_RF_PROTO_MT99XX:
     case MM_RF_PROTO_HONTAI:
     case MM_RF_PROTO_AFHDS2A:
+    case MM_RF_PROTO_Q303:
       return 4;
 
     case MM_RF_PROTO_FLYSKY:
@@ -1881,7 +1872,8 @@ unsigned int getNumSubtypes(MultiModuleRFProtocols type) {
     case MM_RF_PROTO_YD717:
       return 5;
 
-    case MM_RF_PROTO_WALKERA_2x01:
+    case MM_RF_PROTO_FRSKY:
+    case MM_RF_PROTO_WK_2X01:
       return 6;
 
     case MM_RF_PROTO_CX10:

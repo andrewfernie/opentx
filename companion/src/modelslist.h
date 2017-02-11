@@ -34,127 +34,78 @@ class TreeItem
 {
   public:
     explicit TreeItem(const QVector<QVariant> & itemData);
-    explicit TreeItem(TreeItem * parent, int modelIndex = -1);
+    explicit TreeItem(TreeItem * parent, int categoryIndex, int modelIndex);
     ~TreeItem();
-    
-    TreeItem *child(int number);
+
+    TreeItem * child(int number);
     int childCount() const;
     int columnCount() const;
     QVariant data(int column) const;
-    TreeItem * appendChild(int modelIndex);
+    TreeItem * appendChild(int categoryIndex, int modelIndex);
     TreeItem * parent();
     bool removeChildren(int position, int count);
-    
+
     int childNumber() const;
     bool setData(int column, const QVariant &value);
-    
+
     int getModelIndex() const { return modelIndex; }
-  
+    int getCategoryIndex() const { return categoryIndex; }
+
   private:
     QList<TreeItem*> childItems;
     QVector<QVariant> itemData;
     TreeItem * parentItem;
+    int categoryIndex;
     int modelIndex;
 };
 
 
 class TreeModel : public QAbstractItemModel
 {
-    // Q_OBJECT
-  
+    Q_OBJECT
+
   public:
     TreeModel(RadioData * radioData, QObject *parent = 0);
-    ~TreeModel();
-    
+    virtual ~TreeModel();
+
     QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
-    
+
     QModelIndex index(int row, int column,
                       const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
     QModelIndex parent(const QModelIndex &index) const Q_DECL_OVERRIDE;
-    
+
     int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
     int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-    
+
     Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
     bool setData(const QModelIndex &index, const QVariant &value,
                  int role = Qt::EditRole) Q_DECL_OVERRIDE;
-    
+
     bool removeRows(int position, int rows,
                     const QModelIndex &parent = QModelIndex()) Q_DECL_OVERRIDE;
-    
+
     void refresh();
-  
+
     int getAvailableEEpromSize() { return availableEEpromSize; }
-    
+
     int getModelIndex(const QModelIndex & index) const {
       return getItem(index)->getModelIndex();
     }
-    
+
+    int getCategoryIndex(const QModelIndex & index) const {
+      return getItem(index)->getCategoryIndex();
+    }
+
+    int rowNumber(const QModelIndex & index = QModelIndex()) const {
+      return getItem(index)->childNumber();
+    }
   private:
     TreeItem * getItem(const QModelIndex & index) const;
     TreeItem * rootItem;
     RadioData * radioData;
     int availableEEpromSize;
 };
-
-#if 0
-class ModelsListWidget : public QTreeView
-{
-    Q_OBJECT
-
-public:
-    ModelsListWidget(QWidget * parent = 0);
-
-    void setRadioData(RadioData * radioData);
-    bool hasSelection();
-    void keyPressEvent(QKeyEvent * event);
-    bool hasPasteData();
-    int currentRow() const;
-
-protected:
-    void dropEvent(QDropEvent *event);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void dragEnterEvent(QDragEnterEvent *event);
-    void dragLeaveEvent(QDragLeaveEvent *event);
-    void dragMoveEvent(QDragMoveEvent *event);
-#ifndef WIN32
-    void focusInEvent ( QFocusEvent * event );
-    void focusOutEvent ( QFocusEvent * event );
-#endif
-    
-public slots:
-    void refreshList();
-    
-    void cut();
-    void copy();
-    void paste();
-    void print();
-    void EditModel();
-    void LoadBackup();
-    void OpenWizard();
-    void duplicate();
-    
-    void deleteSelected(bool ask);
-    void confirmDelete();
-    void onCurrentItemChanged(QTreeWidgetItem *, QTreeWidgetItem *);
-
-private:
-    void doCut(QByteArray *gmData);
-    void doPaste(QByteArray *gmData, int index);
-    void doCopy(QByteArray *gmData);
-    void saveSelection();
-    void restoreSelection();
-
-    RadioData * radioData;
-    QPoint dragStartPosition;
-
-    CurrentSelection currentSelection;
-    QColor active_highlight_color;
-    
-};
-#endif
 
 #endif // _MODELSLIST_H_

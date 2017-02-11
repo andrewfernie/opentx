@@ -72,6 +72,7 @@ void sig(int sgn)
 #include <pthread.h>
 #include <semaphore.h>
 #include <stddef.h>
+#include <errno.h>
 
 #undef min
 #undef max
@@ -428,7 +429,7 @@ OS_TID CoCreateTask(FUNCPtr task, void *argv, uint32_t parameter, void * stk, ui
 #define CoWaitForSingleFlag(...)       0
 #define CoTickDelay(x)                 sleep(2*(x))
 #define CoCreateFlag(...)              0
-#define CoGetOSTime(...)               0
+U64 CoGetOSTime(void);
 #define UART_Stop(...)
 #define UART3_Stop(...)
 #define USART_GetITStatus(...)         0

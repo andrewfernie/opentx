@@ -48,7 +48,6 @@ radioData(new RadioData())
   if (backupPath.isEmpty() || !QDir(backupPath).exists()) {
     ui->backupBeforeWrite->setEnabled(false);
   }
-  updateUI();
 }
 
 FlashEEpromDialog::~FlashEEpromDialog()
@@ -56,11 +55,16 @@ FlashEEpromDialog::~FlashEEpromDialog()
   delete ui;
 }
 
+void FlashEEpromDialog::showEvent(QShowEvent *)
+{
+  updateUI();
+}
+
 void FlashEEpromDialog::updateUI()
 {
   // ui->burnButton->setEnabled(true);
   ui->eepromFilename->setText(eepromFilename);
-  if (getEEpromVersion(eepromFilename) >= 0) {
+  if (!eepromFilename.isEmpty() && getEEpromVersion(eepromFilename) >= 0) {
     ui->profileLabel->show();
     ui->patchCalibration->show();
     ui->patchHardwareSettings->show();
@@ -123,7 +127,7 @@ bool FlashEEpromDialog::patchCalibration()
 {
   QString calib = g.profile[g.id()].stickPotCalib();
   QString trainercalib = g.profile[g.id()].trainerCalib();
-  int potsnum = GetCurrentFirmware()->getCapability(Pots);
+  int potsnum = getBoardCapability(getCurrentBoard(), Board::Pots);
   int8_t txVoltageCalibration = (int8_t) g.profile[g.id()].txVoltageCalibration();
   int8_t txCurrentCalibration = (int8_t) g.profile[g.id()].txCurrentCalibration();
   int8_t PPM_Multiplier = (int8_t) g.profile[g.id()].ppmMultiplier();
@@ -223,10 +227,9 @@ void FlashEEpromDialog::on_burnButton_clicked()
   if (patch) {
     QString filename = generateProcessUniqueTempFileName("temp.bin");
     QFile file(filename);
-    uint8_t *eeprom = (uint8_t*)malloc(getEEpromSize(GetCurrentFirmware()->getBoard()));
-    int eeprom_size = GetEepromInterface()->save(eeprom, *radioData, 0, GetCurrentFirmware()->getVariantNumber());
-    if (!eeprom_size) {
-      QMessageBox::warning(this, tr("Error"), tr("Cannot write file %1:\n%2.").arg(filename).arg(file.errorString()));
+    uint8_t *eeprom = (uint8_t*)malloc(getEEpromSize(getCurrentBoard()));
+    int eeprom_size = getCurrentEEpromInterface()->save(eeprom, *radioData, 0, getCurrentFirmware()->getVariantNumber());
+    if (eeprom_size == 0) {
       return;
     }
     if (!file.open(QIODevice::WriteOnly)) {
@@ -290,9 +293,10 @@ void FlashEEpromDialog::on_burnButton_clicked()
   }
 
   // and write...
-  writeEeprom(filename, progressDialog.progress());
-
-  progressDialog.exec();
+  bool result = writeEeprom(filename, progressDialog.progress());
+  if (!result && !progressDialog.isEmpty()) {
+    progressDialog.exec();
+  }
 }
 
 void FlashEEpromDialog::on_cancelButton_clicked()

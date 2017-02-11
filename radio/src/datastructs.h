@@ -776,8 +776,10 @@ PACK(struct CustomScreenData {
 // TODO other boards could have their custom screens here as well
 #endif
 
-#if defined(PCBHORUS)
+#if defined(PCBX12S)
   #define MODELDATA_EXTRA   NOBACKUP(uint8_t spare:3); NOBACKUP(uint8_t trainerMode:3); NOBACKUP(uint8_t potsWarnMode:2); ModuleData moduleData[NUM_MODULES+1]; NOBACKUP(ScriptData scriptsData[MAX_SCRIPTS]); NOBACKUP(char inputNames[MAX_INPUTS][LEN_INPUT_NAME]); NOBACKUP(uint8_t potsWarnEnabled); NOBACKUP(int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS]);
+#elif defined(PCBX10)
+  #define MODELDATA_EXTRA   NOBACKUP(uint8_t spare:3); NOBACKUP(uint8_t trainerMode:3); NOBACKUP(uint8_t potsWarnMode:2); ModuleData moduleData[NUM_MODULES+1]; NOBACKUP(ScriptData scriptsData[MAX_SCRIPTS]); NOBACKUP(char inputNames[MAX_INPUTS][LEN_INPUT_NAME]); NOBACKUP(uint8_t potsWarnEnabled); NOBACKUP(int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS]); NOBACKUP(uint8_t potsWarnSpares[NUM_DUMMY_ANAS]);
 #elif defined(PCBFLAMENCO)
   #define MODELDATA_EXTRA   uint8_t spare:3; uint8_t trainerMode:3; uint8_t potsWarnMode:2; ModuleData moduleData[NUM_MODULES+1]; ScriptData scriptsData[MAX_SCRIPTS]; char inputNames[MAX_INPUTS][LEN_INPUT_NAME]; uint8_t potsWarnEnabled; int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS];
 #elif defined(PCBTARANIS)
@@ -868,7 +870,7 @@ PACK(struct TrainerData {
 });
 
 #if defined(PCBHORUS)
-  #define SPLASH_MODE
+  #define SPLASH_MODE uint8_t splashSpares:3
 #elif defined(FSPLASH)
   #define SPLASH_MODE uint8_t splashMode:3
 #elif defined(PCBTARANIS)
@@ -905,7 +907,7 @@ PACK(struct TrainerData {
     uint32_t switchConfig; \
     uint8_t  potsConfig; /* two bits per pot */ \
     NOBACKUP(char switchNames[NUM_SWITCHES][LEN_SWITCH_NAME]); \
-    NOBACKUP(char anaNames[NUM_STICKS+NUM_POTS+NUM_SLIDERS][LEN_ANA_NAME]); \
+    NOBACKUP(char anaNames[NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_DUMMY_ANAS][LEN_ANA_NAME]); \
     NOBACKUP(char currModelFilename[LEN_MODEL_FILENAME+1]); \
     NOBACKUP(uint8_t bluetoothEnable:1); \
     NOBACKUP(uint8_t blOffBright:7); \
@@ -977,7 +979,7 @@ PACK(struct TrainerData {
 PACK(struct RadioData {
   NOBACKUP(uint8_t version);
   NOBACKUP(uint16_t variant);
-  CalibData calib[NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_MOUSE_ANALOGS];
+  CalibData calib[NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_MOUSE_ANALOGS+NUM_DUMMY_ANAS];
   NOBACKUP(uint16_t chkSum);
   N_HORUS_FIELD(int8_t currModel);
   N_HORUS_FIELD(uint8_t contrast);
@@ -1062,7 +1064,24 @@ static inline void check_struct()
   /* LEN_FUNCTION_NAME is the difference in CustomFunctionData */
 
 #if defined(PCBX7)
-  // TODO
+  CHKSIZE(MixData, 20);
+  CHKSIZE(ExpoData, 17);
+  CHKSIZE(LimitData, 11);
+  CHKSIZE(LogicalSwitchData, 9);
+  CHKSIZE(CustomFunctionData, 11);
+  CHKSIZE(FlightModeData, 36);
+  CHKSIZE(TimerData, 11);
+  CHKSIZE(SwashRingData, 8);
+  CHKSIZE(FrSkyBarData, 6);
+  CHKSIZE(FrSkyLineData, 4);
+  CHKTYPE(union FrSkyScreenData, 24);
+  CHKSIZE(FrSkyTelemetryData, 106);
+  CHKSIZE(ModelHeader, 12);
+  CHKSIZE(CurveData, 4);
+
+  CHKSIZE(RadioData, 850);
+  CHKSIZE(ModelData, 6025);
+  
 #elif defined(PCBTARANIS)
   CHKSIZE(MixData, 22);
   CHKSIZE(ExpoData, 19);
@@ -1078,13 +1097,9 @@ static inline void check_struct()
   CHKSIZE(FrSkyTelemetryData, 106);
   CHKSIZE(ModelHeader, 24);
   CHKSIZE(CurveData, 4);
-
 #if defined(PCBX9E)
   CHKSIZE(RadioData, 952);
   CHKSIZE(ModelData, 6520);
-#elif defined(PCBX7)
-  CHKSIZE(RadioData, 839);
-  CHKSIZE(ModelData, 6504);
 #else
   CHKSIZE(RadioData, 872);
   CHKSIZE(ModelData, 6507);

@@ -31,7 +31,7 @@ TimerPanel::TimerPanel(QWidget *parent, ModelData & model, TimerData & timer, Ge
   timer(timer),
   ui(new Ui::Timer)
 {
-  BoardEnum board = firmware->getBoard();
+  Board::Type board = firmware->getBoard();
 
   ui->setupUi(this);
 
@@ -161,6 +161,10 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
   QString label;
   if (moduleIdx < 0) {
     label = tr("Trainer Port");
+    if (IS_HORUS(firmware->getBoard())) {
+      ui->trainerMode->setItemData(TRAINER_MODE_MASTER_CPPM_EXTERNAL_MODULE, 0, Qt::UserRole - 1);
+      ui->trainerMode->setItemData(TRAINER_MODE_MASTER_SBUS_EXTERNAL_MODULE, 0, Qt::UserRole - 1);
+    }
     if (generalSettings.hw_uartMode != UART_MODE_SBUS_TRAINER) {
       ui->trainerMode->setItemData(TRAINER_MODE_MASTER_BATTERY_COMPARTMENT, 0, Qt::UserRole - 1);
     }
@@ -169,6 +173,7 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
       ui->label_trainerMode->hide();
       ui->trainerMode->hide();
     }
+    ui->formLayout_col1->setSpacing(0);
   }
   else {
     ui->label_trainerMode->hide();
@@ -197,10 +202,10 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
   for (int i=0; i<PULSES_PROTOCOL_LAST; i++) {
     if (firmware->isAvailable((PulsesProtocol)i, moduleIdx)) {
       ui->protocol->addItem(ModelPrinter::printModuleProtocol(i), (QVariant)i);
-      if (i == module.protocol) ui->protocol->setCurrentIndex(ui->protocol->count()-1);
+      if (i == module.protocol)
+        ui->protocol->setCurrentIndex(ui->protocol->count()-1);
     }
   }
-
   for (int i=0; i<=MM_RF_PROTO_LAST; i++) {
     ui->multiProtocol->addItem(ModelPrinter::printMultiRfProtocol(i, false), (QVariant) i);
   }
@@ -236,6 +241,11 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
   disableMouseScrolling();
 
   lock = false;
+
+  // a change will not register if only one item was added
+  if (ui->protocol->count() == 1)
+    on_protocol_currentIndexChanged(ui->protocol->currentIndex());
+
 }
 
 ModulePanel::~ModulePanel()
@@ -251,6 +261,7 @@ ModulePanel::~ModulePanel()
 #define MASK_FAILSAFES      32
 #define MASK_OPEN_DRAIN     64
 #define MASK_MULTIMODULE    128
+#define MASK_ANTENNA        256
 
 void ModulePanel::update()
 {
@@ -268,6 +279,7 @@ void ModulePanel::update()
         mask |= MASK_CHANNELS_RANGE | MASK_CHANNELS_COUNT;
         if (protocol==PULSES_PXX_XJT_X16) mask |= MASK_FAILSAFES | MASK_RX_NUMBER;
         if (protocol==PULSES_PXX_XJT_LR12) mask |= MASK_RX_NUMBER;
+        if (IS_HORUS(firmware->getBoard()) && moduleIdx==0) mask |= MASK_ANTENNA;
         break;
       case PULSES_LP45:
       case PULSES_DSM2:
@@ -290,6 +302,7 @@ void ModulePanel::update()
         mask |= MASK_CHANNELS_RANGE | MASK_RX_NUMBER | MASK_MULTIMODULE;
         break;
       case PULSES_OFF:
+        break;
       default:
         break;
     }
@@ -334,6 +347,11 @@ void ModulePanel::update()
   ui->ppmFrameLength->setMaximum(firmware->getCapability(PPMFrameLength));
   ui->ppmFrameLength->setValue(22.5+((double)module.ppm.frameLength)*0.5);
 
+  // Antenna slection on Horus
+  ui->label_antenna->setVisible(mask & MASK_ANTENNA);
+  ui->antennaMode->setVisible(mask & MASK_ANTENNA);
+  ui->antennaMode->setCurrentIndex(module.ppm.pulsePol);
+
   // Multi settings fields
   ui->label_multiProtocol->setVisible(mask & MASK_MULTIMODULE);
   ui->multiProtocol->setVisible(mask & MASK_MULTIMODULE);
@@ -366,7 +384,7 @@ void ModulePanel::update()
     ui->label_failsafeMode->setVisible(mask & MASK_FAILSAFES);
     ui->failsafeMode->setVisible(mask & MASK_FAILSAFES);
     ui->failsafeMode->setCurrentIndex(module.failsafeMode);
-    ui->failsafesFrame->setEnabled(module.failsafeMode == FAILSAFE_CUSTOM);
+    ui->failsafesGroupBox->setEnabled(module.failsafeMode == FAILSAFE_CUSTOM);
     if (firmware->getCapability(ChannelsName) > 0) {
       for(int i=0; i<maxChannels;i++) {
         QString name = QString(model->limitData[i+module.channelsStart].name).trimmed();
@@ -383,8 +401,7 @@ void ModulePanel::update()
     mask = 0;
   }
 
-  ui->failsafesLayoutLabel->setVisible(mask & MASK_FAILSAFES);
-  ui->failsafesFrame->setVisible(mask & MASK_FAILSAFES);
+  ui->failsafesGroupBox->setVisible((mask & MASK_FAILSAFES) && module.failsafeMode == FAILSAFE_CUSTOM);
 
   if (mask & MASK_CHANNELS_RANGE) {
     ui->channelsStart->setMaximum(33 - ui->channelsCount->value());
@@ -411,6 +428,12 @@ void ModulePanel::on_protocol_currentIndexChanged(int index)
 }
 
 void ModulePanel::on_ppmPolarity_currentIndexChanged(int index)
+{
+  module.ppm.pulsePol = index;
+  emit modified();
+}
+
+void ModulePanel::on_antennaMode_currentIndexChanged(int index)
 {
   module.ppm.pulsePol = index;
   emit modified();
@@ -554,7 +577,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   ModelPanel(parent, model, generalSettings, firmware),
   ui(new Ui::Setup)
 {
-  BoardEnum board = firmware->getBoard();
+  Board::Type board = firmware->getBoard();
 
   lock = true;
 
@@ -574,12 +597,24 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     QDir qd(path);
     if (qd.exists()) {
       QStringList filters;
-      filters << "*.bmp" << "*.bmp";
-      foreach ( QString file, qd.entryList(filters, QDir::Files) ) {
-        QFileInfo fi(file);
-        QString temp = fi.completeBaseName();
-        if (!items.contains(temp) && temp.length() <= 10+4) {
-          items.append(temp);
+      if(IS_HORUS(board)) {
+        filters << "*.bmp" << "*.jpg" << "*.png";
+        foreach ( QString file, qd.entryList(filters, QDir::Files) ) {
+          QFileInfo fi(file);
+          QString temp = fi.fileName();
+          if (!items.contains(temp) && temp.length() <= 6+4) {
+            items.append(temp);
+          }
+        }
+      }
+      else {
+        filters << "*.bmp";
+        foreach (QString file, qd.entryList(filters, QDir::Files)) {
+          QFileInfo fi(file);
+          QString temp = fi.completeBaseName();
+          if (!items.contains(temp) && temp.length() <= 10+4) {
+            items.append(temp);
+          }
         }
       }
     }
@@ -587,22 +622,30 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
       items.append(model.bitmap);
     }
     items.sort();
-    foreach ( QString file, items ) {
+    foreach (QString file, items) {
       ui->image->addItem(file);
       if (file == model.bitmap) {
         ui->image->setCurrentIndex(ui->image->count()-1);
         QString fileName = path;
         fileName.append(model.bitmap);
-        fileName.append(".bmp");
+        if (!IS_HORUS(board))
+          fileName.append(".bmp");
         QImage image(fileName);
-        if (image.isNull()) {
+        if (image.isNull() && !IS_HORUS(board)) {
           fileName = path;
           fileName.append(model.bitmap);
           fileName.append(".BMP");
           image.load(fileName);
         }
         if (!image.isNull()) {
-          ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled( 64,32)));;
+          if (IS_HORUS(board)) {
+            ui->imagePreview->setFixedSize(QSize(192, 114));
+            ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(192, 114)));
+          }
+          else {
+            ui->imagePreview->setFixedSize(QSize(64, 32));
+            ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(64, 32)));
+          }
         }
       }
     }
@@ -651,7 +694,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
 
   // Beep Center checkboxes
   prevFocus = ui->trimsDisplay;
-  int analogs = CPN_MAX_STICKS + firmware->getCapability(Pots) + firmware->getCapability(Sliders);
+  int analogs = CPN_MAX_STICKS + getBoardCapability(board, Board::Pots) + getBoardCapability(board, Board::Sliders);
   for (int i=0; i<analogs+firmware->getCapability(RotaryEncoders); i++) {
     QCheckBox * checkbox = new QCheckBox(this);
     checkbox->setProperty("index", i);
@@ -659,12 +702,12 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     ui->centerBeepLayout->addWidget(checkbox, 0, i+1);
     connect(checkbox, SIGNAL(toggled(bool)), this, SLOT(onBeepCenterToggled(bool)));
     centerBeepCheckboxes << checkbox;
-    if (IS_TARANIS(board)) {
+    if (IS_HORUS_OR_TARANIS(board)) {
       RawSource src(SOURCE_TYPE_STICK, i);
       if (src.isPot() && !generalSettings.isPotAvailable(i-CPN_MAX_STICKS)) {
         checkbox->hide();
       }
-      else if (src.isSlider() && !generalSettings.isSliderAvailable(i-CPN_MAX_STICKS-firmware->getCapability(Pots))) {
+      else if (src.isSlider() && !generalSettings.isSliderAvailable(i-CPN_MAX_STICKS-getBoardCapability(board, Board::Pots))) {
         checkbox->hide();
       }
     }
@@ -673,12 +716,12 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   }
 
   // Startup switches warnings
-  for (int i=0; i<firmware->getCapability(Switches); i++) {
-    Firmware::Switch sw = firmware->getSwitch(i);
+  for (int i=0; i<getBoardCapability(board, Board::Switches); i++) {
+    Board::SwitchInfo switchInfo = getSwitchInfo(board, i);
     if (IS_HORUS_OR_TARANIS(board)) {
-      sw.type = Firmware::SwitchType(generalSettings.switchConfig[i]);
+      switchInfo.config = Board::SwitchType(generalSettings.switchConfig[i]);
     }
-    if (sw.type == Firmware::SWITCH_NONE || sw.type == Firmware::SWITCH_TOGGLE) {
+    if (switchInfo.config == Board::SWITCH_NOT_AVAILABLE || switchInfo.config == Board::SWITCH_TOGGLE) {
       continue;
     }
     QLabel * label = new QLabel(this);
@@ -694,8 +737,8 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     slider->setSingleStep(1);
     slider->setPageStep(1);
     slider->setTickInterval(1);
-    label->setText(sw.name);
-    slider->setMaximum(sw.type == Firmware::SWITCH_3POS ? 2 : 1);
+    label->setText(switchInfo.name);
+    slider->setMaximum(switchInfo.config == Board::SWITCH_3POS ? 2 : 1);
     cb->setProperty("index", i);
     ui->switchesStartupLayout->addWidget(label, 0, i+1);
     ui->switchesStartupLayout->setAlignment(label, Qt::AlignCenter);
@@ -714,8 +757,8 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
 
   // Pot warnings
   prevFocus = ui->potWarningMode;
-  if (IS_TARANIS(board)) {
-    for (int i=0; i<firmware->getCapability(Pots)+firmware->getCapability(Sliders); i++) {
+  if (IS_HORUS_OR_TARANIS(board)) {
+    for (int i=0; i<getBoardCapability(board, Board::Pots)+getBoardCapability(board, Board::Sliders); i++) {
       QCheckBox * cb = new QCheckBox(this);
       cb->setProperty("index", i);
       cb->setText(firmware->getAnalogInputName(i+4));
@@ -728,7 +771,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
         }
       }
       else {
-        if (!generalSettings.isSliderAvailable(i-firmware->getCapability(Pots))) {
+        if (!generalSettings.isSliderAvailable(i-getBoardCapability(board, Board::Pots))) {
           cb->hide();
         }
       }
@@ -820,6 +863,7 @@ void SetupPanel::on_name_editingFinished()
 void SetupPanel::on_image_currentIndexChanged(int index)
 {
   if (!lock) {
+    Board::Type board = firmware->getBoard();
     strncpy(model->bitmap, ui->image->currentText().toLatin1(), 10);
     QString path = g.profile[g.id()].sdPath();
     path.append("/IMAGES/");
@@ -827,16 +871,24 @@ void SetupPanel::on_image_currentIndexChanged(int index)
     if (qd.exists()) {
       QString fileName=path;
       fileName.append(model->bitmap);
-      fileName.append(".bmp");
+      if (!IS_HORUS(board))
+        fileName.append(".bmp");
       QImage image(fileName);
-      if (image.isNull()) {
+      if (image.isNull() && !IS_HORUS(board)) {
         fileName=path;
         fileName.append(model->bitmap);
         fileName.append(".BMP");
         image.load(fileName);
       }
       if (!image.isNull()) {
-        ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(64, 32)));;
+        if (IS_HORUS(board)) {
+          ui->imagePreview->setFixedSize(QSize(192, 114));
+          ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(192, 114)));
+        }
+        else {
+          ui->imagePreview->setFixedSize(QSize(64, 32));
+          ui->imagePreview->setPixmap(QPixmap::fromImage(image.scaled(64, 32)));
+        }
       }
       else {
         ui->imagePreview->clear();
@@ -851,10 +903,11 @@ void SetupPanel::on_image_currentIndexChanged(int index)
 
 void SetupPanel::populateThrottleSourceCB()
 {
+  Board::Type board = firmware->getBoard();
   lock = true;
   ui->throttleSource->clear();
   ui->throttleSource->addItem(QObject::tr("THR"));
-  for (int i=0; i<firmware->getCapability(Pots)+firmware->getCapability(Sliders); i++) {
+  for (int i=0; i<getBoardCapability(board, Board::Pots)+getBoardCapability(board, Board::Sliders); i++) {
     ui->throttleSource->addItem(firmware->getAnalogInputName(4+i), i);
   }
   for (int i=0; i<firmware->getCapability(Outputs); i++) {
@@ -867,7 +920,6 @@ void SetupPanel::populateThrottleSourceCB()
 void SetupPanel::update()
 {
   ui->name->setText(model->name);
-
   ui->throttleReverse->setChecked(model->throttleReversed);
   populateThrottleSourceCB();
   ui->throttleWarning->setChecked(!model->disableThrottleWarning);
@@ -881,7 +933,7 @@ void SetupPanel::update()
   updateBeepCenter();
   updateStartupSwitches();
 
-  if(IS_TARANIS(GetEepromInterface()->getBoard())) {
+  if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
     updatePotWarnings();
   }
 
@@ -915,9 +967,9 @@ void SetupPanel::updateStartupSwitches()
     QCheckBox * cb = startupSwitchesCheckboxes[i];
     int index = slider->property("index").toInt();
     bool enabled = !(model->switchWarningEnable & (1 << index));
-    if (IS_TARANIS(GetEepromInterface()->getBoard())) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       value = (switchStates >> 2*index) & 0x03;
-      if (generalSettings.switchConfig[index] != Firmware::SWITCH_3POS && value == 2) {
+      if (generalSettings.switchConfig[index] != Board::SWITCH_3POS && value == 2) {
         value = 1;
       }
     }
@@ -940,7 +992,7 @@ void SetupPanel::startupSwitchEdited(int value)
     uint64_t mask;
     int index = sender()->property("index").toInt();
 
-    if (IS_TARANIS(GetEepromInterface()->getBoard())) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       shift = index * 2;
       mask = 0x03ul << shift;
     }
@@ -956,7 +1008,7 @@ void SetupPanel::startupSwitchEdited(int value)
 
     model->switchWarningStates &= ~mask;
 
-    if (IS_TARANIS(GetEepromInterface()->getBoard()) && generalSettings.switchConfig[index] != Firmware::SWITCH_3POS) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard()) && generalSettings.switchConfig[index] != Board::SWITCH_3POS) {
       if (value == 1) {
         value = 2;
       }

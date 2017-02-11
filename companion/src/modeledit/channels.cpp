@@ -27,7 +27,7 @@ LimitsGroup::LimitsGroup(Firmware * firmware, TableLayout * tableLayout, int row
   value(value),
   displayStep(0.1)
 {
-  BoardEnum board = firmware->getBoard();
+  Board::Type board = firmware->getBoard();
   bool allowGVars = IS_HORUS_OR_TARANIS(board);
   int internalStep = 1;
 
@@ -45,7 +45,7 @@ LimitsGroup::LimitsGroup(Firmware * firmware, TableLayout * tableLayout, int row
     spinbox->setSuffix("%");
   }
 
-  if (HAS_LARGE_LCD(board) || deflt == 0 /*it's the offset*/) {
+  if (IS_ARM(board) || deflt == 0 /*it's the offset*/) {
     spinbox->setDecimals(1);
   }
   else {
@@ -101,7 +101,7 @@ Channels::Channels(QWidget * parent, ModelData & model, GeneralSettings & genera
     headerLabels << tr("Name");
   }
   headerLabels << tr("Subtrim") << tr("Min") << tr("Max") << tr("Direction");
-  if (IS_TARANIS(GetEepromInterface()->getBoard()))
+  if (IS_HORUS_OR_TARANIS(firmware->getBoard()))
     headerLabels << tr("Curve");
   if (firmware->getCapability(PPMCenter))
     headerLabels << tr("PPM Center");
@@ -150,7 +150,7 @@ Channels::Channels(QWidget * parent, ModelData & model, GeneralSettings & genera
     tableLayout->addWidget(i, col++, invCB);
 
     // Curve
-    if (IS_TARANIS(GetEepromInterface()->getBoard())) {
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       QComboBox * curveCB = new QComboBox(this);
       curveCB->setProperty("index", i);
       int numcurves = firmware->getCapability(NumCurves);

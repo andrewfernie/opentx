@@ -1,13 +1,16 @@
 #ifndef _RADIODATA_H_
 #define _RADIODATA_H_
 
+#include "boards.h"
 #include "constants.h"
 #include <QString>
 #include <QComboBox>
 
+class Firmware;
+
 enum Switches {
   SWITCH_NONE,
-  
+
   SWITCH_THR = SWITCH_NONE+1,
   SWITCH_RUD,
   SWITCH_ELE,
@@ -17,7 +20,7 @@ enum Switches {
   SWITCH_AIL,
   SWITCH_GEA,
   SWITCH_TRN,
-  
+
   SWITCH_SA0 = SWITCH_NONE+1,
   SWITCH_SA1,
   SWITCH_SA2,
@@ -46,7 +49,6 @@ enum Switches {
   SWITCH_SJ2,
   SWITCH_SK0,
   SWITCH_SK2,
-  
 };
 
 enum TimerModes {
@@ -188,9 +190,9 @@ class RawSourceRange
       offset(0.0)
     {
     }
-    
+
     float getValue(int value);
-    
+
     int decimals;
     double min;
     double max;
@@ -210,40 +212,42 @@ class RawSource {
       index(0)
     {
     }
-    
+
     explicit RawSource(int value):
       type(RawSourceType(abs(value)/65536)),
       index(value >= 0 ? abs(value)%65536 : -(abs(value)%65536))
     {
     }
-    
+
     RawSource(RawSourceType type, int index=0):
       type(type),
       index(index)
     {
     }
-    
+
+    void convert(Board::Type before, Board::Type after);
+
     inline const int toValue() const
     {
       return index >= 0 ? (type * 65536 + index) : -(type * 65536 - index);
     }
-    
+
     QString toString(const ModelData * model = NULL) const;
-    
+
     RawSourceRange getRange(const ModelData * model, const GeneralSettings & settings, unsigned int flags=0) const;
-    
+
     bool operator == ( const RawSource & other) {
       return (this->type == other.type) && (this->index == other.index);
     }
-    
+
     bool operator != ( const RawSource & other) {
       return (this->type != other.type) || (this->index != other.index);
     }
-    
+
     bool isTimeBased() const;
     bool isPot() const;
     bool isSlider() const;
-    
+
     RawSourceType type;
     int index;
 };
@@ -269,34 +273,34 @@ class RawSwitch {
       index(0)
     {
     }
-    
+
     explicit RawSwitch(int value):
       type(RawSwitchType(abs(value)/256)),
       index(value >= 0 ? abs(value)%256 : -(abs(value)%256))
     {
     }
-    
+
     RawSwitch(RawSwitchType type, int index=0):
       type(type),
       index(index)
     {
     }
-    
+
     inline const int toValue() const
     {
       return index >= 0 ? (type * 256 + index) : -(type * 256 - index);
     }
-    
-    QString toString() const;
-    
+
+    QString toString(Board::Type board = Board::BOARD_UNKNOWN) const;
+
     bool operator== ( const RawSwitch& other) {
       return (this->type == other.type) && (this->index == other.index);
     }
-    
+
     bool operator!= ( const RawSwitch& other) {
       return (this->type != other.type) || (this->index != other.index);
     }
-    
+
     RawSwitchType type;
     int index;
 };
@@ -309,20 +313,20 @@ class CurveReference {
       CURVE_REF_FUNC,
       CURVE_REF_CUSTOM
     };
-    
+
     CurveReference() { clear(); }
-    
+
     CurveReference(CurveRefType type, int value):
       type(type),
       value(value)
     {
     }
-    
+
     void clear() { memset(this, 0, sizeof(CurveReference)); }
-    
+
     CurveRefType type;
     int value;
-    
+
     QString toString() const;
 };
 
@@ -363,7 +367,7 @@ class CurveData {
       CURVE_TYPE_CUSTOM,
       CURVE_TYPE_LAST = CURVE_TYPE_CUSTOM
     };
-    
+
     CurveData();
     void clear(int count);
     bool isEmpty() const;
@@ -403,6 +407,8 @@ enum MltpxValue {
 class MixData {
   public:
     MixData() { clear(); }
+    void convert(Board::Type before, Board::Type after);
+
     unsigned int destCh;            //        1..CPN_MAX_CHNOUT
     RawSource srcRaw;
     int     weight;
@@ -419,7 +425,7 @@ class MixData {
     unsigned int flightModes;             // -5=!FP4, 0=normal, 5=FP4
     int    sOffset;
     char   name[MIXDATA_NAME_LEN+1];
-    
+
     void clear() { memset(this, 0, sizeof(MixData)); }
 };
 
@@ -539,11 +545,11 @@ class CustomFunctionData { // Function Switches data
     QString paramToString(const ModelData * model) const;
     QString repeatToString() const;
     QString enabledToString() const;
-    
+
     static void populateResetParams(const ModelData * model, QComboBox * b, unsigned int value);
     static void populatePlaySoundParams(QStringList & qs);
     static void populateHapticParams(QStringList & qs);
-  
+
 };
 
 class FlightModeData {
@@ -581,7 +587,7 @@ class FrSkyAlarmData {
     unsigned int   level;               // 0=none, 1=Yellow, 2=Orange, 3=Red
     unsigned int   greater;             // 0=LT(<), 1=GT(>)
     unsigned int value;               // 0.1V steps EG. 6.6 Volts = 66. 25.1V = 251, etc.
-    
+
     void clear() { memset(this, 0, sizeof(FrSkyAlarmData)); }
 };
 
@@ -601,7 +607,7 @@ class FrSkyChannelData {
     int   offset;
     unsigned int multiplier;
     FrSkyAlarmData alarms[2];
-    
+
     float getRatio() const;
     RawSourceRange getRange() const;
     void clear() { memset(this, 0, sizeof(FrSkyChannelData)); }
@@ -631,16 +637,16 @@ enum TelemetryScreenEnum {
 class FrSkyScreenData {
   public:
     FrSkyScreenData() { clear(); }
-    
+
     typedef struct {
       FrSkyBarData bars[4];
       FrSkyLineData lines[4];
       TelemetryScriptData script;
     } FrSkyScreenBody;
-    
+
     unsigned int type;
     FrSkyScreenBody body;
-    
+
     void clear();
 };
 
@@ -708,7 +714,7 @@ class FrSkyData {
     unsigned int storedMah;
     int fasOffset;
     bool ignoreSensorIds;
-    
+
     void clear();
 };
 
@@ -791,7 +797,9 @@ enum MultiModuleRFProtocols {
   MM_RF_PROTO_OLRS,
   MM_RF_PROTO_AFHDS2A,
   MM_RF_PROTO_Q2X2,
-  MM_RF_PROTO_LAST= MM_RF_PROTO_Q2X2
+  MM_RF_PROTO_WK_2X01,
+  MM_RF_PROTO_Q303,
+  MM_RF_PROTO_LAST=MM_RF_PROTO_Q303
 };
 
 unsigned int getNumSubtypes(MultiModuleRFProtocols type);
@@ -815,15 +823,15 @@ class ModuleData {
     int          channelsCount; // 0=8 channels
     unsigned int failsafeMode;
     int          failsafeChannels[CPN_MAX_CHNOUT];
-    
-    
+
+
     struct {
       int delay;
       bool pulsePol;           // false = positive
       bool outputType;         // false = open drain, true = push pull
       int frameLength;
     } ppm;
-    
+
     struct {
       unsigned int rfProtocol;
       bool autoBindMode;
@@ -831,14 +839,14 @@ class ModuleData {
       bool customProto;
       int optionValue;
     } multi;
-    
-    
-    
+
+
+
     void clear() { memset(this, 0, sizeof(ModuleData)); }
     QString polarityToString() const { return ppm.pulsePol ? QObject::tr("Positive") : QObject::tr("Negative"); } // TODO ModelPrinter
 };
 
-#define CPN_MAX_SCRIPTS       7
+#define CPN_MAX_SCRIPTS       9
 #define CPN_MAX_SCRIPT_INPUTS 10
 class ScriptData {
   public:
@@ -851,15 +859,15 @@ class ScriptData {
 
 #define CPN_MAX_SENSORS       32
 class SensorData {
-  
+
   public:
-    
+
     enum
     {
       TELEM_TYPE_CUSTOM,
       TELEM_TYPE_CALCULATED
     };
-    
+
     enum
     {
       TELEM_FORMULA_ADD,
@@ -873,7 +881,7 @@ class SensorData {
       TELEM_FORMULA_DIST,
       TELEM_FORMULA_LAST = TELEM_FORMULA_DIST
     };
-    
+
     enum {
       TELEM_CELL_INDEX_LOWEST,
       TELEM_CELL_INDEX_1,
@@ -885,7 +893,7 @@ class SensorData {
       TELEM_CELL_INDEX_HIGHEST,
       TELEM_CELL_INDEX_DELTA,
     };
-    
+
     enum
     {
       UNIT_RAW,
@@ -929,7 +937,7 @@ class SensorData {
       UNIT_DATETIME_HOUR_MIN,
       UNIT_DATETIME_SEC
     };
-    
+
     SensorData() { clear(); }
     unsigned int type; // custom / formula
     unsigned int id;
@@ -945,25 +953,25 @@ class SensorData {
     bool logs;
     bool persistent;
     bool onlyPositive;
-    
+
     // for custom sensors
     unsigned int ratio;
     int offset;
-    
+
     // for consumption
     unsigned int amps;
-    
+
     // for cell
     unsigned int source;
     unsigned int index;
-    
+
     // for calculations
     int sources[4];
-    
+
     // for GPS dist
     unsigned int gps;
     unsigned int alt;
-    
+
     bool isAvailable() const { return strlen(label) > 0; }
     void updateUnit();
     QString unitString() const;
@@ -1004,16 +1012,18 @@ class ModelData {
     ModelData(const ModelData & src);
     ModelData & operator = (const ModelData & src);
     
+    void convert(Board::Type before, Board::Type after);
+    
     ExpoData * insertInput(const int idx);
     void removeInput(const int idx);
-    
+
     bool isInputValid(const unsigned int idx) const;
     bool hasExpos(uint8_t inputIdx) const;
     bool hasMixes(uint8_t output) const;
-    
+
     QVector<const ExpoData *> expos(int input) const;
     QVector<const MixData *> mixes(int channel) const;
-    
+
     bool      used;
     int       category;
     char      name[15+1];
@@ -1024,19 +1034,19 @@ class ModelData {
     int       trimInc;            // Trim Increments
     unsigned int trimsDisplay;
     bool      disableThrottleWarning;
-    
+
     unsigned int beepANACenter;      // 1<<0->A1.. 1<<6->A7
-    
+
     bool      extendedLimits; // TODO xml
     bool      extendedTrims;
     bool      throttleReversed;
     FlightModeData flightModeData[CPN_MAX_FLIGHT_MODES];
     MixData   mixData[CPN_MAX_MIXERS];
     LimitData limitData[CPN_MAX_CHNOUT];
-    
+
     char      inputNames[CPN_MAX_INPUTS][4+1];
     ExpoData  expoData[CPN_MAX_EXPOS];
-    
+
     CurveData curves[CPN_MAX_CURVES];
     LogicalSwitchData  logicalSw[CPN_MAX_CSW];
     CustomFunctionData customFn[CPN_MAX_CUSTOM_FUNCTIONS];
@@ -1054,42 +1064,42 @@ class ModelData {
     MavlinkData mavlink;
     unsigned int telemetryProtocol;
     FrSkyData frsky;
-    
+
     char bitmap[10+1];
-    
+
     unsigned int trainerMode;
-    
+
     ModuleData moduleData[CPN_MAX_MODULES+1/*trainer*/];
-    
+
     ScriptData scriptData[CPN_MAX_SCRIPTS];
-    
+
     SensorData sensorData[CPN_MAX_SENSORS];
-    
+
     unsigned int toplcdTimer;
-    
+
     CustomScreenData customScreenData[5];
-    
+
     TopbarData topbarData;
-    
+
     void clear();
     bool isEmpty() const;
     void setDefaultInputs(const GeneralSettings & settings);
     void setDefaultMixes(const GeneralSettings & settings);
     void setDefaultValues(unsigned int id, const GeneralSettings & settings);
-    
+
     int getTrimValue(int phaseIdx, int trimIdx);
     void setTrimValue(int phaseIdx, int trimIdx, int value);
-    
+
     bool isGVarLinked(int phaseIdx, int gvarIdx);
     int getGVarFieldValue(int phaseIdx, int gvarIdx);
-    
+
     ModelData removeGlobalVars();
-    
+
     void clearMixes();
     void clearInputs();
-    
+
     int getChannelsMax(bool forceExtendedLimits=false) const;
-  
+
   protected:
     void removeGlobalVar(int & var);
 };
@@ -1115,32 +1125,21 @@ class TrainerData {
 
 class GeneralSettings {
   public:
-    
+
     enum BeeperMode {
       BEEPER_QUIET = -2,
       BEEPER_ALARMS_ONLY = -1,
       BEEPER_NOKEYS = 0,
       BEEPER_ALL = 1
     };
-    
-    enum PotConfig {
-      POT_NONE,
-      POT_WITH_DETENT,
-      POT_MULTIPOS_SWITCH,
-      POT_WITHOUT_DETENT
-    };
-    
-    enum SliderConfig {
-      SLIDER_NONE,
-      SLIDER_WITH_DETENT
-    };
-    
+
     GeneralSettings();
-    
+    void convert(Board::Type before, Board::Type after);
+
     int getDefaultStick(unsigned int channel) const;
     RawSource getDefaultSource(unsigned int channel) const;
     int getDefaultChannel(unsigned int stick) const;
-    
+
     unsigned int version;
     unsigned int variant;
     int   calibMid[CPN_MAX_STICKS+CPN_MAX_POTS+CPN_MAX_MOUSE_ANALOGS];
@@ -1185,7 +1184,6 @@ class GeneralSettings {
     int   hapticStrength;
     unsigned int   speakerMode;
     char      ownerName[10+1];
-    unsigned int   switchWarningStates;
     int    beeperLength;
     unsigned int    gpsFormat;
     int     speakerVolume;
@@ -1219,28 +1217,17 @@ class GeneralSettings {
     unsigned int backlightColor;
     CustomFunctionData customFn[CPN_MAX_CUSTOM_FUNCTIONS];
     char switchName[18][3+1];
-    unsigned int switchConfig[18];
+    unsigned int switchConfig[CPN_MAX_SWITCHES];
     char stickName[4][3+1];
     char potName[4][3+1];
     unsigned int potConfig[4];
     char sliderName[4][3+1];
     unsigned int sliderConfig[4];
-    
+
     char themeName[8+1];
     typedef uint8_t ThemeOptionData[8+1];
     ThemeOptionData themeOptionValue[5];
-    
-    struct SwitchInfo {
-      SwitchInfo(unsigned int index, unsigned int position):
-        index(index),
-        position(position)
-      {
-      }
-      unsigned int index;
-      unsigned int position;
-    };
-    
-    static SwitchInfo switchInfoFromSwitchPositionTaranis(unsigned int index);
+
     bool switchPositionAllowedTaranis(int index) const;
     bool switchSourceAllowedTaranis(int index) const;
     bool isPotAvailable(int index) const;
@@ -1258,64 +1245,19 @@ class CategoryData {
 class RadioData {
   public:
     RadioData();
-    
+
     GeneralSettings generalSettings;
     std::vector<CategoryData> categories;
     std::vector<ModelData> models;
     
-    void setCurrentModel(unsigned int index)
-    {
-      generalSettings.currModelIndex = index;
-      strcpy(generalSettings.currModelFilename, models[index].filename);
-    }
-    
-    void fixModelFilename(unsigned int index)
-    {
-      ModelData & model = models[index];
-      QString filename(model.filename);
-      bool ok = filename.endsWith(".bin");
-      if (ok) {
-        if (filename.startsWith("model") && filename.mid(5, filename.length()-9).toInt() > 0) {
-          ok = false;
-        }
-      }
-      if (ok) {
-        for (unsigned i=0; i<index; i++) {
-          if (strcmp(models[i].filename, model.filename) == 0) {
-            ok = false;
-            break;
-          }
-        }
-      }
-      if (!ok) {
-        sprintf(model.filename, "model%d.bin", index+1);
-      }
-    }
-    
-    void fixModelFilenames()
-    {
-      for (unsigned int i=0; i<models.size(); i++) {
-        fixModelFilename(i);
-      }
-    }
-    
-    QString getNextModelFilename()
-    {
-      char filename[sizeof(ModelData::filename)];
-      int index = 0;
-      bool found = true;
-      while (found) {
-        sprintf(filename, "model%d.bin", ++index);
-        found = false;
-        for (unsigned int i=0; i<models.size(); i++) {
-          if (strcmp(filename, models[i].filename) == 0) {
-            found = true;
-            break;
-          }
-        }
-      }
-      return filename;
-    }
+    void convert(Board::Type before, Board::Type after);
+
+    void setCurrentModel(unsigned int index);
+    void fixModelFilenames();
+    QString getNextModelFilename();
+
+  protected:
+    void fixModelFilename(unsigned int index);
 };
 
 #endif // _RADIODATA_H_
