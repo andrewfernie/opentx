@@ -91,6 +91,8 @@ extern "C" {
 #define BOOTLOADER_SIZE    0x8000
 #define FIRMWARE_ADDRESS   0x08000000
 
+#define LUA_MEM_MAX        (0)    // max allowed memory usage for complete Lua  (in bytes), 0 means unlimited
+
 #if defined(PCBX9E)
   #define PERI1_FREQUENCY  42000000
   #define PERI2_FREQUENCY  84000000
@@ -373,11 +375,25 @@ enum Analogs {
   SLIDER2,
 #endif
   TX_VOLTAGE,
-  NUMBER_ANALOG
+  NUM_ANALOGS
 };
+
 #define NUM_POTS                       (POT_LAST-POT_FIRST+1)
-#define NUM_SLIDERS                    (TX_VOLTAGE-POT_LAST-1)
 #define NUM_XPOTS                      NUM_POTS
+#define NUM_SLIDERS                    (TX_VOLTAGE-POT_LAST-1)
+
+enum CalibratedAnalogs {
+  CALIBRATED_STICK1,
+  CALIBRATED_STICK2,
+  CALIBRATED_STICK3,
+  CALIBRATED_STICK4,
+  CALIBRATED_POT_FIRST,
+  CALIBRATED_POT_LAST = CALIBRATED_POT_FIRST + NUM_POTS - 1,
+  CALIBRATED_SLIDER_FIRST,
+  CALIBRATED_SLIDER_LAST = CALIBRATED_SLIDER_FIRST + NUM_SLIDERS - 1,
+  NUM_CALIBRATED_ANALOGS
+};
+
 #if defined(PCBX9D)
   #define IS_POT(x)                    ((x)>=POT_FIRST && (x)<=POT2) // POT3 is only defined in software
 #else
@@ -386,7 +402,7 @@ enum Analogs {
 #define IS_SLIDER(x)                   ((x)>POT_LAST && (x)<TX_VOLTAGE)
 void adcInit(void);
 void adcRead(void);
-extern uint16_t adcValues[NUMBER_ANALOG];
+extern uint16_t adcValues[NUM_ANALOGS];
 uint16_t getAnalogValue(uint8_t index);
 uint16_t getBatteryVoltage();   // returns current battery voltage in 10mV steps
 
@@ -412,7 +428,12 @@ uint32_t pwrPressedDuration(void);
 #else
 uint32_t pwroffPressed(void);
 #endif
+
+#if defined(SIMU)
+#define UNEXPECTED_SHUTDOWN()          false
+#else
 #define UNEXPECTED_SHUTDOWN()          (WAS_RESET_BY_WATCHDOG() || g_eeGeneral.unexpectedShutdown)
+#endif
 
 // Backlight driver
 void backlightInit(void);
