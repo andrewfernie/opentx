@@ -113,6 +113,8 @@ extern uint16_t sessionTimer;
 
 #if defined(PCBX9E)
 #define TRAINER_CONNECTED()            (true)
+#elif defined(PCBX7)
+#define TRAINER_CONNECTED()            (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == Bit_SET)
 #else
 #define TRAINER_CONNECTED()            (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == Bit_RESET)
 #endif
@@ -189,6 +191,11 @@ void init_dsm2( uint32_t module_index );
 void disable_dsm2( uint32_t module_index );
 void init_crossfire( uint32_t module_index );
 void disable_crossfire( uint32_t module_index );
+
+#if defined(MULTIMODULE)
+void init_multimodule(uint32_t module_index);
+void disable_multimodule(uint32_t module_index);
+#endif
 
 // Trainer driver
 void init_trainer_ppm(void);
@@ -417,16 +424,14 @@ extern "C" {
 #endif
 
 // Power driver
+#define SOFT_PWR_CTRL
 void pwrInit(void);
 uint32_t pwrCheck(void);
 void pwrOn(void);
 void pwrOff(void);
-#if defined(PWR_PRESS_BUTTON)
 uint32_t pwrPressed(void);
+#if defined(PWR_PRESS_BUTTON)
 uint32_t pwrPressedDuration(void);
-#define pwroffPressed() pwrPressed()
-#else
-uint32_t pwroffPressed(void);
 #endif
 
 #if defined(SIMU)
@@ -483,6 +488,22 @@ void telemetryPortSetDirectionOutput(void);
 void sportSendBuffer(uint8_t * buffer, uint32_t count);
 uint8_t telemetryGetByte(uint8_t * byte);
 extern uint32_t telemetryErrors;
+
+// PCBREV driver
+#if defined(PCBX7)
+#define IS_PCBREV_40()                 (GPIO_ReadInputDataBit(PCBREV_GPIO, PCBREV_GPIO_PIN) == Bit_SET)
+#endif
+
+// Sport update driver
+#if defined(PCBX7)
+void sportUpdatePowerOn(void);
+void sportUpdatePowerOff(void);
+#define SPORT_UPDATE_POWER_ON()        sportUpdatePowerOn()
+#define SPORT_UPDATE_POWER_OFF()       sportUpdatePowerOff()
+#else
+#define SPORT_UPDATE_POWER_ON()        EXTERNAL_MODULE_ON()
+#define SPORT_UPDATE_POWER_OFF()       EXTERNAL_MODULE_OFF()
+#endif
 
 // Audio driver
 void audioInit(void) ;

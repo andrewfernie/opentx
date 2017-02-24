@@ -22,25 +22,26 @@
 #include "ui_debugoutput.h"
 
 #include "appdata.h"
+#include "filteredtextbuffer.h"
 
+#include <QElapsedTimer>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QScrollBar>
+#include <QThread>
 #include <QDebug>
 
 #define DEBUG_OUTPUT_STATE_VERSION    1
 
 extern AppData g;  // ensure what "g" means
 
-DebugOutput * traceCallbackInstance = 0;
-const int DebugOutput::m_dataBufferMaxSize = 100;        // lines of text (this is not the display buffer)
-const int DebugOutput::m_dataPrintFreqDefault = 10;      // ms
+FilteredTextBuffer * DebugOutput::m_dataBufferDevice = Q_NULLPTR;
 const quint16 DebugOutput::m_savedViewStateVersion = 1;
 
-void traceCb(const char * text)
+void firmwareTraceCb(const char * text)
 {
-  // divert C callback into simulator instance
-  if (traceCallbackInstance) {
-    traceCallbackInstance->traceCallback(text);
+  if (DebugOutput::m_dataBufferDevice) {
+    DebugOutput::m_dataBufferDevice->write(text);
   }
 }
 
@@ -48,26 +49,22 @@ DebugOutput::DebugOutput(QWidget * parent, SimulatorInterface *simulator):
   QWidget(parent),
   ui(new Ui::DebugOutput),
   m_simulator(simulator),
-  m_tmrDataPrint(new QTimer()),
-  m_dataBuffer(QByteArray()),
   m_radioProfileId(g.sessionId()),
-  m_dataPrintFreq(m_dataPrintFreqDefault),
-  m_running(false),
-  m_filterExclude(true)
+  m_filterEnable(false),
+  m_filterExclude(false)
 {
   ui->setupUi(this);
 
 #ifdef __APPLE__
-  QFont newFont("Courier", 13);
-  ui->console->setFont(newFont);
+  ui->console->setFont(QFont("Courier", 13));
 #endif
 
   // TODO : allow selecting multiple filters, but needs to be efficient at output stage
 
   QStringList stockFilters;
-  stockFilters << "^lua[A-Z].*";
+  stockFilters << "/^(lua[A-Z]|script).*/i";
   stockFilters << "/(error|warning|-(E|W)-)/i";
-  stockFilters << "!^(GC Use|(play|load|write|find(True)?)File|convert(To|From)Simu|\\t(not )?found( in map)?:?|eeprom |f_[a-z]+\\(|(push|(p|P)op(up)?|chain)? ?Menu( .+ display)?|RamBackup).+$";
+  stockFilters << "!^(GC Use|(play|load|write|find(True)?)File|convert(To|From)Simu|\\t(not found|found( in map|\\:))|eeprom |f_[a-z]+\\(|(push|(p|P)op(up)?|chain)? ?Menu( .+ display)?|RamBackup).*$";
 
   foreach (const QString & fltr, stockFilters)
     ui->filterText->addItem(fltr, "no_delete");
@@ -79,44 +76,47 @@ DebugOutput::DebugOutput(QWidget * parent, SimulatorInterface *simulator):
   ui->actionWordWrap->setIcon(SimulatorIcon("word_wrap"));
   ui->actionClearScr->setIcon(SimulatorIcon("eraser"));
 
+  ui->btnFilter->setDefaultAction(ui->actionToggleFilter);
   ui->btnShowFilterHelp->setDefaultAction(ui->actionShowFilterHelp);
   ui->btnWordWrap->setDefaultAction(ui->actionWordWrap);
   ui->btnClearScr->setDefaultAction(ui->actionClearScr);
+
+  m_dataBufferDevice = new FilteredTextBuffer();
+  m_dataBufferDevice->setDataBufferMaxSize(DEBUG_OUTPUT_WIDGET_OUT_BUFF_SIZE);
+  m_dataBufferDevice->setInputBufferMaxSize(DEBUG_OUTPUT_WIDGET_INP_BUFF_SIZE);
+  m_dataBufferDevice->open(QIODevice::ReadWrite | QIODevice::Text);
+
+	connect(m_dataBufferDevice, &FilteredTextBuffer::readyRead, this, &DebugOutput::processBytesReceived);
+  connect(m_dataBufferDevice, &FilteredTextBuffer::bufferOverflow, this, &DebugOutput::onDataBufferOverflow);
+  connect(this, &DebugOutput::filterChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilter);
+  connect(this, &DebugOutput::filterEnabledChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilterEnabled);
+  connect(this, &DebugOutput::filterExprChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilterExpr);
+  connect(this, &DebugOutput::filterExclusiveChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilterExclusive);
 
   restoreState();
 
   ui->bufferSize->setValue(ui->console->maximumBlockCount());
 
-  // install simulator TRACE hook
-  traceCallbackInstance = this;
-  m_simulator->installTraceHook(traceCb);
-
-  m_tmrDataPrint->setInterval(m_dataPrintFreq);
-
+  connect(ui->actionToggleFilter, &QAction::toggled, this, &DebugOutput::onFilterToggled);
   connect(ui->filterText, &QComboBox::currentTextChanged, this, &DebugOutput::onFilterTextChanged);
-  connect(m_tmrDataPrint, &QTimer::timeout, this, &DebugOutput::processBytesReceived);
+
+  // send firmware TRACE events to our data collector
+  m_simulator->installTraceHook(firmwareTraceCb);
 }
 
 DebugOutput::~DebugOutput()
 {
-  traceCallbackInstance = 0;
-  stop();
   saveState();
-  if (m_tmrDataPrint)
-    delete m_tmrDataPrint;
+
+
+  if (m_dataBufferDevice) {
+    disconnect(m_dataBufferDevice, 0, this, 0);
+    disconnect(this, 0, m_dataBufferDevice, 0);
+    m_dataBufferDevice->deleteLater();
+    m_dataBufferDevice = Q_NULLPTR;
+  }
+
   delete ui;
-}
-
-void DebugOutput::start()
-{
-  m_tmrDataPrint->start();
-  m_running = true;
-}
-
-void DebugOutput::stop()
-{
-  m_tmrDataPrint->stop();
-  m_running = false;
 }
 
 void DebugOutput::saveState()
@@ -132,7 +132,7 @@ void DebugOutput::saveState()
   QDataStream stream(&state, QIODevice::WriteOnly);
   stream << m_savedViewStateVersion
          << (qint16)ui->filterText->currentIndex() << (qint32)ui->console->maximumBlockCount()
-         << ui->btnFilter->isChecked() << ui->actionWordWrap->isChecked();
+         << m_filterEnable << ui->actionWordWrap->isChecked();
 
   SimulatorOptions opts = g.profile[m_radioProfileId].simulatorOptions();
   opts.dbgConsoleState = state;
@@ -154,55 +154,23 @@ void DebugOutput::restoreState()
 
   ui->filterText->insertItems(0, g.simuDbgFilters());
   ui->filterText->setCurrentIndex(fci);
-  ui->btnFilter->setChecked(flten);
   ui->console->setMaximumBlockCount(mbc);
   ui->actionWordWrap->setChecked(wwen);
-  onFilterTextEdited();
-}
 
-void DebugOutput::traceCallback(const char * text)
-{
-  const static QRegExp blank("^[\\r\\n]+$");
-  bool isBlank;
-
-  if (!m_running)
-    return;
-
-  QString line(text);
-  isBlank = line.contains(blank);
-
-  m_mtxDataBuffer.lock();
-  if (isBlank && m_dataBuffer.size())
-    m_dataBuffer[m_dataBuffer.size()-1] += line;
-  else
-    m_dataBuffer.append(text);
-  if (m_dataBuffer.size() > m_dataBufferMaxSize) {
-    m_dataBuffer.removeFirst();
-    qDebug() << __FILE__ << __LINE__ << "Line buffer overflow! size >" << m_dataBufferMaxSize;
-  }
-  m_mtxDataBuffer.unlock();
+  onFilterToggled(flten);
 }
 
 void DebugOutput::processBytesReceived()
 {
-  QString text;
-  bool fltMatch;
   const QTextCursor savedCursor(ui->console->textCursor());
   const int sbValue = ui->console->verticalScrollBar()->value();
   const bool sbAtBottom = (sbValue == ui->console->verticalScrollBar()->maximum());
+  qint64 len;
 
-  m_tmrDataPrint->stop();
-  while (m_dataBuffer.size() > 1) {
-    m_mtxDataBuffer.lock();
-    text = m_dataBuffer.takeFirst();
-    m_mtxDataBuffer.unlock();
-    // filter
-    if (ui->btnFilter->isChecked()) {
-      fltMatch = text.contains(m_filterRegEx);
-      if ((m_filterExclude && fltMatch) || (!m_filterExclude && !fltMatch)) {
-        continue;
-      }
-    }
+  while ((len = m_dataBufferDevice->bytesAvailable()) > 0) {
+    QString text(m_dataBufferDevice->read(qMin(len, qint64(512))));
+    if (text.isEmpty())
+      break;
     ui->console->moveCursor(QTextCursor::End);
     ui->console->textCursor().insertText(text);
     if (sbAtBottom) {
@@ -215,38 +183,62 @@ void DebugOutput::processBytesReceived()
     }
     QCoreApplication::processEvents();
   }
-  m_tmrDataPrint->start();
+}
+
+void DebugOutput::onDataBufferOverflow(const qint64 len)
+{
+  static QElapsedTimer reportTimer;
+
+  if (len <= 0) {
+    reportTimer.invalidate();
+  }
+  else if (!reportTimer.isValid() || reportTimer.elapsed() > 1000 * 30) {
+    qWarning("Data buffer overflow by %lld bytes!", len);
+    reportTimer.start();
+  }
 }
 
 /*
  * UI handlers
  */
 
-void DebugOutput::onFilterTextEdited()
+void DebugOutput::onFilterStateChanged()
 {
   const QString fText = ui->filterText->currentText();
   if (fText.isEmpty()) {
-    ui->btnFilter->setChecked(false);
-    m_filterRegEx = QRegularExpression();
+    onFilterToggled(false);
     return;
   }
 
-  m_filterRegEx = makeRegEx(fText, &m_filterExclude);
+  QRegularExpression filterRegEx = makeRegEx(fText, &m_filterExclude);
 
-  if (m_filterRegEx.isValid()) {
-    //ui->btnFilter->setChecked(true);
+  if (!m_filterEnable || filterRegEx.isValid())
     ui->filterText->setStyleSheet("");
-  }
-  else {
-    ui->btnFilter->setChecked(false);
-    m_filterRegEx = QRegularExpression();
+  else if (m_filterEnable)
     ui->filterText->setStyleSheet("background-color: rgba(255, 205, 185, 200);");
-  }
+
+  if (filterRegEx.isValid())
+    emit filterChanged(m_filterEnable, m_filterExclude, filterRegEx);
+  else
+    onFilterToggled(false);
 }
 
 void DebugOutput::onFilterTextChanged(const QString &)
 {
-  onFilterTextEdited();
+  onFilterStateChanged();
+}
+
+void DebugOutput::onFilterToggled(bool enable)
+{
+  if (enable != m_filterEnable) {
+    m_filterEnable = enable;
+    if (ui->actionToggleFilter->isChecked() != enable)
+      ui->actionToggleFilter->setChecked(enable);
+    if (enable)
+      onFilterStateChanged();
+    else
+      emit filterEnabledChanged(false);
+  }
 }
 
 void DebugOutput::on_bufferSize_editingFinished()

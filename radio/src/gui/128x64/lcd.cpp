@@ -636,13 +636,13 @@ void lcdDrawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2, uint8_t pat, Lc
   if (dxabs >= dyabs) {
     /* the line is more horizontal than vertical */
     for (int i=0; i<=dxabs; i++) {
+      if ((1<<(px%8)) & pat) {
+        lcdDrawPoint(px, py, att);
+      }
       y += dyabs;
       if (y>=dxabs) {
         y -= dxabs;
         py += sdy;
-      }
-      if ((1<<(px%8)) & pat) {
-        lcdDrawPoint(px, py, att);
       }
       px += sdx;
     }
@@ -650,13 +650,13 @@ void lcdDrawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2, uint8_t pat, Lc
   else {
     /* the line is more vertical than horizontal */
     for (int i=0; i<=dyabs; i++) {
+      if ((1<<(py%8)) & pat) {
+        lcdDrawPoint(px, py, att);
+      }
       x += dxabs;
       if (x >= dyabs) {
         x -= dyabs;
         px += sdx;
-      }
-      if ((1<<(py%8)) & pat) {
-        lcdDrawPoint(px, py, att);
       }
       py += sdy;
     }
@@ -1583,7 +1583,7 @@ void lcdDrawHorizontalLine(coord_t x, coord_t y, coord_t w, uint8_t pat, LcdFlag
 void drawShutdownAnimation(uint32_t index)
 {
   lcdClear();
-  int quarter = index / (PWR_PRESS_SHUTDOWN / 5);
+  int quarter = index / (PWR_PRESS_SHUTDOWN_DELAY / 5);
   for (int i=1; i<=4; i++) {
     if (quarter >= i) {
       lcdDrawFilledRect(LCD_W / 2 - 28 + 10 * i, LCD_H / 2 - 3, 6, 6, SOLID, 0);
