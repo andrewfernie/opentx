@@ -99,7 +99,6 @@ int8_t calcRESXto100(int16_t x)
   return (x*25) >> 8;
 }
 #endif
-
 #if defined(HELI) || defined(FRSKY_HUB) || defined(CPUARM)
 uint16_t isqrt32(uint32_t n)
 {
@@ -129,6 +128,7 @@ uint16_t isqrt32(uint32_t n)
 */
 
 #if defined(FRSKY_HUB) && !defined(CPUARM)
+// convert latitude and longitude to 1/10^6 degrees
 void extractLatitudeLongitude(uint32_t * latitude, uint32_t * longitude)
 {
   div_t qr = div(telemetryData.hub.gpsLatitude_bp, 100);
@@ -141,10 +141,12 @@ void extractLatitudeLongitude(uint32_t * latitude, uint32_t * longitude)
 void getGpsPilotPosition()
 {
   extractLatitudeLongitude(&telemetryData.hub.pilotLatitude, &telemetryData.hub.pilotLongitude);
+  // distFromEarthAxis = cos(lat) * EARTH_RADIUS
+  // 1 - x2/2 + x4/24
   uint32_t lat = telemetryData.hub.pilotLatitude / 10000;
   uint32_t angle2 = (lat*lat) / 10000;
   uint32_t angle4 = angle2 * angle2;
-  telemetryData.hub.distFromEarthAxis = 139*(((uint32_t)10000000-((angle2*(uint32_t)123370)/81)+(angle4/25))/12500);
+  telemetryData.hub.distFromEarthAxis = 139 * (((uint32_t)10000000-((angle2*(uint32_t)123370)/81)+(angle4/25)) / 12500);
   // TRACE("telemetryData.hub.distFromEarthAxis=%d", telemetryData.hub.distFromEarthAxis);
 }
 
@@ -170,5 +172,18 @@ void getGpsDistance()
   telemetryData.hub.gpsDistance = isqrt32(result);
   if (telemetryData.hub.gpsDistance > telemetryData.hub.maxGpsDistance)
     telemetryData.hub.maxGpsDistance = telemetryData.hub.gpsDistance;
+}
+#endif
+
+#if defined(CPUARM)
+// djb2 hash algorithm
+uint32_t hash(const void * ptr, uint32_t size)
+{
+  const uint8_t * data = (const uint8_t *)ptr;
+  uint32_t hash = 5381;
+  for (uint32_t i=0; i<size; i++) {
+    hash = ((hash << 5) + hash) + data[i]; /* hash * 33 + c */
+  }
+  return hash;
 }
 #endif

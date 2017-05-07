@@ -36,6 +36,13 @@ class ModelCell
       strncpy(this->modelFilename, name, sizeof(this->modelFilename));
     }
 
+    ~ModelCell()
+    {
+      if (buffer) {
+        delete buffer;
+      }
+    }
+
     const BitmapBuffer * getBuffer()
     {
       if (!buffer) {
@@ -67,8 +74,15 @@ class ModelCell
       }
       else {
         zchar2str(modelName, header.name, LEN_MODEL_NAME);
+        if (modelName[0] == 0) {
+          char * tmp;
+          strncpy(modelName, modelFilename, LEN_MODEL_NAME);
+          tmp = (char *) memchr(modelName, '.',  LEN_MODEL_NAME);
+          if (tmp != NULL)
+            *tmp = 0;
+        }
         char timer[LEN_TIMER_STRING];
-        buffer->drawSizedText(5, 2, header.name, LEN_MODEL_NAME, SMLSIZE|ZCHAR|TEXT_COLOR);
+        buffer->drawSizedText(5, 2, modelName, LEN_MODEL_NAME, SMLSIZE|TEXT_COLOR);
         getTimerString(timer, 0);
         buffer->drawText(101, 40, timer, TEXT_COLOR);
         for (int i=0; i<4; i++) {
@@ -99,6 +113,14 @@ class ModelsCategory: public std::list<ModelCell *>
     {
       strncpy(this->name, name, sizeof(this->name));
     }
+
+    ~ModelsCategory()
+    {
+      for (std::list<ModelCell *>::iterator it = begin(); it != end(); ++it) {
+        delete *it;
+      }
+    }
+
 
     ModelCell * addModel(const char * name)
     {

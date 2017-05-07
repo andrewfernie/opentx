@@ -101,6 +101,33 @@ enum MenuModelSetupItems {
 #define MODEL_SETUP_RANGE_OFS         7*FW
 #define MODEL_SETUP_SET_FAILSAFE_OFS  10*FW-2
 
+#if defined(BINDING_OPTIONS)
+void onBindMenu(const char * result)
+{
+  if (result == STR_BINDING_1_8_TELEM_ON) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = false;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = false;
+  }
+  else if (result == STR_BINDING_1_8_TELEM_OFF) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = true;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = false;
+  }
+  else if (result == STR_BINDING_9_16_TELEM_ON) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = false;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = true;
+  }
+  else if (result == STR_BINDING_9_16_TELEM_OFF) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = true;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = true;
+  }
+  else {
+    return;
+  }
+
+  moduleFlag[INTERNAL_MODULE] = MODULE_BIND;
+}
+#endif
+
 void copySelection(char * dst, const char * src, uint8_t size)
 {
   if (memcmp(src, "---", 3) == 0)
@@ -176,7 +203,7 @@ void editTimerCountdown(int timerIdx, coord_t y, LcdFlags attr, event_t event)
   lcdDrawTextAtIndex(MODEL_SETUP_2ND_COLUMN, y, STR_VBEEPCOUNTDOWN, timer.countdownBeep, (menuHorizontalPosition==0 ? attr : 0));
   if (timer.countdownBeep != COUNTDOWN_SILENT) {
     lcdDrawNumber(MODEL_SETUP_3RD_COLUMN, y, TIMER_COUNTDOWN_START(timerIdx), (menuHorizontalPosition == 1 ? attr : 0) | LEFT);
-    lcdDrawChar(lcdLastPos, y, 's');
+    lcdDrawChar(lcdLastRightPos, y, 's');
   }
   if (attr && s_editMode>0) {
     switch (menuHorizontalPosition) {
@@ -203,15 +230,12 @@ int getSwitchWarningsCount()
   return count;
 }
 
-#if !defined(TARANIS_INTERNAL_PPM)
-  #define INTERNAL_MODULE_MODE_ROWS       0 // (OFF / RF protocols)
-#else
-  #define INTERNAL_MODULE_MODE_ROWS       (IS_MODULE_XJT(INTERNAL_MODULE) ? (uint8_t)1 : (uint8_t)0) // Module type + RF protocols
-#endif
 #if defined(TARANIS_INTERNAL_PPM)
   #define IF_INTERNAL_MODULE_ON(x)        (g_model.moduleData[INTERNAL_MODULE].type == MODULE_TYPE_NONE ? HIDDEN_ROW : (uint8_t)(x))
+  #define INTERNAL_MODULE_MODE_ROWS       (IS_MODULE_XJT(INTERNAL_MODULE) ? (uint8_t)1 : (uint8_t)0) // Module type + RF protocols
 #else
   #define IF_INTERNAL_MODULE_ON(x)        (g_model.moduleData[INTERNAL_MODULE].rfProtocol == RF_PROTO_OFF ? HIDDEN_ROW : (uint8_t)(x))
+  #define INTERNAL_MODULE_MODE_ROWS       0 // (OFF / RF protocols)
 #endif
 #define IF_EXTERNAL_MODULE_ON(x)          (g_model.moduleData[EXTERNAL_MODULE].type == MODULE_TYPE_NONE ? HIDDEN_ROW : (uint8_t)(x))
 #define IF_EXTERNAL_MODULE_XJT(x)         (IS_MODULE_XJT(EXTERNAL_MODULE) ? (uint8_t)x : HIDDEN_ROW)
@@ -256,15 +280,16 @@ void menuModelSetup(event_t event)
     IF_INTERNAL_MODULE_ON(IS_MODULE_XJT(INTERNAL_MODULE) ? (HAS_RF_PROTOCOL_MODELINDEX(g_model.moduleData[INTERNAL_MODULE].rfProtocol) ? (uint8_t)2 : (uint8_t)1) : (IS_MODULE_PPM(INTERNAL_MODULE) ? (uint8_t)1 : HIDDEN_ROW)),
     IF_INTERNAL_MODULE_ON((IS_MODULE_XJT(INTERNAL_MODULE)) ? FAILSAFE_ROWS(INTERNAL_MODULE) : HIDDEN_ROW),
     LABEL(ExternalModule),
-    (IS_MODULE_XJT(EXTERNAL_MODULE) || IS_MODULE_DSM2(EXTERNAL_MODULE) || IS_MODULE_MULTIMODULE(EXTERNAL_MODULE)) ? (uint8_t)1 : (uint8_t)0,
+    EXTERNAL_MODULE_MODE_ROWS,
     MULTIMODULE_STATUS_ROW
     EXTERNAL_MODULE_CHANNELS_ROWS,
-    (IS_MODULE_XJT(EXTERNAL_MODULE) && !HAS_RF_PROTOCOL_MODELINDEX(g_model.moduleData[EXTERNAL_MODULE].rfProtocol)) ? (uint8_t)1 : (IS_MODULE_PPM(EXTERNAL_MODULE) || IS_MODULE_XJT(EXTERNAL_MODULE) || IS_MODULE_DSM2(EXTERNAL_MODULE) || IS_MODULE_MULTIMODULE(EXTERNAL_MODULE)) ? (uint8_t)2 : HIDDEN_ROW,
-    IF_EXTERNAL_MODULE_XJT(FAILSAFE_ROWS(EXTERNAL_MODULE)),
+    (IS_MODULE_XJT(EXTERNAL_MODULE) && !HAS_RF_PROTOCOL_FAILSAFE(g_model.moduleData[EXTERNAL_MODULE].rfProtocol)) ? (uint8_t)1 : (IS_MODULE_PPM(EXTERNAL_MODULE) || IS_MODULE_XJT(EXTERNAL_MODULE) || IS_MODULE_DSM2(EXTERNAL_MODULE) || IS_MODULE_MULTIMODULE(EXTERNAL_MODULE)) ? (uint8_t)2 : HIDDEN_ROW,
+    FAILSAFE_ROWS(EXTERNAL_MODULE), MULTIMODULE_MODULE_ROWS
     LABEL(Trainer), 0, TRAINER_CHANNELS_ROWS(), IF_TRAINER_ON(2)});
 #else
-  MENU_TAB({ 0, 0, TIMERS_ROWS, TOPLCD_ROWS 0, 1, 0, 0, LABEL(Throttle), 0, 0, 0, LABEL(PreflightCheck), 0, 0, SW_WARN_ITEMS(), POT_WARN_ITEMS(),
-    NAVIGATION_LINE_BY_LINE|(NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_ROTARY_ENCODERS-1), 0,
+  MENU_TAB({ 0, 0, TIMERS_ROWS, TOPLCD_ROWS 0, 1, 0, 0,
+    LABEL(Throttle), 0, 0, 0,
+    LABEL(PreflightCheck), 0, 0, SW_WARN_ITEMS(), POT_WARN_ITEMS(), NAVIGATION_LINE_BY_LINE|(NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_ROTARY_ENCODERS-1), 0,
     LABEL(InternalModule),
     INTERNAL_MODULE_MODE_ROWS,
     INTERNAL_MODULE_CHANNELS_ROWS,
@@ -790,14 +815,14 @@ void menuModelSetup(event_t event)
         lcdDrawTextAlignedLeft(y, STR_CHANNELRANGE);
         if ((int8_t)PORT_CHANNELS_ROWS(moduleIdx) >= 0) {
           lcdDrawText(MODEL_SETUP_2ND_COLUMN, y, STR_CH, menuHorizontalPosition==0 ? attr : 0);
-          lcdDrawNumber(lcdLastPos, y, moduleData.channelsStart+1, LEFT | (menuHorizontalPosition==0 ? attr : 0));
-          lcdDrawChar(lcdLastPos, y, '-');
-          lcdDrawNumber(lcdLastPos + FW+1, y, moduleData.channelsStart+NUM_CHANNELS(moduleIdx), LEFT | (menuHorizontalPosition==1 ? attr : 0));
+          lcdDrawNumber(lcdLastRightPos, y, moduleData.channelsStart+1, LEFT | (menuHorizontalPosition==0 ? attr : 0));
+          lcdDrawChar(lcdLastRightPos, y, '-');
+          lcdDrawNumber(lcdLastRightPos + FW+1, y, moduleData.channelsStart+NUM_CHANNELS(moduleIdx), LEFT | (menuHorizontalPosition==1 ? attr : 0));
           if (IS_MODULE_XJT(moduleIdx) && g_model.moduleData[moduleIdx].rfProtocol== RF_PROTO_X16) {
             if (NUM_CHANNELS(moduleIdx) > 8)
-              lcdDrawText(lcdLastPos+5, y, "(18ms)");
+              lcdDrawText(lcdLastRightPos+5, y, "(18ms)");
             else
-              lcdDrawText(lcdLastPos+5, y, "(9ms)");
+              lcdDrawText(lcdLastRightPos+5, y, "(9ms)");
           }
           if (attr && s_editMode>0) {
             switch (menuHorizontalPosition) {
@@ -831,9 +856,9 @@ void menuModelSetup(event_t event)
         if (IS_MODULE_PPM(moduleIdx)) {
           lcdDrawTextAlignedLeft(y, STR_PPMFRAME);
           lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, (int16_t)moduleData.ppm.frameLength*5 + 225, (menuHorizontalPosition<=0 ? attr : 0) | PREC1|LEFT);
-          lcdDrawText(lcdLastPos, y, STR_MS);
+          lcdDrawText(lcdLastRightPos, y, STR_MS);
           lcdDrawNumber(MODEL_SETUP_2ND_COLUMN+6*FW, y, (moduleData.ppm.delay*50)+300, (CURSOR_ON_LINE() || menuHorizontalPosition==1) ? attr : 0);
-          lcdDrawChar(lcdLastPos, y, 'u');
+          lcdDrawChar(lcdLastRightPos, y, 'u');
           lcdDrawChar(MODEL_SETUP_2ND_COLUMN+12*FW, y, moduleData.ppm.pulsePol ? '+' : '-', (CURSOR_ON_LINE() || menuHorizontalPosition==2) ? attr : 0);
 
           if (attr && s_editMode>0) {
@@ -884,11 +909,43 @@ void menuModelSetup(event_t event)
               s_editMode=0;
             }
 #endif
+#if defined(BINDING_OPTIONS)
+            if (attr && l_posHorz>0) {
+              if(s_editMode>0) {
+                if (l_posHorz == 1) {
+                  if (IS_MODULE_XJT(moduleIdx) && g_model.moduleData[moduleIdx].rfProtocol== RF_PROTO_X16 && s_current_protocol[INTERNAL_MODULE] == PROTO_PXX) {
+                    if(event==EVT_KEY_BREAK(KEY_ENTER)) {
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_1_8_TELEM_ON);
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_1_8_TELEM_OFF);
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_9_16_TELEM_ON);
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_9_16_TELEM_OFF);
+                      POPUP_MENU_SELECT_ITEM(g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off + (g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 << 1));
+                      POPUP_MENU_START(onBindMenu);
+                      continue;
+                    }
+                    if (moduleFlag[INTERNAL_MODULE] == MODULE_BIND) {
+                      newFlag = MODULE_BIND;
+                    }
+                    else {
+                      if (!popupMenuNoItems) {
+                        s_editMode=0;  // this is when popup is exited before a choice is made
+                      }
+                    }
+                  }
+                  else {
+                    newFlag = MODULE_BIND;
+                  }
+                }
+                else if (l_posHorz == 2) {
+                  newFlag = MODULE_RANGECHECK;
+                }
+#else
             if (attr && l_posHorz>0 && s_editMode>0) {
               if (l_posHorz == 1)
                 newFlag = MODULE_BIND;
               else if (l_posHorz == 2) {
                 newFlag = MODULE_RANGECHECK;
+#endif
               }
             }
             moduleFlag[moduleIdx] = newFlag;

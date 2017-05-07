@@ -153,10 +153,10 @@ static void luaPushLatLon(lua_State* L, TelemetrySensor & telemetrySensor, Telem
 /* result is lua table containing members ["lat"] and ["lon"] as lua_Number (doubles) in decimal degrees */
 {
   lua_createtable(L, 0, 4);
-  lua_pushtablenumber(L, "lat", telemetryItem.gps.latitude / 1000000.0);
-  lua_pushtablenumber(L, "pilot-lat", telemetryItem.pilotLatitude / 1000000.0);
-  lua_pushtablenumber(L, "lon", telemetryItem.gps.longitude / 1000000.0);
-  lua_pushtablenumber(L, "pilot-lon", telemetryItem.pilotLongitude / 1000000.0);
+  lua_pushtablenumber(L, "lat", telemetryItem.gps.latitude * 0.000001); // floating point multiplication is faster than division
+  lua_pushtablenumber(L, "pilot-lat", telemetryItem.pilotLatitude * 0.000001);
+  lua_pushtablenumber(L, "lon", telemetryItem.gps.longitude * 0.000001);
+  lua_pushtablenumber(L, "pilot-lon", telemetryItem.pilotLongitude * 0.000001);
 }
 
 static void luaPushTelemetryDateTime(lua_State* L, TelemetrySensor & telemetrySensor, TelemetryItem & telemetryItem)
@@ -173,7 +173,7 @@ static void luaPushCells(lua_State* L, TelemetrySensor & telemetrySensor, Teleme
     lua_createtable(L, telemetryItem.cells.count, 0);
     for (int i = 0; i < telemetryItem.cells.count; i++) {
       lua_pushnumber(L, i + 1);
-      lua_pushnumber(L, telemetryItem.cells.values[i].value / 100.0);
+      lua_pushnumber(L, telemetryItem.cells.values[i].value * 0.01f);
       lua_settable(L, -3);
     }
   }
@@ -215,7 +215,7 @@ void luaGetValueAndPush(lua_State* L, int src)
     }
   }
   else if (src == MIXSRC_TX_VOLTAGE) {
-    lua_pushnumber(L, float(value)/10.0);
+    lua_pushnumber(L, float(value) * 0.1f);
   }
   else {
     lua_pushinteger(L, value);
@@ -408,7 +408,7 @@ static int luaCrossfireTelemetryPop(lua_State * L)
     }
   }
 
-  uint8_t length, data;
+  uint8_t length = 0, data = 0;
   if (luaInputTelemetryFifo->probe(length) && luaInputTelemetryFifo->size() >= uint32_t(length)) {
     // length value includes the length field
     luaInputTelemetryFifo->pop(length);
@@ -478,10 +478,12 @@ static int luaCrossfireTelemetryPush(lua_State * L)
 Return detailed information about field (source)
 
 The list of valid sources is available:
-* for OpenTX 2.0.x at http://downloads-20.open-tx.org/firmware/lua_fields.txt
-* for OpenTX 2.1.x at http://downloads-21.open-tx.org/firmware/lua_fields.txt (depreciated)
-* for OpenTX 2.1.x Taranis and Taranis Plus at http://downloads-21.open-tx.org/firmware/lua_fields_taranis.txt
-* for OpenTX 2.1.x Taranis X9E at http://downloads-21.open-tx.org/firmware/lua_fields_taranis_x9e.txt
+
+| OpenTX Version | Radio |
+|----------------|-------|
+| 2.0 | [all](http://downloads-20.open-tx.org/firmware/lua_fields.txt) |
+| 2.1 | [X9D and X9D+](http://downloads-21.open-tx.org/firmware/lua_fields_taranis.txt), [X9E](http://downloads-21.open-tx.org/firmware/lua_fields_taranis_x9e.txt) |
+| 2.2 | [X9D and X9D+](http://downloads.open-tx.org/2.2/firmware/lua_fields_x9d.txt), [X9E](http://downloads.open-tx.org/2.2/firmware/lua_fields_x9e.txt), [Horus](http://downloads.open-tx.org/2.2/firmware/lua_fields_x12s.txt) |
 
 @param name (string) name of the field
 
@@ -489,10 +491,11 @@ The list of valid sources is available:
  * `id`   (number) field identifier
  * `name` (string) field name
  * `desc` (string) field description
+ * 'unit' (number) unit identifier [Full list](../appendix/units.html)
 
 @retval nil the requested field was not found
 
-@status current Introduced in 2.0.8
+@status current Introduced in 2.0.8, 'unit' field added in 2.2.0
 */
 static int luaGetFieldInfo(lua_State * L)
 {
@@ -504,6 +507,13 @@ static int luaGetFieldInfo(lua_State * L)
     lua_pushtableinteger(L, "id", field.id);
     lua_pushtablestring(L, "name", what);
     lua_pushtablestring(L, "desc", field.desc);
+    if (field.id >= MIXSRC_FIRST_TELEM && field.id <= MIXSRC_LAST_TELEM) {
+      TelemetrySensor & telemetrySensor = g_model.telemetrySensors[(int)((field.id-MIXSRC_FIRST_TELEM)/3)];
+      lua_pushtableinteger(L, "unit", telemetrySensor.unit);
+    }
+    else {
+      lua_pushtablenil(L, "unit");
+    }
     return 1;
   }
   return 0;
@@ -514,11 +524,14 @@ static int luaGetFieldInfo(lua_State * L)
 
 Returns the value of a source.
 
-The list of valid sources is available:
-* for OpenTX 2.0.x at http://downloads-20.open-tx.org/firmware/lua_fields.txt
-* for OpenTX 2.1.x at http://downloads-21.open-tx.org/firmware/lua_fields.txt (depreciated)
-* for OpenTX 2.1.x Taranis and Taranis Plus at http://downloads-21.open-tx.org/firmware/lua_fields_taranis.txt
-* for OpenTX 2.1.x Taranis X9E at http://downloads-21.open-tx.org/firmware/lua_fields_taranis_x9e.txt
+The list of fixed sources:
+
+| OpenTX Version | Radio |
+|----------------|-------|
+| 2.0 | [all](http://downloads-20.open-tx.org/firmware/lua_fields.txt) |
+| 2.1 | [X9D and X9D+](http://downloads-21.open-tx.org/firmware/lua_fields_taranis.txt), [X9E](http://downloads-21.open-tx.org/firmware/lua_fields_taranis_x9e.txt) |
+| 2.2 | [X9D and X9D+](http://downloads.open-tx.org/2.2/firmware/lua_fields_x9d.txt), [X9E](http://downloads.open-tx.org/2.2/firmware/lua_fields_x9e.txt), [Horus](http://downloads.open-tx.org/2.2/firmware/lua_fields_x12s.txt) |
+
 
 In OpenTX 2.1.x the telemetry sources no longer have a predefined name.
 To get a telemetry value simply use it's sensor name. For example:
@@ -660,7 +673,7 @@ Play a numerical value (text to speech)
 
 @param value (number) number to play. Value is interpreted as integer.
 
-@param unit (number) unit identifier (see table todo)
+@param unit (number) unit identifier [Full list]((../appendix/units.html))
 
 @param attributes (unsigned number) possible values:
  * `0 or not present` plays integral part of the number (for a number 123 it plays 123)
@@ -668,36 +681,6 @@ Play a numerical value (text to speech)
  * `PREC2` plays a number with two decimal places (for a number 123 it plays 1.23)
 
 @status current Introduced in 2.0.0
-
-
-| 2.2 Unit  | Sound        |
-| --- | ---                |
-| 0   | (no unit played)   |
-| 1   | Volts              |
-| 2   | Amps               |
-| 3   | Milliamps          |
-| 4   | Knots              |
-| 5   | Meters per Second  |
-| 6   | Feet per Second    |
-| 7   | Kilometers per Hour|
-| 8   | Miles per Hour     |
-| 9   | Meters             |
-| 10  | Feet               |
-| 11  | Degrees Celsius    |
-| 12  | Degrees Fahrenheit |
-| 13  | Percent            |
-| 14  | Milliamp Hours     |
-| 15  | Watts              |
-| 16  | DB                 |
-| 17  | RPM                |
-| 18  | Gee                |
-| 19  | Degrees            |
-| 20  | Radians            |
-| 21  | Milliliters        |
-| 22  | Fluid Ounces       |
-| 23  | Hours              |
-| 24  | Minutes            |
-| 25  | Seconds            |
 
 */
 static int luaPlayNumber(lua_State * L)
@@ -792,13 +775,12 @@ static int luaPlayHaptic(lua_State * L)
 /*luadoc
 @function killEvents(key)
 
-Stops key state machine.
+Stops key state machine. See [Key Events](../key_events.md) for the detailed description.
 
-@param key (number) key to be killed, can also include event type (only key part is used)
+@param key (number) key to be killed, can also include event type (only the key part is used)
 
 @status current Introduced in 2.0.0
 
-TODO table of events/masks
 */
 static int luaKillEvents(lua_State * L)
 {
@@ -851,8 +833,8 @@ Returns (some of) the general radio settings
 static int luaGetGeneralSettings(lua_State * L)
 {
   lua_newtable(L);
-  lua_pushtablenumber(L, "battMin", double(90+g_eeGeneral.vBatMin)/10);
-  lua_pushtablenumber(L, "battMax", double(120+g_eeGeneral.vBatMax)/10);
+  lua_pushtablenumber(L, "battMin", (90+g_eeGeneral.vBatMin) * 0.1f);
+  lua_pushtablenumber(L, "battMax", (120+g_eeGeneral.vBatMax) * 0.1f);
   lua_pushtableinteger(L, "imperial", g_eeGeneral.imperial);
   lua_pushtablestring(L, "language", TRANSLATIONS);
   lua_pushtablestring(L, "voice", currentLanguagePack->id);
@@ -1001,14 +983,7 @@ static int luaDefaultStick(lua_State * L)
 
 @param value fed to the sensor
 
-@param unit unit of the sensor.
- * `0 or not present` UNIT_RAW.
- * `!= 0` Valid values are 1 (UNIT_VOLTS), 2 (UNIT_AMPS), 3 (UNIT_MILLIAMPS),
- 4 (UNIT_KTS), 5 (UNIT_METERS_PER_SECOND), 6 (UNIT_FEET_PER_SECOND), 7 (UNIT_KMH), 8 (UNIT_MPH), 9 (UNIT_METERS),
- 10 (UNIT_FEET), 11 (UNIT_CELSIUS), 12 (UNIT_FAHRENHEIT), 13 (UNIT_PERCENT), 14 (UNIT_MAH), 15 (UNIT_WATTS),
- 16 (UNIT_MILLIWATTS), 17 (UNIT_DB), 18 (UNIT_RPMS), 19 (UNIT_G), 20 (UNIT_DEGREE), 21 (UNIT_RADIANS),
- 22 (UNIT_MILLILITERS), 23 (UNIT_FLOZ), 24 (UNIT_HOURS), 25 (UNIT_MINUTES), 26 (UNIT_SECONDS), 27 (UNIT_CELLS),
- 28 (UNIT_DATETIME), 29 (UNIT_GPS), 30 (UNIT_BITFIELD), 31 (UNIT_TEXT)
+@param unit unit of the sensor [Full list](../appendix/units.html)
 
 @param precision the precision of the sensor
  * `0 or not present` no decimal precision.
@@ -1113,47 +1088,54 @@ static int luaGetRSSI(lua_State * L)
 /*luadoc
 @function loadScript(file [, mode], [,env])
 
-Load a Lua script file. This is similar to Lua's own loadfile() API method,  but it uses
-OpenTx's optional pre-compilation feature to (possibly) save memory and time during load.
+Load a Lua script file. This is similar to Lua's own [loadfile()](https://www.lua.org/manual/5.2/manual.html#pdf-loadfile)
+API method,  but it uses OpenTx's optional pre-compilation feature to save memory and time during load.
 
-@param file (string) Full path and file name of script. The file extension is optional and ignored (see "mode" param to control
+Return values are same as from Lua API loadfile() method: If the script was loaded w/out errors
+then the loaded script (or "chunk") is returned as a function. Otherwise, returns nil plus the error message.
+
+@param file (string) Full path and file name of script. The file extension is optional and ignored (see `mode` param to control
   which extension will be used). However, if an extension is specified, it should be ".lua" (or ".luac"), otherwise it is treated
   as part of the file name and the .lua/.luac will be appended to that.
 
-@param mode (string) (optional) Controls whether to force loading the text (.lua) or binary (.luac, that is, a pre-compiled file)
+@param mode (string) (optional) Controls whether to force loading the text (.lua) or pre-compiled binary (.luac)
   version of the script. By default OTx will load the newest version and compile a new binary if necessary (overwriting any
-  existing .luac version of the same script, and stripping some debug info like line numbers). You can use this to bypass the automatic
-  script version check and set specific compilation options in OpenTx.
-    Possible values are:
-      "b" only binary.
-      "t" only text.
-      "T" (default on simulator) prefer text but load binary if that is the only version available.
-      "bt" (default on radio) either binary or text, whichever is newer (binary preferred when timestamps are equal).
-      Add "x" to avoid automatic compilation of source file to .luac version.
-        Eg: "tx", "bx", or "btx".
-      Add "c" to force compilation of source file to .luac version (even if existing version is newer than source file).
-        Eg: "tc" or "btc" (forces "t", overrides "x").
-      Add "d" to keep extra debug info in the compiled binary.
-        Eg: "td", "btd", or "tcd" (no effect with just "b" or with "x").
+  existing .luac version of the same script, and stripping some debug info like line numbers).
+  You can use `mode` to control the loading behavior more specifically. Possible values are:
+   * `b` only binary.
+   * `t` only text.
+   * `T` (default on simulator) prefer text but load binary if that is the only version available.
+   * `bt` (default on radio) either binary or text, whichever is newer (binary preferred when timestamps are equal).
+   * Add `x` to avoid automatic compilation of source file to .luac version.
+       Eg: "tx", "bx", or "btx".
+   * Add `c` to force compilation of source file to .luac version (even if existing version is newer than source file).
+       Eg: "tc" or "btc" (forces "t", overrides "x").
+   * Add `d` to keep extra debug info in the compiled binary.
+       Eg: "td", "btd", or "tcd" (no effect with just "b" or with "x").
 
-  Note that you will get an error if you specify "b" or "t" and that specific version of the file does not exist (eg. no .luac file when "b" is used).
-  Also note that mode is NOT passed on to Lua's loader function, so unlike with loadfile() the actual file content is not checked (as if no mode or "bt" were passed to loadfile()).
+@notice
+  Note that you will get an error if you specify `mode` as "b" or "t" and that specific version of the file does not exist (eg. no .luac file when "b" is used).
+  Also note that `mode` is NOT passed on to Lua's loader function, so unlike with loadfile() the actual file content is not checked (as if no mode or "bt" were passed to loadfile()).
 
 @param env (integer) See documentation for Lua function loadfile().
 
-@returns Same as from Lua API loadfile() method.
-  If the script was loaded w/out errors then the loaded script (or "chunk") is returned as a function;
-  Otherwise, returns nil plus the error message
+@retval function The loaded script, or `nil` if there was an error (e.g. file not found or syntax error).
 
-@usage
+@retval string Error message(s), if any. Blank if no error occurred.
+
+@status current Introduced in 2.2.0
+
+### Example
+
+```lua
   fun, err = loadScript("/SCRIPTS/FUNCTIONS/print.lua")
   if (fun ~= nil) then
      fun("Hello from loadScript()")
   else
      print(err)
   end
+```
 
-@status current Introduced in 2.2.0
 */
 static int luaLoadScript(lua_State * L)
 {
