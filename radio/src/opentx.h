@@ -897,7 +897,7 @@ void checkModelIdUnique(uint8_t index, uint8_t module);
 #endif
 
 #if defined(CPUARM)
-
+uint32_t hash(const void * ptr, uint32_t size);
 inline int divRoundClosest(const int n, const int d)
 {
   if (d == 0)
@@ -1557,7 +1557,7 @@ extern uint8_t s_frsky_view;
 #endif
 
 #define EARTH_RADIUSKM ((uint32_t)6371)
-#define EARTH_RADIUS ((uint32_t)111194)
+#define EARTH_RADIUS ((uint32_t)111194) // meters * pi / 180°
 
 void getGpsPilotPosition();
 void getGpsDistance();

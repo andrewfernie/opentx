@@ -575,7 +575,7 @@ void check(event_t event, uint8_t curr, const MenuHandlerFunc * menuTab, uint8_t
         }
         break;
 #endif
-        
+
       case EVT_KEY_LONG(KEY_PAGE):
         if (curr > 0)
           cc = curr - 1;
@@ -603,7 +603,7 @@ void check(event_t event, uint8_t curr, const MenuHandlerFunc * menuTab, uint8_t
     // TODO lcdDrawFilledRect(0, 0, LCD_W, MENU_HEADER_HEIGHT, SOLID, FILL_WHITE|GREY_DEFAULT);
   }
 
-  DISPLAY_PROGRESS_BAR(menuTab ? lcdLastPos-2*FW-((curr+1)/10*FWNUM)-2 : 20*FW+1);
+  DISPLAY_PROGRESS_BAR(menuTab ? lcdLastRightPos-2*FW-((curr+1)/10*FWNUM)-2 : 20*FW+1);
 
   switch (event) {
     case EVT_ENTRY:
@@ -833,7 +833,7 @@ void check(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, uint8_t 
 
   if (menuTab) {
     uint8_t attr = 0;
-    
+
     if (l_posVert==0 && !menuCalibrationState) {
       attr = INVERS;
 
@@ -898,7 +898,7 @@ void check(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, uint8_t 
 
   }
 
-  DISPLAY_PROGRESS_BAR(menuTab ? lcdLastPos-2*FW-((curr+1)/10*FWNUM)-2 : 20*FW+1);
+  DISPLAY_PROGRESS_BAR(menuTab ? lcdLastRightPos-2*FW-((curr+1)/10*FWNUM)-2 : 20*FW+1);
 
   if (s_editMode<=0) {
     if (scrollUD) {
@@ -1007,7 +1007,7 @@ void check(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, uint8_t 
       INC(l_posHorz, 0, maxcol);
       break;
 #endif
-  
+
 #if !defined(PCBX7)
     case EVT_KEY_REPT(KEY_DOWN):
       if (!IS_ROTARY_RIGHT(event) && l_posVert==maxrow) break;

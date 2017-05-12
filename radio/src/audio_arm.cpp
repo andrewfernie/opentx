@@ -661,8 +661,8 @@ int ToneContext::mixBuffer(AudioBuffer * buffer, int volume, unsigned int fade)
 
     if (fragment.tone.freq != state.freq) {
       state.freq = fragment.tone.freq;
-      state.step = limit<float>(1, float(DIM(sineValues)*fragment.tone.freq) / AUDIO_SAMPLE_RATE, 512);
-      state.volume = evalVolumeRatio(fragment.tone.freq, volume);
+      state.step = limit<float>(1, float(fragment.tone.freq) * (float(DIM(sineValues))/float(AUDIO_SAMPLE_RATE)), 512);
+      state.volume = 1.0f / evalVolumeRatio(fragment.tone.freq, volume);
     }
 
     if (fragment.tone.freqIncr) {
@@ -699,7 +699,7 @@ int ToneContext::mixBuffer(AudioBuffer * buffer, int volume, unsigned int fade)
     }
 
     for (int i=0; i<points; i++) {
-      int16_t sample = sineValues[int(toneIdx)] / state.volume;
+      int16_t sample = sineValues[int(toneIdx)] * state.volume;
       mixSample(&buffer->data[i], sample, fade);
       toneIdx += state.step;
       if ((unsigned int)toneIdx >= DIM(sineValues))
@@ -833,9 +833,7 @@ void AudioQueue::playTone(uint16_t freq, uint16_t len, uint16_t pause, uint8_t f
 
   CoEnterMutexSection(audioMutex);
 
-  if (freq && freq < BEEP_MIN_FREQ) {
-    freq = BEEP_MIN_FREQ;
-  }
+  freq = limit<uint16_t>(BEEP_MIN_FREQ, freq, BEEP_MAX_FREQ);
 
   if (flags & PLAY_BACKGROUND) {
     varioContext.setFragment(freq, len, pause, 0, 0, (flags & PLAY_NOW));

@@ -25,6 +25,7 @@
 #include "helpers.h"
 #include "appdata.h"
 #include "modelprinter.h"
+#include "multiprotocols.h"
 
 TimerPanel::TimerPanel(QWidget *parent, ModelData & model, TimerData & timer, GeneralSettings & generalSettings, Firmware * firmware, QWidget * prevFocus):
   ModelPanel(parent, model, generalSettings, firmware),
@@ -48,7 +49,8 @@ TimerPanel::TimerPanel(QWidget *parent, ModelData & model, TimerData & timer, Ge
   }
 
   // Mode
-  populateSwitchCB(ui->mode, timer.mode, generalSettings, TimersContext);
+  ui->mode->setModel(Helpers::getRawSwitchItemModel(&generalSettings, Helpers::TimersContext));
+  ui->mode->setCurrentIndex(ui->mode->findData(timer.mode.toValue()));
 
   if (!firmware->getCapability(PermTimers)) {
     ui->persistent->hide();
@@ -118,8 +120,11 @@ QWidget * TimerPanel::getLastFocus()
 
 void TimerPanel::on_value_editingFinished()
 {
-  timer.val = ui->value->time().hour()*3600 + ui->value->time().minute()*60 + ui->value->time().second();
-  emit modified();
+  unsigned val = ui->value->time().hour()*3600 + ui->value->time().minute()*60 + ui->value->time().second();
+  if (timer.val != val) {
+    timer.val = val;
+    emit modified();
+  }
 }
 
 void TimerPanel::on_mode_currentIndexChanged(int index)
@@ -138,15 +143,30 @@ void TimerPanel::on_minuteBeep_toggled(bool checked)
 
 void TimerPanel::on_name_editingFinished()
 {
-  int length = ui->name->maxLength();
-  strncpy(timer.name, ui->name->text().toLatin1(), length);
-  emit modified();
+  if (QString(timer.name) != ui->name->text()) {
+    int length = ui->name->maxLength();
+    strncpy(timer.name, ui->name->text().toLatin1(), length);
+    emit modified();
+  }
 }
 
 /******************************************************************************/
 
 #define FAILSAFE_CHANNEL_HOLD    2000
 #define FAILSAFE_CHANNEL_NOPULSE 2001
+
+#define MASK_PROTOCOL       1
+#define MASK_CHANNELS_COUNT 2
+#define MASK_RX_NUMBER      4
+#define MASK_CHANNELS_RANGE 8
+#define MASK_PPM_FIELDS     16
+#define MASK_FAILSAFES      32
+#define MASK_OPEN_DRAIN     64
+#define MASK_MULTIMODULE    128
+#define MASK_ANTENNA        256
+#define MASK_MULTIOPTION    512
+
+quint8 ModulePanel::failsafesValueDisplayType = ModulePanel::FAILSAFE_DISPLAY_PERCENT;
 
 ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & module, GeneralSettings & generalSettings, Firmware * firmware, int moduleIdx):
   ModelPanel(parent, model, generalSettings, firmware),
@@ -210,41 +230,22 @@ ModulePanel::ModulePanel(QWidget * parent, ModelData & model, ModuleData & modul
     ui->multiProtocol->addItem(ModelPrinter::printMultiRfProtocol(i, false), (QVariant) i);
   }
 
-  if (firmware->getCapability(HasFailsafe)) {
-    for (int i=0; i<maxChannels; i++) {
-      QLabel * label = new QLabel(this);
-      label->setText(QString::number(i+1));
-      QComboBox * combo = new QComboBox(this);
-      combo->setProperty("index", i);
-      combo->addItem(tr("Value"), 0);
-      combo->addItem(tr("Hold"), FAILSAFE_CHANNEL_HOLD);
-      combo->addItem(tr("No Pulse"), FAILSAFE_CHANNEL_NOPULSE);
-      QDoubleSpinBox * spinbox = new QDoubleSpinBox(this);
-      spinbox->setMinimumSize(QSize(20, 0));
-      spinbox->setRange(-150, 150);
-      spinbox->setSingleStep(0.1);
-      spinbox->setDecimals(1);
-      label->setProperty("index", i);
-      spinbox->setProperty("index", i);
-      ui->failsafesLayout->addWidget(label, 3*(i/8), i%8, Qt::AlignHCenter);
-      ui->failsafesLayout->addWidget(combo, 1+3*(i/8), i%8, Qt::AlignHCenter);
-      ui->failsafesLayout->addWidget(spinbox, 2+3*(i/8), i%8, Qt::AlignHCenter);
-      failsafeGroups[i].combo = combo;
-      failsafeGroups[i].spinbox = spinbox;
-      failsafeGroups[i].label = label;
-      updateFailsafe(i);
-      connect(combo, SIGNAL(currentIndexChanged(int)), this, SLOT(onFailsafeComboIndexChanged(int)));
-      connect(spinbox, SIGNAL(valueChanged(double)), this, SLOT(onFailsafeSpinChanged(double)));
-    }
-  }
+  ui->btnGrpValueType->setId(ui->optPercent, FAILSAFE_DISPLAY_PERCENT);
+  ui->btnGrpValueType->setId(ui->optUs, FAILSAFE_DISPLAY_USEC);
+  ui->btnGrpValueType->button(failsafesValueDisplayType)->setChecked(true);
+
+  setupFailsafes();
 
   disableMouseScrolling();
 
-  lock = false;
+  update();
 
-  // a change will not register if only one item was added
-  if (ui->protocol->count() == 1)
-    on_protocol_currentIndexChanged(ui->protocol->currentIndex());
+  connect(ui->protocol, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ModulePanel::onProtocolChanged);
+  connect(ui->multiProtocol, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ModulePanel::onMultiProtocolChanged);
+  connect(this, &ModulePanel::channelsRangeChanged, this, &ModulePanel::setupFailsafes);
+  connect(ui->btnGrpValueType, static_cast<void(QButtonGroup::*)(int)>(&QButtonGroup::buttonClicked), this, &ModulePanel::onFailsafesDisplayValueTypeChanged);
+
+  lock = false;
 
 }
 
@@ -253,15 +254,102 @@ ModulePanel::~ModulePanel()
   delete ui;
 }
 
-#define MASK_PROTOCOL       1
-#define MASK_CHANNELS_COUNT 2
-#define MASK_RX_NUMBER      4
-#define MASK_CHANNELS_RANGE 8
-#define MASK_PPM_FIELDS     16
-#define MASK_FAILSAFES      32
-#define MASK_OPEN_DRAIN     64
-#define MASK_MULTIMODULE    128
-#define MASK_ANTENNA        256
+bool ModulePanel::moduleHasFailsafes()
+{
+  return ((PulsesProtocol)module.protocol == PulsesProtocol::PULSES_PXX_XJT_X16 && firmware->getCapability(HasFailsafe));;
+}
+
+void ModulePanel::setupFailsafes()
+{
+  ChannelFailsafeWidgetsGroup grp;
+  const int start = module.channelsStart;
+  const int end = start + module.channelsCount;
+  const bool hasFailsafe = moduleHasFailsafes();
+
+  lock = true;
+
+  QMutableMapIterator<int, ChannelFailsafeWidgetsGroup> i(failsafeGroupsMap);
+  while (i.hasNext()) {
+    i.next();
+    grp = i.value();
+    ui->failsafesLayout->removeWidget(grp.label);
+    ui->failsafesLayout->removeWidget(grp.combo);
+    ui->failsafesLayout->removeWidget(grp.sbPercent);
+    ui->failsafesLayout->removeWidget(grp.sbUsec);
+    if (i.key() < start || i.key() >= end || !hasFailsafe) {
+      grp.label->deleteLater();
+      grp.combo->deleteLater();
+      grp.sbPercent->deleteLater();
+      grp.sbUsec->deleteLater();
+      i.remove();
+    }
+  }
+
+  if (!hasFailsafe)
+    return;
+
+  int row = 0;
+  int col = 0;
+  int channelMax = model->getChannelsMax();
+  int channelMaxUs = 512 * channelMax / 100 * 2;
+
+  for (int i = start; i < end; ++i) {
+    if (failsafeGroupsMap.contains(i)) {
+      grp = failsafeGroupsMap.value(i);
+    }
+    else {
+      QLabel * label = new QLabel(this);
+      label->setProperty("index", i);
+      label->setText(QString::number(i+1));
+
+      QComboBox * combo = new QComboBox(this);
+      combo->setProperty("index", i);
+      combo->addItem(tr("Value"), 0);
+      combo->addItem(tr("Hold"), FAILSAFE_CHANNEL_HOLD);
+      combo->addItem(tr("No Pulse"), FAILSAFE_CHANNEL_NOPULSE);
+
+      QDoubleSpinBox * sbDbl = new QDoubleSpinBox(this);
+      sbDbl->setProperty("index", i);
+      sbDbl->setMinimumSize(QSize(20, 0));
+      sbDbl->setRange(-channelMax, channelMax);
+      sbDbl->setSingleStep(0.1);
+      sbDbl->setDecimals(1);
+
+      QSpinBox * sbInt = new QSpinBox(this);
+      sbInt->setProperty("index", i);
+      sbInt->setMinimumSize(QSize(20, 0));
+      sbInt->setRange(-channelMaxUs, channelMaxUs);
+      sbInt->setSingleStep(1);
+
+      grp = ChannelFailsafeWidgetsGroup();
+      grp.combo = combo;
+      grp.sbPercent = sbDbl;
+      grp.sbUsec = sbInt;
+      grp.label = label;
+      failsafeGroupsMap.insert(i, grp);
+
+      connect(combo, SIGNAL(currentIndexChanged(int)), this, SLOT(onFailsafeComboIndexChanged(int)));
+      connect(sbInt, SIGNAL(valueChanged(int)), this, SLOT(onFailsafeUsecChanged(int)));
+      connect(sbDbl, SIGNAL(valueChanged(double)), this, SLOT(onFailsafePercentChanged(double)));
+    }
+
+    ui->failsafesLayout->addWidget(grp.label, row, col, Qt::AlignHCenter);
+    ui->failsafesLayout->addWidget(grp.combo, row + 1, col, Qt::AlignHCenter);
+    ui->failsafesLayout->addWidget(grp.sbPercent, row + 2, col, Qt::AlignHCenter);
+    ui->failsafesLayout->addWidget(grp.sbUsec, row + 3, col, Qt::AlignHCenter);
+    grp.sbPercent->setVisible(failsafesValueDisplayType == FAILSAFE_DISPLAY_PERCENT);
+    grp.sbUsec->setVisible(failsafesValueDisplayType == FAILSAFE_DISPLAY_USEC);
+
+    updateFailsafe(i);
+
+    if (++col > 7) {
+      row += 4;
+      col = 0;
+    }
+  }
+
+  lock = false;
+}
 
 void ModulePanel::update()
 {
@@ -277,9 +365,10 @@ void ModulePanel::update()
       case PULSES_PXX_XJT_LR12:
       case PULSES_PXX_DJT:
         mask |= MASK_CHANNELS_RANGE | MASK_CHANNELS_COUNT;
-        if (protocol==PULSES_PXX_XJT_X16) mask |= MASK_FAILSAFES | MASK_RX_NUMBER;
-        if (protocol==PULSES_PXX_XJT_LR12) mask |= MASK_RX_NUMBER;
-        if (IS_HORUS(firmware->getBoard()) && moduleIdx==0) mask |= MASK_ANTENNA;
+        if (protocol==PULSES_PXX_XJT_X16 || protocol==PULSES_PXX_XJT_LR12)
+          mask |= MASK_RX_NUMBER;
+        if (IS_HORUS(firmware->getBoard()) && moduleIdx==0)
+          mask |= MASK_ANTENNA;
         break;
       case PULSES_LP45:
       case PULSES_DSM2:
@@ -300,6 +389,13 @@ void ModulePanel::update()
         break;
       case PULSES_MULTIMODULE:
         mask |= MASK_CHANNELS_RANGE | MASK_RX_NUMBER | MASK_MULTIMODULE;
+        max_rx_num = 15;
+        if (module.multi.rfProtocol == MM_RF_PROTO_DSM2)
+          mask |= MASK_CHANNELS_COUNT;
+        else
+          module.channelsCount = 16;
+        if (multiProtocols.getProtocol(module.multi.rfProtocol).optionsstr != nullptr)
+          mask |= MASK_MULTIOPTION;
         break;
       case PULSES_OFF:
         break;
@@ -314,6 +410,10 @@ void ModulePanel::update()
   }
   else if (model->trainerMode != TRAINER_MASTER_JACK) {
     mask |= MASK_PPM_FIELDS | MASK_CHANNELS_RANGE | MASK_CHANNELS_COUNT;
+  }
+
+  if (moduleHasFailsafes()) {
+    mask |= MASK_FAILSAFES;
   }
 
   ui->label_protocol->setVisible(mask & MASK_PROTOCOL);
@@ -358,9 +458,11 @@ void ModulePanel::update()
   ui->multiProtocol->setCurrentIndex(module.multi.rfProtocol);
   ui->label_multiSubType->setVisible(mask & MASK_MULTIMODULE);
   ui->multiSubType->setVisible(mask & MASK_MULTIMODULE);
+  ui->label_option->setVisible(mask & MASK_MULTIOPTION);
+  ui->optionValue->setVisible(mask & MASK_MULTIOPTION);
 
   if (mask & MASK_MULTIMODULE) {
-    int numEntries = getNumSubtypes(static_cast<MultiModuleRFProtocols>(module.multi.rfProtocol));
+    int numEntries = multiProtocols.getProtocol(module.multi.rfProtocol).numSubytes();
     if (module.multi.customProto)
       numEntries=8;
     // Removes extra items
@@ -372,6 +474,14 @@ void ModulePanel::update()
         ui->multiSubType->addItem(ModelPrinter::printMultiSubType(module.multi.rfProtocol, module.multi.customProto, i), (QVariant) i);
     }
   }
+
+  if (mask & MASK_MULTIOPTION) {
+    auto pdef = multiProtocols.getProtocol(module.multi.rfProtocol);
+    ui->optionValue->setMinimum(pdef.getOptionMin());
+    ui->optionValue->setMaximum(pdef.getOptionMax());
+    ui->optionValue->setValue(module.multi.optionValue);
+    ui->label_option->setText(qApp->translate("Multiprotocols", qPrintable(pdef.optionsstr)));
+  }
   ui->multiSubType->setCurrentIndex(module.subType);
 
   ui->autoBind->setVisible(mask & MASK_MULTIMODULE);
@@ -380,28 +490,37 @@ void ModulePanel::update()
   ui->lowPower->setChecked(module.multi.lowPowerMode ? Qt::Checked : Qt::Unchecked);
 
 
-  if (firmware->getCapability(HasFailsafe)) {
-    ui->label_failsafeMode->setVisible(mask & MASK_FAILSAFES);
-    ui->failsafeMode->setVisible(mask & MASK_FAILSAFES);
-    ui->failsafeMode->setCurrentIndex(module.failsafeMode);
-    ui->failsafesGroupBox->setEnabled(module.failsafeMode == FAILSAFE_CUSTOM);
-    if (firmware->getCapability(ChannelsName) > 0) {
-      for(int i=0; i<maxChannels;i++) {
-        QString name = QString(model->limitData[i+module.channelsStart].name).trimmed();
-        if (!name.isEmpty()) {
-          failsafeGroups[i].label->setText(name);
-        }
-        else {
-          failsafeGroups[i].label->setText(QString::number(i+1));
-        }
-      }
+  ui->label_failsafeMode->setVisible(mask & MASK_FAILSAFES);
+  ui->failsafeMode->setVisible(mask & MASK_FAILSAFES);
+
+  if ((mask & MASK_FAILSAFES) && module.failsafeMode == FAILSAFE_CUSTOM) {
+    if (ui->failsafesGroupBox->isHidden()) {
+      setupFailsafes();
+      ui->failsafesGroupBox->setVisible(true);
     }
   }
   else {
-    mask = 0;
+    ui->failsafesGroupBox->setVisible(false);
   }
 
-  ui->failsafesGroupBox->setVisible((mask & MASK_FAILSAFES) && module.failsafeMode == FAILSAFE_CUSTOM);
+  if (mask & MASK_FAILSAFES) {
+    ui->failsafeMode->setCurrentIndex(module.failsafeMode);
+
+    if (firmware->getCapability(ChannelsName)) {
+      int chan;
+      QString name;
+      QMapIterator<int, ChannelFailsafeWidgetsGroup> i(failsafeGroupsMap);
+      while (i.hasNext()) {
+        i.next();
+        chan = i.key();
+        name = QString(model->limitData[chan + module.channelsStart].name).trimmed();
+        if (name.isEmpty())
+          i.value().label->setText(QString::number(chan + 1));
+        else
+          i.value().label->setText(name);
+      }
+    }
+  }
 
   if (mask & MASK_CHANNELS_RANGE) {
     ui->channelsStart->setMaximum(33 - ui->channelsCount->value());
@@ -418,7 +537,7 @@ void ModulePanel::on_trainerMode_currentIndexChanged(int index)
   }
 }
 
-void ModulePanel::on_protocol_currentIndexChanged(int index)
+void ModulePanel::onProtocolChanged(int index)
 {
   if (!lock) {
     module.protocol = ui->protocol->itemData(index).toInt();
@@ -447,25 +566,27 @@ void ModulePanel::on_ppmOutputType_currentIndexChanged(int index)
 
 void ModulePanel::on_channelsCount_editingFinished()
 {
-  if (!lock) {
+  if (!lock && module.channelsCount != ui->channelsCount->value()) {
     module.channelsCount = ui->channelsCount->value();
     update();
+    emit channelsRangeChanged();
     emit modified();
   }
 }
 
 void ModulePanel::on_channelsStart_editingFinished()
 {
-  if (!lock) {
-    module.channelsStart = ui->channelsStart->value() - 1;
+  if (!lock && module.channelsStart != (unsigned)ui->channelsStart->value() - 1) {
+    module.channelsStart = (unsigned)ui->channelsStart->value() - 1;
     update();
+    emit channelsRangeChanged();
     emit modified();
   }
 }
 
 void ModulePanel::on_ppmDelay_editingFinished()
 {
-  if (!lock) {
+  if (!lock && module.ppm.delay != ui->ppmDelay->value()) {
     // TODO only accept valid values
     module.ppm.delay = ui->ppmDelay->value();
     emit modified();
@@ -474,14 +595,19 @@ void ModulePanel::on_ppmDelay_editingFinished()
 
 void ModulePanel::on_rxNumber_editingFinished()
 {
-  module.modelId = ui->rxNumber->value();
-  emit modified();
+  if (module.modelId != (unsigned)ui->rxNumber->value()) {
+    module.modelId = (unsigned)ui->rxNumber->value();
+    emit modified();
+  }
 }
 
 void ModulePanel::on_ppmFrameLength_editingFinished()
 {
-  module.ppm.frameLength = (ui->ppmFrameLength->value()-22.5) / 0.5;
-  emit modified();
+  int val = (ui->ppmFrameLength->value()-22.5) / 0.5;
+  if (module.ppm.frameLength != val) {
+    module.ppm.frameLength = val;
+    emit modified();
+  }
 }
 
 void ModulePanel::on_failsafeMode_currentIndexChanged(int value)
@@ -493,39 +619,26 @@ void ModulePanel::on_failsafeMode_currentIndexChanged(int value)
   }
 }
 
-void ModulePanel::onFailsafeSpinChanged(double value)
-{
-  if (!lock) {
-    int channel = sender()->property("index").toInt();
-    module.failsafeChannels[channel] = (value*1024)/100;
-    emit modified();
-  }
-}
-
-void ModulePanel::onFailsafeComboIndexChanged(int index)
-{
-  if (!lock) {
-    lock = true;
-    int channel = sender()->property("index").toInt();
-    module.failsafeChannels[channel] = ((QComboBox *)sender())->itemData(index).toInt();
-    updateFailsafe(channel);
-    emit modified();
-    lock = false;
-  }
-}
-
-void ModulePanel::on_multiProtocol_currentIndexChanged(int index)
+void ModulePanel::onMultiProtocolChanged(int index)
 {
   if (!lock) {
     lock=true;
-    module.multi.rfProtocol = index;
-    unsigned int maxSubTypes = getNumSubtypes(static_cast<MultiModuleRFProtocols>(index));
+    module.multi.rfProtocol = (unsigned int) index;
+    unsigned int maxSubTypes = multiProtocols.getProtocol(index).numSubytes();
     if (module.multi.customProto)
       maxSubTypes=8;
     module.subType = std::min(module.subType, maxSubTypes -1);
     update();
     emit modified();
     lock = false;
+  }
+}
+
+void ModulePanel::on_optionValue_editingFinished()
+{
+  if (module.multi.optionValue != ui->optionValue->value()) {
+    module.multi.optionValue = ui->optionValue->value();
+    emit modified();
   }
 }
 
@@ -549,26 +662,118 @@ void ModulePanel::on_lowPower_stateChanged(int state)
   module.multi.lowPowerMode = (state == Qt::Checked);
 }
 
+// updtSb (update spin box(es)): 0=none or bitmask of FailsafeValueDisplayTypes
+void ModulePanel::setChannelFailsafeValue(const int channel, const int value, quint8 updtSb)
+{
+  if (channel < 0 || channel >= CPN_MAX_CHNOUT)
+    return;
+
+  module.failsafeChannels[channel] = value;
+  double pctVal = divRoundClosest(value * 1000, 1024) / 10.0;
+  // qDebug() << value << pctVal;
+
+  if (failsafeGroupsMap.contains(channel)) {
+    const ChannelFailsafeWidgetsGroup & grp = failsafeGroupsMap.value(channel);
+    if ((updtSb & FAILSAFE_DISPLAY_PERCENT) && grp.sbPercent) {
+      grp.sbPercent->blockSignals(true);
+      grp.sbPercent->setValue(pctVal);
+      grp.sbPercent->blockSignals(false);
+    }
+    if ((updtSb & FAILSAFE_DISPLAY_USEC) && grp.sbUsec) {
+      grp.sbUsec->blockSignals(true);
+      grp.sbUsec->setValue(value);
+      grp.sbUsec->blockSignals(false);
+    }
+  }
+  if (!lock)
+    emit modified();
+}
+
+void ModulePanel::onFailsafeUsecChanged(int value)
+{
+  if (!sender())
+    return;
+
+  bool ok = false;
+  int channel = sender()->property("index").toInt(&ok);
+  if (ok)
+    setChannelFailsafeValue(channel, value, FAILSAFE_DISPLAY_PERCENT);
+}
+
+void ModulePanel::onFailsafePercentChanged(double value)
+{
+  if (!sender())
+    return;
+
+  bool ok = false;
+  int channel = sender()->property("index").toInt(&ok);
+  if (ok)
+    setChannelFailsafeValue(channel, divRoundClosest(int(value * 1024), 100), FAILSAFE_DISPLAY_USEC);
+}
+
+void ModulePanel::onFailsafeComboIndexChanged(int index)
+{
+  if (!sender())
+    return;
+
+  QComboBox * cb = qobject_cast<QComboBox *>(sender());
+
+  if (cb && !lock) {
+    lock = true;
+    bool ok = false;
+    int channel = sender()->property("index").toInt(&ok);
+    if (ok) {
+      module.failsafeChannels[channel] = cb->itemData(index).toInt();
+      updateFailsafe(channel);
+      emit modified();
+    }
+    lock = false;
+  }
+}
+
+void ModulePanel::onFailsafesDisplayValueTypeChanged(int type)
+{
+  if (failsafesValueDisplayType != type) {
+    failsafesValueDisplayType = type;
+    foreach (ChannelFailsafeWidgetsGroup grp, failsafeGroupsMap) {
+      if (grp.sbPercent)
+        grp.sbPercent->setVisible(type == FAILSAFE_DISPLAY_PERCENT);
+      if (grp.sbUsec)
+        grp.sbUsec->setVisible(type == FAILSAFE_DISPLAY_USEC);
+    }
+  }
+}
+
+void ModulePanel::onExtendedLimitsToggled()
+{
+  double channelMaxPct = double(model->getChannelsMax());
+  int channelMaxUs = 512 * channelMaxPct / 100 * 2;
+  foreach (ChannelFailsafeWidgetsGroup grp, failsafeGroupsMap) {
+    if (grp.sbPercent)
+      grp.sbPercent->setRange(-channelMaxPct, channelMaxPct);
+    if (grp.sbUsec)
+      grp.sbUsec->setRange(-channelMaxUs, channelMaxUs);
+  }
+}
+
 void ModulePanel::updateFailsafe(int channel)
 {
-  int failsafeValue = module.failsafeChannels[channel];
-  QComboBox * combo = failsafeGroups[channel].combo;
-  QDoubleSpinBox * spinbox = failsafeGroups[channel].spinbox;
-  if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
-    combo->setCurrentIndex(1);
-    spinbox->setEnabled(false);
-    spinbox->setValue(0);
-  }
-  else if (failsafeValue == FAILSAFE_CHANNEL_NOPULSE) {
-    combo->setCurrentIndex(2);
-    spinbox->setEnabled(false);
-    spinbox->setValue(0);
-  }
-  else {
-    combo->setCurrentIndex(0);
-    spinbox->setEnabled(true);
-    spinbox->setValue(((double)failsafeValue*100)/1024);
-  }
+  if (channel >= CPN_MAX_CHNOUT || !failsafeGroupsMap.contains(channel))
+    return;
+
+  const int failsafeValue = module.failsafeChannels[channel];
+  const ChannelFailsafeWidgetsGroup & grp = failsafeGroupsMap.value(channel);
+  const bool valDisable = (failsafeValue == FAILSAFE_CHANNEL_HOLD || failsafeValue == FAILSAFE_CHANNEL_NOPULSE);
+
+  if (grp.combo)
+    grp.combo->setCurrentIndex(grp.combo->findData(valDisable ? failsafeValue : 0));
+  if (grp.sbPercent)
+    grp.sbPercent->setDisabled(valDisable);
+  if (grp.sbUsec)
+    grp.sbUsec->setDisabled(valDisable);
+
+  if (!valDisable)
+    setChannelFailsafeValue(channel, failsafeValue, (FAILSAFE_DISPLAY_PERCENT | FAILSAFE_DISPLAY_USEC));
 }
 
 /******************************************************************************/
@@ -661,7 +866,7 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     if (i<firmware->getCapability(Timers)) {
       timers[i] = new TimerPanel(this, model, model.timers[i], generalSettings, firmware, prevFocus);
       ui->gridLayout->addWidget(timers[i], 1+i, 1);
-      connect(timers[i], SIGNAL(modified()), this, SLOT(onChildModified()));
+      connect(timers[i], &TimerPanel::modified, this, &SetupPanel::modified);
       prevFocus = timers[i]->getLastFocus();
     }
     else {
@@ -695,19 +900,20 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   // Beep Center checkboxes
   prevFocus = ui->trimsDisplay;
   int analogs = CPN_MAX_STICKS + getBoardCapability(board, Board::Pots) + getBoardCapability(board, Board::Sliders);
-  for (int i=0; i<analogs+firmware->getCapability(RotaryEncoders); i++) {
+  int genAryIdx = 0;
+  for (int i=0; i < analogs + firmware->getCapability(RotaryEncoders); i++) {
+    RawSource src((i < analogs) ? SOURCE_TYPE_STICK : SOURCE_TYPE_ROTARY_ENCODER, (i < analogs) ? i : analogs - i);
     QCheckBox * checkbox = new QCheckBox(this);
     checkbox->setProperty("index", i);
-    checkbox->setText(i<analogs ? firmware->getAnalogInputName(i) : RotaryEncoderString(i-analogs));
+    checkbox->setText(src.toString(&model, &generalSettings));
     ui->centerBeepLayout->addWidget(checkbox, 0, i+1);
     connect(checkbox, SIGNAL(toggled(bool)), this, SLOT(onBeepCenterToggled(bool)));
     centerBeepCheckboxes << checkbox;
     if (IS_HORUS_OR_TARANIS(board)) {
-      RawSource src(SOURCE_TYPE_STICK, i);
-      if (src.isPot() && !generalSettings.isPotAvailable(i-CPN_MAX_STICKS)) {
+      if (src.isPot(&genAryIdx) && !generalSettings.isPotAvailable(genAryIdx)) {
         checkbox->hide();
       }
-      else if (src.isSlider() && !generalSettings.isSliderAvailable(i-CPN_MAX_STICKS-getBoardCapability(board, Board::Pots))) {
+      else if (src.isSlider(&genAryIdx) && !generalSettings.isSliderAvailable(genAryIdx)) {
         checkbox->hide();
       }
     }
@@ -717,13 +923,12 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
 
   // Startup switches warnings
   for (int i=0; i<getBoardCapability(board, Board::Switches); i++) {
-    Board::SwitchInfo switchInfo = getSwitchInfo(board, i);
-    if (IS_HORUS_OR_TARANIS(board)) {
-      switchInfo.config = Board::SwitchType(generalSettings.switchConfig[i]);
-    }
+    Board::SwitchInfo switchInfo = Boards::getSwitchInfo(board, i);
+    switchInfo.config = Board::SwitchType(generalSettings.switchConfig[i]);
     if (switchInfo.config == Board::SWITCH_NOT_AVAILABLE || switchInfo.config == Board::SWITCH_TOGGLE) {
       continue;
     }
+    RawSource src(RawSourceType::SOURCE_TYPE_SWITCH, i);
     QLabel * label = new QLabel(this);
     QSlider * slider = new QSlider(this);
     QCheckBox * cb = new QCheckBox(this);
@@ -731,13 +936,14 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
     slider->setOrientation(Qt::Vertical);
     slider->setMinimum(0);
     slider->setInvertedAppearance(true);
+    slider->setInvertedControls(true);
     slider->setTickPosition(QSlider::TicksBothSides);
     slider->setMinimumSize(QSize(30, 50));
     slider->setMaximumSize(QSize(50, 50));
     slider->setSingleStep(1);
     slider->setPageStep(1);
     slider->setTickInterval(1);
-    label->setText(switchInfo.name);
+    label->setText(src.toString(&model, &generalSettings));
     slider->setMaximum(switchInfo.config == Board::SWITCH_3POS ? 2 : 1);
     cb->setProperty("index", i);
     ui->switchesStartupLayout->addWidget(label, 0, i+1);
@@ -759,21 +965,18 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   prevFocus = ui->potWarningMode;
   if (IS_HORUS_OR_TARANIS(board)) {
     for (int i=0; i<getBoardCapability(board, Board::Pots)+getBoardCapability(board, Board::Sliders); i++) {
+      RawSource src(SOURCE_TYPE_STICK, CPN_MAX_STICKS + i);
       QCheckBox * cb = new QCheckBox(this);
       cb->setProperty("index", i);
-      cb->setText(firmware->getAnalogInputName(i+4));
+      cb->setText(src.toString(&model, &generalSettings));
       ui->potWarningLayout->addWidget(cb, 0, i+1);
       connect(cb, SIGNAL(toggled(bool)), this, SLOT(potWarningToggled(bool)));
       potWarningCheckboxes << cb;
-      if (RawSource(SOURCE_TYPE_STICK, CPN_MAX_STICKS+i).isPot()) {
-        if (!generalSettings.isPotAvailable(i)) {
-          cb->hide();
-        }
+      if (src.isPot(&genAryIdx) && !generalSettings.isPotAvailable(genAryIdx)) {
+        cb->hide();
       }
-      else {
-        if (!generalSettings.isSliderAvailable(i-getBoardCapability(board, Board::Pots))) {
-          cb->hide();
-        }
+      else if (src.isSlider(&genAryIdx) && !generalSettings.isSliderAvailable(genAryIdx)) {
+        cb->hide();
       }
       QWidget::setTabOrder(prevFocus, cb);
       prevFocus = cb;
@@ -795,13 +998,14 @@ SetupPanel::SetupPanel(QWidget * parent, ModelData & model, GeneralSettings & ge
   for (int i=0; i<firmware->getCapability(NumModules); i++) {
     modules[i] = new ModulePanel(this, model, model.moduleData[i], generalSettings, firmware, i);
     ui->modulesLayout->addWidget(modules[i]);
-    connect(modules[i], SIGNAL(modified()), this, SLOT(onChildModified()));
+    connect(modules[i], &ModulePanel::modified, this, &SetupPanel::modified);
+    connect(this, &SetupPanel::extendedLimitsToggled, modules[i], &ModulePanel::onExtendedLimitsToggled);
   }
 
   if (firmware->getCapability(ModelTrainerEnable)) {
     modules[CPN_MAX_MODULES] = new ModulePanel(this, model, model.moduleData[CPN_MAX_MODULES], generalSettings, firmware, -1);
     ui->modulesLayout->addWidget(modules[CPN_MAX_MODULES]);
-    connect(modules[CPN_MAX_MODULES], SIGNAL(modified()), this, SLOT(onChildModified()));
+    connect(modules[CPN_MAX_MODULES], &ModulePanel::modified, this, &SetupPanel::modified);
   }
 
   disableMouseScrolling();
@@ -855,9 +1059,11 @@ void SetupPanel::on_throttleSource_currentIndexChanged(int index)
 
 void SetupPanel::on_name_editingFinished()
 {
-  int length = ui->name->maxLength();
-  strncpy(model->name, ui->name->text().toLatin1(), length);
-  emit modified();
+  if (QString(model->name) != ui->name->text()) {
+    int length = ui->name->maxLength();
+    strncpy(model->name, ui->name->text().toLatin1(), length);
+    emit modified();
+  }
 }
 
 void SetupPanel::on_image_currentIndexChanged(int index)
@@ -911,7 +1117,7 @@ void SetupPanel::populateThrottleSourceCB()
     ui->throttleSource->addItem(firmware->getAnalogInputName(4+i), i);
   }
   for (int i=0; i<firmware->getCapability(Outputs); i++) {
-    ui->throttleSource->addItem(ModelPrinter::printChannelName(i));
+    ui->throttleSource->addItem(RawSource(SOURCE_TYPE_CH, i).toString(model, &generalSettings));
   }
   ui->throttleSource->setCurrentIndex(model->thrTraceSrc);
   lock = false;
@@ -968,7 +1174,7 @@ void SetupPanel::updateStartupSwitches()
     int index = slider->property("index").toInt();
     bool enabled = !(model->switchWarningEnable & (1 << index));
     if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
-      value = (switchStates >> 2*index) & 0x03;
+      value = (switchStates >> (2*index)) & 0x03;
       if (generalSettings.switchConfig[index] != Board::SWITCH_3POS && value == 2) {
         value = 1;
       }
@@ -994,7 +1200,7 @@ void SetupPanel::startupSwitchEdited(int value)
 
     if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
       shift = index * 2;
-      mask = 0x03ul << shift;
+      mask = 0x03ull << shift;
     }
     else {
       if (index == 0) {
@@ -1099,9 +1305,4 @@ void SetupPanel::onBeepCenterToggled(bool checked)
       model->beepANACenter &= ~mask;
     emit modified();
   }
-}
-
-void SetupPanel::onChildModified()
-{
-  emit modified();
 }

@@ -53,6 +53,9 @@ enum MenuModelSetupItems {
   CASE_CPUARM(ITEM_MODEL_CHECKLIST_DISPLAY)
   ITEM_MODEL_THROTTLE_WARNING,
   ITEM_MODEL_SWITCHES_WARNING,
+#if defined(PCBX7)
+  ITEM_MODEL_POTS_WARNING,
+#endif
   ITEM_MODEL_BEEP_CENTER,
   CASE_CPUARM(ITEM_MODEL_USE_GLOBAL_FUNCTIONS)
 #if defined(PCBX7)
@@ -168,10 +171,37 @@ enum MenuModelSetupItems {
   #define MODEL_SETUP_MAX_LINES          ((IS_PPM_PROTOCOL(protocol)||IS_DSM2_PROTOCOL(protocol)||IS_PXX_PROTOCOL(protocol)) ? HEADER_LINE+ITEM_MODEL_SETUP_MAX : HEADER_LINE+ITEM_MODEL_SETUP_MAX-1)
 #endif
 
+#if defined(BINDING_OPTIONS)
+void onBindMenu(const char * result)
+{
+  if (result == STR_BINDING_1_8_TELEM_ON) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = false;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = false;
+  }
+  else if (result == STR_BINDING_1_8_TELEM_OFF) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = true;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = false;
+  }
+  else if (result == STR_BINDING_9_16_TELEM_ON) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = false;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = true;
+  }
+  else if (result == STR_BINDING_9_16_TELEM_OFF) {
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off = true;
+    g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 = true;
+  }
+  else {
+    return;
+  }
+
+  moduleFlag[INTERNAL_MODULE] = MODULE_BIND;
+}
+#endif
+
 void menuModelSetup(event_t event)
 {
 #if defined(PCBX7)
-  MENU_TAB({ HEADER_LINE_COLUMNS 0, TIMER_ROWS, TIMER_ROWS, TIMER_ROWS, 0, 1, 0, 0, 0, 0, 0, CASE_CPUARM(LABEL(PreflightCheck)) CASE_CPUARM(0) 0, NUM_SWITCHES-1, NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_ROTARY_ENCODERS-1, 0,
+  MENU_TAB({ HEADER_LINE_COLUMNS 0, TIMER_ROWS, TIMER_ROWS, TIMER_ROWS, 0, 1, 0, 0, 0, 0, 0, CASE_CPUARM(LABEL(PreflightCheck)) CASE_CPUARM(0) 0, NUM_SWITCHES-1,  NUM_POTS, NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_ROTARY_ENCODERS-1, 0,
   LABEL(InternalModule),
   INTERNAL_MODULE_MODE_ROWS,
   INTERNAL_MODULE_CHANNELS_ROWS,
@@ -470,8 +500,13 @@ void menuModelSetup(event_t event)
                 g_model.switchWarningEnable ^= (1 << menuHorizontalPosition);
                 storageDirty(EE_MODEL);
 #else
+#if defined(PCBX7)
+                if (menuHorizontalPosition < NUM_SWITCHES) {
+                  g_model.switchWarningEnable ^= (1 << (menuHorizontalPosition-1));
+#else
                 if (menuHorizontalPosition < NUM_SWITCHES-1) {
                   g_model.switchWarningEnable ^= (1 << menuHorizontalPosition);
+#endif
                   storageDirty(EE_MODEL);
                 }
 #endif
@@ -484,10 +519,12 @@ void menuModelSetup(event_t event)
                 AUDIO_WARNING1();
                 storageDirty(EE_MODEL);
 #elif defined(PCBX7)
-                getMovedSwitch();
-                g_model.switchWarningState = switches_states;
-                AUDIO_WARNING1();
-                storageDirty(EE_MODEL);
+                if (attr && menuHorizontalPosition == 0) {
+                  getMovedSwitch();
+                  g_model.switchWarningState = switches_states;
+                  AUDIO_WARNING1();
+                  storageDirty(EE_MODEL);
+                }
 #else
                 if (menuHorizontalPosition == NUM_SWITCHES-1) {
                   START_NO_HIGHLIGHT();
@@ -502,7 +539,6 @@ void menuModelSetup(event_t event)
             }
           }
         }
-
         LcdFlags line = attr;
 #if defined(PCBX7)
         int current = 0;
@@ -510,11 +546,14 @@ void menuModelSetup(event_t event)
           if (SWITCH_WARNING_ALLOWED(i)) {
             uint8_t swactive = !(g_model.switchWarningEnable & (1<<i));
             c = "\300-\301"[states & 0x03];
-            lcdDrawChar(MODEL_SETUP_2ND_COLUMN+(2*FW*i), y, (i < 4 ? 'A'+i : 'B'+i), line && (menuHorizontalPosition==current) ? INVERS : 0);
+            lcdDrawChar(MODEL_SETUP_2ND_COLUMN+(2*FW*i), y, (i < 4 ? 'A'+i : 'B'+i), line && (menuHorizontalPosition-1==current) ? INVERS : 0);
             if (swactive) lcdDrawChar(lcdNextPos, y, c);
             ++current;
           }
           states >>= 2;
+        }
+        if (attr && menuHorizontalPosition == 0) {
+          lcdDrawFilledRect(MODEL_SETUP_2ND_COLUMN-1, y-1, (NUM_SWITCHES-1)*(2*FW), 1+FH*((current+7)/8));
         }
 #else // PCBX7
         for (uint8_t i=0; i<NUM_SWITCHES-1/*not on TRN switch*/; i++) {
@@ -546,6 +585,54 @@ void menuModelSetup(event_t event)
 #endif // PCBX7
         break;
       }
+#if defined(PCBX7)
+      case ITEM_MODEL_POTS_WARNING:
+        lcdDrawTextAlignedLeft(y, STR_POTWARNING);
+        lcdDrawTextAtIndex(MODEL_SETUP_2ND_COLUMN, y, PSTR("\004""OFF\0""Man\0""Auto"), g_model.potsWarnMode, (menuHorizontalPosition == 0) ? attr : 0);
+        if (attr && (menuHorizontalPosition == 0)) {
+          CHECK_INCDEC_MODELVAR(event, g_model.potsWarnMode, POTS_WARN_OFF, POTS_WARN_AUTO);
+          storageDirty(EE_MODEL);
+        }
+
+        if (attr) {
+          if (menuHorizontalPosition > 0) s_editMode = 0;
+          if (!READ_ONLY() && menuHorizontalPosition > 0) {
+            switch (event) {
+              case EVT_KEY_LONG(KEY_ENTER):
+                killEvents(event);
+                if (g_model.potsWarnMode == POTS_WARN_MANUAL) {
+                  SAVE_POT_POSITION(menuHorizontalPosition-1);
+                  AUDIO_WARNING1();
+                  storageDirty(EE_MODEL);
+                }
+                break;
+              case EVT_KEY_BREAK(KEY_ENTER):
+                g_model.potsWarnEnabled ^= (1 << (menuHorizontalPosition-1));
+                storageDirty(EE_MODEL);
+                break;
+            }
+          }
+        }
+        if (g_model.potsWarnMode) {
+          coord_t x = MODEL_SETUP_2ND_COLUMN+28;
+          for (int i=0; i<NUM_POTS+NUM_SLIDERS; ++i) {
+            if (i<NUM_XPOTS && !IS_POT_SLIDER_AVAILABLE(POT1+i)) {
+              if (attr && (menuHorizontalPosition==i+1)) REPEAT_LAST_CURSOR_MOVE();
+            }
+            else {
+              LcdFlags flags = ((menuHorizontalPosition==i+1) && attr) ? BLINK : 0;
+              if ((!attr || menuHorizontalPosition >= 0) && !(g_model.potsWarnEnabled & (1 << i))) {
+                flags |= INVERS;
+              }
+
+              // TODO add a new function
+              lcdDrawSizedText(x, y, STR_VSRCRAW+2+STR_VSRCRAW[0]*(NUM_STICKS+1+i), STR_VSRCRAW[0]-1, flags & ~ZCHAR);
+              x = lcdNextPos+3;
+            }
+          }
+        }
+        break;
+#endif // PCBX7
 
       case ITEM_MODEL_BEEP_CENTER:
         lcdDrawTextAlignedLeft(y, STR_BEEPCTR);
@@ -723,9 +810,9 @@ void menuModelSetup(event_t event)
         lcdDrawTextAlignedLeft(y, STR_CHANNELRANGE);
         if ((int8_t)PORT_CHANNELS_ROWS(moduleIdx) >= 0) {
           lcdDrawText(MODEL_SETUP_2ND_COLUMN, y, STR_CH, menuHorizontalPosition==0 ? attr : 0);
-          lcdDrawNumber(lcdLastPos, y, moduleData.channelsStart+1, LEFT | (menuHorizontalPosition==0 ? attr : 0));
-          lcdDrawChar(lcdLastPos, y, '-');
-          lcdDrawNumber(lcdLastPos + FW+1, y, moduleData.channelsStart+NUM_CHANNELS(moduleIdx), LEFT | (menuHorizontalPosition==1 ? attr : 0));
+          lcdDrawNumber(lcdLastRightPos, y, moduleData.channelsStart+1, LEFT | (menuHorizontalPosition==0 ? attr : 0));
+          lcdDrawChar(lcdLastRightPos, y, '-');
+          lcdDrawNumber(lcdLastRightPos + FW+1, y, moduleData.channelsStart+NUM_CHANNELS(moduleIdx), LEFT | (menuHorizontalPosition==1 ? attr : 0));
           if (attr && (editMode>0 || p1valdiff)) {
             switch (menuHorizontalPosition) {
               case 0:
@@ -810,11 +897,43 @@ void menuModelSetup(event_t event)
               s_editMode=0;
             }
 #endif
+#if defined(BINDING_OPTIONS)
+            if (attr && l_posHorz>0) {
+              if(s_editMode>0) {
+                if (l_posHorz == 1) {
+                  if (IS_MODULE_XJT(moduleIdx) && g_model.moduleData[moduleIdx].rfProtocol== RF_PROTO_X16 && s_current_protocol[INTERNAL_MODULE] == PROTO_PXX) {
+                    if(event==EVT_KEY_BREAK(KEY_ENTER)) {
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_1_8_TELEM_ON);
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_1_8_TELEM_OFF);
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_9_16_TELEM_ON);
+                      POPUP_MENU_ADD_ITEM(STR_BINDING_9_16_TELEM_OFF);
+                      POPUP_MENU_SELECT_ITEM(g_model.moduleData[INTERNAL_MODULE].pxx.receiver_telem_off + (g_model.moduleData[INTERNAL_MODULE].pxx.receiver_channel_9_16 << 1));
+                      POPUP_MENU_START(onBindMenu);
+                      continue;
+                    }
+                    if (moduleFlag[INTERNAL_MODULE] == MODULE_BIND) {
+                      newFlag = MODULE_BIND;
+                    }
+                    else {
+                      if (!popupMenuNoItems) {
+                        s_editMode=0;  // this is when popup is exited before a choice is made
+                      }
+                    }
+                  }
+                  else {
+                    newFlag = MODULE_BIND;
+                  }
+                }
+                else if (l_posHorz == 2) {
+                  newFlag = MODULE_RANGECHECK;
+                }
+#else
             if (attr && l_posHorz>0 && s_editMode>0) {
               if (l_posHorz == 1)
                 newFlag = MODULE_BIND;
               else if (l_posHorz == 2) {
                 newFlag = MODULE_RANGECHECK;
+#endif
               }
             }
             moduleFlag[moduleIdx] = newFlag;
@@ -953,9 +1072,9 @@ void menuModelSetup(event_t event)
         lcdDrawTextAlignedLeft(y, PSTR("Port2"));
         lcdDrawTextAtIndex(MODEL_SETUP_2ND_COLUMN, y, STR_VPROTOS, 0, 0);
         lcdDrawText(MODEL_SETUP_2ND_COLUMN+4*FW+3, y, STR_CH, menuHorizontalPosition<=0 ? attr : 0);
-        lcdDrawNumber(lcdLastPos, y, g_model.moduleData[1].channelsStart+1, LEFT | (menuHorizontalPosition<=0 ? attr : 0));
-        lcdDrawChar(lcdLastPos, y, '-');
-        lcdDrawNumber(lcdLastPos + FW+1, y, g_model.moduleData[1].channelsStart+8+g_model.moduleData[1].channelsCount, LEFT | (menuHorizontalPosition!=0 ? attr : 0));
+        lcdDrawNumber(lcdLastRightPos, y, g_model.moduleData[1].channelsStart+1, LEFT | (menuHorizontalPosition<=0 ? attr : 0));
+        lcdDrawChar(lcdLastRightPos, y, '-');
+        lcdDrawNumber(lcdLastRightPos + FW+1, y, g_model.moduleData[1].channelsStart+8+g_model.moduleData[1].channelsCount, LEFT | (menuHorizontalPosition!=0 ? attr : 0));
         if (attr && (editMode>0 || p1valdiff)) {
           switch (menuHorizontalPosition) {
             case 0:

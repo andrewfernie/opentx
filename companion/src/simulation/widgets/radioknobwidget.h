@@ -26,7 +26,7 @@
 
 #include <QDial>
 #include <QMouseEvent>
-#include <QDebug>
+#include <QToolTip>
 #include <math.h>
 
 class RadioKnobWidget : public RadioWidget
@@ -65,7 +65,6 @@ class RadioKnobWidget : public RadioWidget
 
     Board::PotType m_potType;
 
-
     class KnobWidget : public QDial
     {
       public:
@@ -73,13 +72,15 @@ class RadioKnobWidget : public RadioWidget
         explicit KnobWidget(Board::PotType type, QWidget * parent = 0):
           QDial(parent)
         {
+          m_toolTip = tr("<p>Value (input): <b>%1</b></p>");
+
           setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
           setFixedSize(QSize(42, 42));
-          setMinimum(-1024);
-          setMaximum(1024);
           setNotchesVisible(true);
           if (type == Board::POT_MULTIPOS_SWITCH) {
             m_stepSize = 2048 / 5;
+            setMinimum(0);
+            setMaximum(2048);
             // this is a bit of a hack to get the notch markers to display correctly
             // the actual notches/value are constrained in setValue()
             setSingleStep(m_stepSize / 10);
@@ -88,7 +89,9 @@ class RadioKnobWidget : public RadioWidget
           }
           else {
             m_stepSize = 1;
-            setToolTip(tr("Right-double-click to reset to center."));
+            m_toolTip.append(tr("Right-double-click to reset to center."));
+            setMinimum(-1024);
+            setMaximum(1024);
             setPageStep(128);
             setNotchTarget(64);
           }
@@ -97,9 +100,22 @@ class RadioKnobWidget : public RadioWidget
         void setValue(int value)
         {
           if (m_stepSize > 1) {
-            value = (value + 1024) / m_stepSize * m_stepSize - 1024;
+            value = value / m_stepSize * m_stepSize;
           }
           QDial::setValue(value);
+        }
+
+
+        bool event(QEvent *event)
+        {
+          if (event->type() == QEvent::ToolTip) {
+            QHelpEvent * helpEvent = static_cast<QHelpEvent *>(event);
+            if (helpEvent) {
+              QToolTip::showText(helpEvent->globalPos(), m_toolTip.arg(this->value()));
+              return true;
+            }
+          }
+          return QWidget::event(event);
         }
 
         void mousePressEvent(QMouseEvent * event)
@@ -127,6 +143,7 @@ class RadioKnobWidget : public RadioWidget
         }
 
         quint16 m_stepSize;
+        QString m_toolTip;
     };
 
 };

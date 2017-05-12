@@ -5,6 +5,7 @@
 /doc/
 build*/
 cmake-build-*/
+/debian/
 .vscode/
 /companion-build/
 CMakeFiles/

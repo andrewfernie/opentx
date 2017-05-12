@@ -38,6 +38,8 @@ option(SIMU_LUA_COMPILER "Pre-compile and save Lua scripts in simulator." ON)
 option(FAS_PROTOTYPE "Support of old FAS prototypes (different resistors)" OFF)
 option(TEMPLATES "Model templates menu" OFF)
 option(TRACE_SIMPGMSPACE "Turn on traces in simpgmspace.cpp" ON)
+option(TRACE_LUA_INTERNALS "Turn on traces for Lua internals" OFF)
+option(BINDING_OPTIONS "Allow advanced frsky bindings" OFF)
 
 # since we reset all default CMAKE compiler flags for firmware builds, provide an alternate way for user to specify additional flags.
 set(FIRMWARE_C_FLAGS "" CACHE STRING "Additional flags for firmware target c compiler (note: all CMAKE_C_FLAGS[_*] are ignored for firmware/bootloader).")
@@ -95,6 +97,7 @@ elseif(PCB STREQUAL 9X2561)
   set(MCU atmega2561)
   string(TOLOWER ${PCB} FLAVOUR)
   set(EEPROM EEPROM_RLC)
+  set(SDCARD NO)
   add_definitions(-DEEPROM_VARIANT=${M2561_VARIANT})
   set(GUI_DIR 128x64)
   set(TARGET_DIR 9x)
@@ -320,6 +323,14 @@ if(TRACE_SIMPGMSPACE)
   add_definitions(-DTRACE_SIMPGMSPACE)
 endif()
 
+if(TRACE_LUA_INTERNALS)
+  add_definitions(-DTRACE_LUA_INTERNALS_ENABLED)
+endif()
+
+if(BINDING_OPTIONS)
+  add_definitions(-DBINDING_OPTIONS)
+endif()
+
 if(EEPROM_VARIANT_NEEDED)
   add_definitions(-DEEPROM_VARIANT=${EEPROM_VARIANT})
 endif()
@@ -391,6 +402,12 @@ set(SRC ${SRC} ${FIRMWARE_SRC})
 
 
 ##### firmware target #####
+
+option(FIRMWARE_TARGET "Configure Firmware target (can be turned of for compiling Companion only)" ON)
+if(NOT FIRMWARE_TARGET)
+  message(STATUS "firmware target disabled")
+  return()
+endif()
 
 set(CMAKE_EXECUTABLE_SUFFIX ".elf")
 # trick to remove the -rdynamic and --out-implib issues
@@ -502,7 +519,7 @@ if(NOT MSVC)
     if (BASH AND NOT WIN32)
       add_custom_command(
         OUTPUT ${ALLSRC}
-        COMMAND ${BASH} -kc 'rm -f ${ALLSRC}\; for f in ${SRC}\; do echo "\\# 1 \"$$f\"" >> allsrc.cpp\; cat "$$f" >> ${ALLSRC}\; done'
+        COMMAND ${BASH} -kc 'rm -f ${ALLSRC}\; for f in ${SRC}\; do echo "\\# 1 \\\"$$f\\\"" >> ${ALLSRC}\; cat "$$f" >> ${ALLSRC}\; done'
         WORKING_DIRECTORY ${RADIO_SRC_DIRECTORY}
         DEPENDS ${SRC}
         )

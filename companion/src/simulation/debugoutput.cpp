@@ -21,6 +21,7 @@
 #include "debugoutput.h"
 #include "ui_debugoutput.h"
 
+#include "appdebugmessagehandler.h"
 #include "appdata.h"
 #include "filteredtextbuffer.h"
 
@@ -35,20 +36,13 @@
 
 extern AppData g;  // ensure what "g" means
 
-FilteredTextBuffer * DebugOutput::m_dataBufferDevice = Q_NULLPTR;
 const quint16 DebugOutput::m_savedViewStateVersion = 1;
-
-void firmwareTraceCb(const char * text)
-{
-  if (DebugOutput::m_dataBufferDevice) {
-    DebugOutput::m_dataBufferDevice->write(text);
-  }
-}
 
 DebugOutput::DebugOutput(QWidget * parent, SimulatorInterface *simulator):
   QWidget(parent),
   ui(new Ui::DebugOutput),
   m_simulator(simulator),
+  m_dataBufferDevice(NULL),
   m_radioProfileId(g.sessionId()),
   m_filterEnable(false),
   m_filterExclude(false)
@@ -70,7 +64,7 @@ DebugOutput::DebugOutput(QWidget * parent, SimulatorInterface *simulator):
     ui->filterText->addItem(fltr, "no_delete");
 
   ui->filterText->setValidator(new DebugOutputFilterValidator(ui->filterText));
-  ui->filterText->installEventFilter(new DeleteComboBoxItemEventFilter());
+  ui->filterText->installEventFilter(new DeleteComboBoxItemEventFilter(this));
 
   ui->actionShowFilterHelp->setIcon(SimulatorIcon("info"));
   ui->actionWordWrap->setIcon(SimulatorIcon("word_wrap"));
@@ -86,8 +80,8 @@ DebugOutput::DebugOutput(QWidget * parent, SimulatorInterface *simulator):
   m_dataBufferDevice->setInputBufferMaxSize(DEBUG_OUTPUT_WIDGET_INP_BUFF_SIZE);
   m_dataBufferDevice->open(QIODevice::ReadWrite | QIODevice::Text);
 
-	connect(m_dataBufferDevice, &FilteredTextBuffer::readyRead, this, &DebugOutput::processBytesReceived);
-  connect(m_dataBufferDevice, &FilteredTextBuffer::bufferOverflow, this, &DebugOutput::onDataBufferOverflow);
+  connect(m_dataBufferDevice, &FilteredTextBuffer::readyRead, this, &DebugOutput::processBytesReceived, Qt::QueuedConnection);
+  connect(m_dataBufferDevice, &FilteredTextBuffer::bufferOverflow, this, &DebugOutput::onDataBufferOverflow, Qt::QueuedConnection);
   connect(this, &DebugOutput::filterChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilter);
   connect(this, &DebugOutput::filterEnabledChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilterEnabled);
   connect(this, &DebugOutput::filterExprChanged, m_dataBufferDevice, &FilteredTextBuffer::setLineFilterExpr);
@@ -100,21 +94,27 @@ DebugOutput::DebugOutput(QWidget * parent, SimulatorInterface *simulator):
   connect(ui->actionToggleFilter, &QAction::toggled, this, &DebugOutput::onFilterToggled);
   connect(ui->filterText, &QComboBox::currentTextChanged, this, &DebugOutput::onFilterTextChanged);
 
+  if (AppDebugMessageHandler::instance())
+    connect(AppDebugMessageHandler::instance(), &AppDebugMessageHandler::messageOutput, this, &DebugOutput::onAppDebugMessage);
+
   // send firmware TRACE events to our data collector
-  m_simulator->installTraceHook(firmwareTraceCb);
+  m_simulator->addTracebackDevice(m_dataBufferDevice);
 }
 
 DebugOutput::~DebugOutput()
 {
-  saveState();
-
+  if (AppDebugMessageHandler::instance())
+    disconnect(AppDebugMessageHandler::instance(), 0, this, 0);
 
   if (m_dataBufferDevice) {
+    m_simulator->removeTracebackDevice(m_dataBufferDevice);
     disconnect(m_dataBufferDevice, 0, this, 0);
     disconnect(this, 0, m_dataBufferDevice, 0);
-    m_dataBufferDevice->deleteLater();
+    delete m_dataBufferDevice;
     m_dataBufferDevice = Q_NULLPTR;
   }
+
+  saveState();
 
   delete ui;
 }
@@ -162,15 +162,18 @@ void DebugOutput::restoreState()
 
 void DebugOutput::processBytesReceived()
 {
+  static char buf[512];
   const QTextCursor savedCursor(ui->console->textCursor());
   const int sbValue = ui->console->verticalScrollBar()->value();
   const bool sbAtBottom = (sbValue == ui->console->verticalScrollBar()->maximum());
   qint64 len;
+  QString text;
 
-  while ((len = m_dataBufferDevice->bytesAvailable()) > 0) {
-    QString text(m_dataBufferDevice->read(qMin(len, qint64(512))));
-    if (text.isEmpty())
+  while (m_dataBufferDevice && m_dataBufferDevice->bytesAvailable() > 0) {
+    len = m_dataBufferDevice->read(buf, sizeof(buf));
+    if (len <= 0)
       break;
+    text = QString::fromLocal8Bit(buf, len);
     ui->console->moveCursor(QTextCursor::End);
     ui->console->textCursor().insertText(text);
     if (sbAtBottom) {
@@ -195,6 +198,13 @@ void DebugOutput::onDataBufferOverflow(const qint64 len)
   else if (!reportTimer.isValid() || reportTimer.elapsed() > 1000 * 30) {
     qWarning("Data buffer overflow by %lld bytes!", len);
     reportTimer.start();
+  }
+}
+
+void DebugOutput::onAppDebugMessage(quint8 level, const QString & msg)
+{
+  if (level > 0 && m_dataBufferDevice) {
+    m_dataBufferDevice->write(qPrintable(msg % "\n"));
   }
 }
 

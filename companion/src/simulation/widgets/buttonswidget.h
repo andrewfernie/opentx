@@ -22,46 +22,11 @@
 #define _BUTTONSWIDGET_H_
 
 #include "radiouiaction.h"
+#include "radiokeywidget.h"
 
 #include <QWidget>
 #include <QtGui>
 #include <QStyleOption>
-
-class Area : public QObject
-{
-  Q_OBJECT
-
-  public:
-    explicit Area(const QPolygon & polygon, const QString &image, RadioUiAction * action = NULL, QObject * parent = NULL):
-      QObject(parent),
-      polygon(polygon),
-      imgFile(image),
-      action(action)
-    {
-      if (action)
-        connect(action, &RadioUiAction::triggered, this, &Area::onActionTriggered);
-    }
-
-    bool contains(int x, int y)
-    {
-      return polygon.containsPoint(QPoint(x, y), Qt::OddEvenFill);
-    }
-
-    void onActionTriggered(int, bool active)
-    {
-      if (active)
-        emit imageChanged(imgFile);
-      else
-        emit imageChanged("");
-    }
-
-    QPolygon polygon;
-    QString imgFile;
-    RadioUiAction * action;
-
-  signals:
-    void imageChanged(const QString image);
-};
 
 class ButtonsWidget : public QWidget
 {
@@ -80,18 +45,17 @@ class ButtonsWidget : public QWidget
       QWidget::setStyleSheet(sheet);
     }
 
-    void addArea(int x1, int y1, int x2, int y2, const char * image, RadioUiAction * action = NULL)
+    RadioKeyWidget * addArea(const QRect & rect, const char * image, RadioUiAction * action = NULL)
     {
-      QPolygon polygon;
-      polygon.setPoints(4, x1, y1, x1, y2, x2, y2, x2, y1);
-      addArea(polygon, image, action);
+      return addArea(QPolygon(rect), image, action);
     }
 
-    void addArea(const QPolygon & polygon, const char * image, RadioUiAction * action = NULL)
+    RadioKeyWidget * addArea(const QPolygon & polygon, const char * image, RadioUiAction * action = NULL)
     {
-      Area * area = new Area(polygon, image, action, this);
-      areas.push_back(area);
-      connect(area, &Area::imageChanged, this, &ButtonsWidget::setBitmap);
+      RadioKeyWidget * btn = new RadioKeyWidget(polygon, image, action, this);
+      m_buttons.append(btn);
+      connect(btn, &RadioKeyWidget::imageChanged, this, &ButtonsWidget::setBitmap);
+      return btn;
     }
 
   protected:
@@ -108,20 +72,22 @@ class ButtonsWidget : public QWidget
 
     void onMouseButtonEvent(bool press, QMouseEvent * event)
     {
-      bool anyTriggered = false;
-      int x = event->x();
-      int y = event->y();
+      if (!(event->button() & (Qt::LeftButton | Qt::MidButton))) {
+        event->ignore();
+        return;
+      }
 
-      foreach(Area * area, areas) {
-        if (event->button() == Qt::LeftButton && area->contains(x, y)) {
-          if (area->action)
-            area->action->trigger(press);
-          anyTriggered = true;
-          break;
+      foreach(RadioKeyWidget * key, m_buttons) {
+        if (key->contains(event->pos())) {
+          key->toggle(press);
+          event->accept();
+          return;
+        }
+        else if (key->getValue()) {
+          key->toggle(false);
         }
       }
-      if (!anyTriggered)
-        setBitmap("");
+      event->ignore();
     }
 
     virtual void mousePressEvent(QMouseEvent * event)
@@ -129,10 +95,6 @@ class ButtonsWidget : public QWidget
       onMouseButtonEvent(true, event);
     }
     virtual void mouseReleaseEvent(QMouseEvent * event)
-    {
-      onMouseButtonEvent(false, event);
-    }
-    virtual void mouseLeaveEvent(QMouseEvent * event)
     {
       onMouseButtonEvent(false, event);
     }
@@ -145,7 +107,7 @@ class ButtonsWidget : public QWidget
       style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
     }
 
-    QList<Area *> areas;
+    QList<RadioKeyWidget *> m_buttons;
     QString defaultStyleSheet;
 };
 

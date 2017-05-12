@@ -26,6 +26,7 @@
 #include <QMessageBox>
 #include <QTime>
 #include <QUrl>
+#include <companion/src/storage/storage.h>
 
 using namespace Board;
 
@@ -95,30 +96,6 @@ const char * OpenTxEepromInterface::getName()
   }
 }
 
-uint32_t OpenTxEepromInterface::getFourCC()
-{
-  switch (board) {
-    case BOARD_X12S:
-    case BOARD_X10:
-      return 0x3478746F;
-    case BOARD_TARANIS_X7:
-      return 0x3678746F;
-    case BOARD_TARANIS_X9E:
-      return 0x3578746F;
-    case BOARD_TARANIS_X9D:
-    case BOARD_TARANIS_X9DP:
-      return 0x3378746F;
-    case BOARD_SKY9X:
-    case BOARD_AR9X:
-      return 0x3278746F;
-    case BOARD_MEGA2560:
-    case BOARD_GRUVIN9X:
-      return 0x3178746F;
-    default:
-      return 0;
-  }
-}
-
 bool OpenTxEepromInterface::loadRadioSettingsFromRLE(GeneralSettings & settings, RleFile * rleFile, uint8_t version)
 {
   QByteArray data(sizeof(settings), 0); // GeneralSettings should be always bigger than the EEPROM struct
@@ -163,7 +140,7 @@ bool OpenTxEepromInterface::saveToByteArray(const T & src, QByteArray & data, ui
   // manager.Dump();
   manager.Export(raw);
   data.resize(8);
-  *((uint32_t*)&data.data()[0]) = getFourCC();
+  *((uint32_t*)&data.data()[0]) = StorageFormat::getFourCC(board);
   data[4] = version;
   data[5] = 'M';
   *((uint16_t*)&data.data()[6]) = raw.size();
@@ -186,12 +163,12 @@ template <class T, class M>
 bool OpenTxEepromInterface::loadFromByteArray(T & dest, const QByteArray & data)
 {
   uint32_t fourcc = *((uint32_t*)&data.data()[0]);
-  if (getFourCC() != fourcc) {
+  if (StorageFormat::getFourCC(board) != fourcc) {
     if (IS_HORUS(board) && fourcc == 0x3178396F) {
-      qDebug() << QString().sprintf("%s: Deprecated fourcc used %x vs %x", getName(), fourcc, getFourCC());
+      qDebug() << QString().sprintf("%s: Deprecated fourcc used %x vs %x", getName(), fourcc, StorageFormat::getFourCC(board));
     }
     else {
-      qDebug() << QString().sprintf("%s: Wrong fourcc %x vs %x", getName(), fourcc, getFourCC());
+      qDebug() << QString().sprintf("%s: Wrong fourcc %x vs %x", getName(), fourcc, StorageFormat::getFourCC(board));
       return false;
     }
   }
@@ -207,7 +184,7 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * 
 
   std::bitset<NUM_ERRORS> errors;
 
-  if (size != getEEpromSize(board)) {
+  if (size != Boards::getEEpromSize(board)) {
     if (size == 4096) {
       int notnull = false;
       for (int i = 2048; i < 4096; i++) {
@@ -227,7 +204,7 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * 
       }
     }
     else {
-      std::cout << " wrong size (" << size << "/" << getEEpromSize(board) << ")\n";
+      std::cout << " wrong size (" << size << "/" << Boards::getEEpromSize(board) << ")\n";
       errors.set(WRONG_SIZE);
       return errors.to_ulong();
     }
@@ -254,6 +231,7 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * 
   if (version_error == OLD_VERSION) {
     errors.set(version_error);
     errors.set(HAS_WARNINGS);
+    ShowEepromWarnings(NULL, QObject::tr("Warning"), errors.to_ulong());
   }
   else if (version_error == NOT_OPENTX) {
     std::cout << " not open9x\n";
@@ -272,7 +250,7 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * 
     radioData.models.resize(firmware->getCapability(Models));
   }
   for (int i = 0; i < firmware->getCapability(Models); i++) {
-    if (!loadModelFromRLE(radioData.models[i], efile, i, version, radioData.generalSettings.variant)) {
+    if (i < (int)radioData.models.size() && !loadModelFromRLE(radioData.models[i], efile, i, version, radioData.generalSettings.variant)) {
       std::cout << " ko\n";
       errors.set(UNKNOWN_ERROR);
       if (getCurrentFirmware()->getCapability(Models) == 0) {
@@ -281,7 +259,6 @@ unsigned long OpenTxEepromInterface::load(RadioData &radioData, const uint8_t * 
       return errors.to_ulong();
     }
   }
-
   std::cout << " ok\n";
   errors.set(ALL_OK);
   return errors.to_ulong();
@@ -330,7 +307,7 @@ int OpenTxEepromInterface::save(uint8_t * eeprom, const RadioData & radioData, u
     version = getLastDataVersion(board);
   }
 
-  int size = getEEpromSize(board);
+  int size = Boards::getEEpromSize(board);
 
   efile->EeFsCreate(eeprom, size, board, version);
 
@@ -379,8 +356,8 @@ int OpenTxEepromInterface::getSize(const ModelData &model)
   if (model.isEmpty())
     return 0;
 
-  QByteArray tmp(EESIZE_MAX, 0);
-  efile->EeFsCreate((uint8_t *) tmp.data(), EESIZE_MAX, board, 255/*version max*/);
+  QByteArray tmp(Boards::getEEpromSize(Board::BOARD_UNKNOWN), 0);
+  efile->EeFsCreate((uint8_t *) tmp.data(), Boards::getEEpromSize(Board::BOARD_UNKNOWN), board, 255/*version max*/);
 
   OpenTxModelData open9xModel((ModelData &) model, board, 255/*version max*/, getCurrentFirmware()->getVariantNumber());
 
@@ -398,8 +375,8 @@ int OpenTxEepromInterface::getSize(const GeneralSettings &settings)
   if (IS_SKY9X(board))
     return 0;
 
-  QByteArray tmp(EESIZE_MAX, 0);
-  efile->EeFsCreate((uint8_t *) tmp.data(), EESIZE_MAX, board, 255);
+  QByteArray tmp(Boards::getEEpromSize(Board::BOARD_UNKNOWN), 0);
+  efile->EeFsCreate((uint8_t *) tmp.data(), Boards::getEEpromSize(Board::BOARD_UNKNOWN), board, 255);
 
   OpenTxGeneralData open9xGeneral((GeneralSettings &) settings, board, 255, getCurrentFirmware()->getVariantNumber());
   // open9xGeneral.Dump();
@@ -512,16 +489,6 @@ int OpenTxFirmware::getCapability(::Capability capability)
         return 0;
     case PermTimers:
       return (IS_2560(board) || IS_ARM(board));
-    case SwitchesPositions:
-      if (IS_HORUS_OR_TARANIS(board))
-        return getBoardCapability(board, Board::Switches) * 3;
-      else
-        return 9;
-    case NumTrimSwitches:
-      if (IS_HORUS(board))
-        return 12;
-      else
-        return 8;
     case CustomFunctions:
       if (IS_ARM(board))
         return 64;
@@ -557,7 +524,7 @@ int OpenTxFirmware::getCapability(::Capability capability)
     case VoicesAsNumbers:
       return (IS_ARM(board) ? 0 : 1);
     case VoicesMaxLength:
-      return (IS_ARM(board) ? (IS_TARANIS(board) ? 8 : 6) : 0);
+      return (IS_ARM(board) ? (IS_TARANIS_X9(board) ? 8 : 6) : 0);
     case MultiLangVoice:
       return (IS_ARM(board) ? 1 : 0);
     case SoundPitch:
@@ -575,7 +542,9 @@ int OpenTxFirmware::getCapability(::Capability capability)
       return (IS_ARM(board) ? 1 : 0);
     case ExtraInputs:
       return 1;
-    case ExtendedTrims:
+    case TrimsRange:
+      return 125;
+    case ExtendedTrimsRange:
       return 500;
     case Simulation:
       return 1;
@@ -719,8 +688,6 @@ int OpenTxFirmware::getCapability(::Capability capability)
     case HasInputDiff:
     case HasMixerExpo:
       return (IS_HORUS_OR_TARANIS(board) ? true : false);
-    case MixersMonitor:
-      return id.contains("mixersmon") ? 1 : 0;
     case HasBatMeterRange:
       return (IS_HORUS_OR_TARANIS(board) ? true : id.contains("battgraph"));
     case DangerousFunctions:
@@ -734,49 +701,61 @@ int OpenTxFirmware::getCapability(::Capability capability)
 
 QString OpenTxFirmware::getAnalogInputName(unsigned int index)
 {
-  if (index < 4) {
-    const QString sticks[] = { QObject::tr("Rud"),
-                               QObject::tr("Ele"),
-                               QObject::tr("Thr"),
-                               QObject::tr("Ail") };
+  if ((int)index < getBoardCapability(board, Board::Sticks)) {
+    const QString sticks[] = {
+      QObject::tr("Rud"),
+      QObject::tr("Ele"),
+      QObject::tr("Thr"),
+      QObject::tr("Ail")
+    };
     return sticks[index];
   }
 
-  index -= 4;
+  index -= getBoardCapability(board, Board::Sticks);
 
   if (IS_9X(board) || IS_2560(board) || IS_SKY9X(board)) {
-    const QString pots[]  = { QObject::tr("P1"),
-                              QObject::tr("P2"),
-                              QObject::tr("P3") };
+    const QString pots[] = {
+      QObject::tr("P1"),
+      QObject::tr("P2"),
+      QObject::tr("P3")
+    };
     return CHECK_IN_ARRAY(pots, index);
   }
   else if (IS_TARANIS_X9E(board)) {
-    const QString pots[] = { QObject::tr("F1"),
-                             QObject::tr("F2"),
-                             QObject::tr("F3"),
-                             QObject::tr("F4"),
-                             QObject::tr("S1"),
-                             QObject::tr("S2"),
-                             QObject::tr("LS"),
-                             QObject::tr("RS") };
+    const QString pots[] = {
+      QObject::tr("F1"),
+      QObject::tr("F2"),
+      QObject::tr("F3"),
+      QObject::tr("F4"),
+      QObject::tr("S1"),
+      QObject::tr("S2"),
+      QObject::tr("LS"),
+      QObject::tr("RS")
+    };
     return CHECK_IN_ARRAY(pots, index);
   }
   else if (IS_TARANIS(board)) {
-    const QString pots[] = {QObject::tr("S1"),
-                            QObject::tr("S2"),
-                            QObject::tr("S3"),
-                            QObject::tr("LS"),
-                            QObject::tr("RS")};
+    const QString pots[] = {
+      QObject::tr("S1"),
+      QObject::tr("S2"),
+      QObject::tr("S3"),
+      QObject::tr("LS"),
+      QObject::tr("RS")
+    };
     return CHECK_IN_ARRAY(pots, index);
   }
   else if (IS_HORUS(board)) {
-    const QString pots[] = {QObject::tr("S1"),
-                            QObject::tr("6P"),
-                            QObject::tr("S2"),
-                            QObject::tr("L1"),
-                            QObject::tr("L2"),
-                            QObject::tr("LS"),
-                            QObject::tr("RS")};
+    const QString pots[] = {
+      QObject::tr("S1"),
+      QObject::tr("6P"),
+      QObject::tr("S2"),
+      QObject::tr("L1"),
+      QObject::tr("L2"),
+      QObject::tr("LS"),
+      QObject::tr("RS"),
+      QObject::tr("JSx"),
+      QObject::tr("JSy")
+    };
     return CHECK_IN_ARRAY(pots, index);
   }
   else {
@@ -855,6 +834,8 @@ int OpenTxFirmware::isAvailable(PulsesProtocol proto, int port)
           case PULSES_DSM2:
           case PULSES_DSMX:
             return 1;
+          case PULSES_MULTIMODULE:
+            return id.contains("multimodule") ? 1 : 0;
           default:
             return 0;
         }
@@ -1145,6 +1126,7 @@ void addOpenTxFrskyOptions(OpenTxFirmware * firmware)
   firmware->addOption("nogvars", QObject::tr("Disable Global variables"));
   firmware->addOption("lua", QObject::tr("Support for Lua model scripts"));
   firmware->addOption("luac", QObject::tr("Enable Lua compiler"));
+  firmware->addOption("bindopt", QObject::tr("Enable bindings options"));
   Option usb_options[] = {{"massstorage", QObject::tr("Instead of Joystick emulation, USB connection is Mass Storage (as in the Bootloader)")},
                           {"cli",         QObject::tr("Instead of Joystick emulation, USB connection is Command Line Interface")},
                           {NULL}};
@@ -1154,7 +1136,6 @@ void addOpenTxFrskyOptions(OpenTxFirmware * firmware)
 void addOpenTxTaranisOptions(OpenTxFirmware * firmware)
 {
   addOpenTxFrskyOptions(firmware);
-  firmware->addOption("mixersmon", QObject::tr("Adds mixers output view to the CHANNELS MONITOR screen, pressing [ENT] switches between the views"));
   firmware->addOption("internalppm", QObject::tr("Support for PPM internal module hack"));
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
 }
@@ -1172,6 +1153,16 @@ void addOpenTxLcdOptions(OpenTxFirmware * firmware)
   firmware->addOptions(lcd_options);
 }
 
+void addOpenTxVoiceOptions(OpenTxFirmware * firmware)
+{
+  Option voice_options[] = {
+    {"WTV20",     	QObject::tr("WTV20 voice module")},
+    {"JQ6500", 		QObject::tr("JQ6500 voice module")},
+    {NULL}
+  };
+  firmware->addOptions(voice_options);
+}
+
 QList<OpenTxEepromInterface *> opentxEEpromInterfaces;
 
 void registerOpenTxFirmware(OpenTxFirmware * firmware)
@@ -1180,7 +1171,7 @@ void registerOpenTxFirmware(OpenTxFirmware * firmware)
   firmware->setEEpromInterface(eepromInterface);
   opentxEEpromInterfaces.push_back(eepromInterface);
   eepromInterfaces.push_back(eepromInterface);
-  firmwares.push_back(firmware);
+  Firmware::addRegisteredFirmware(firmware);
 }
 
 void registerOpenTxFirmwares()
@@ -1238,7 +1229,7 @@ void registerOpenTxFirmwares()
   addOpenTxFrskyOptions(firmware);
   firmware->addOption("pcbdev", QObject::tr("Use ONLY with first DEV pcb version"));
   registerOpenTxFirmware(firmware);
-  
+
 
   /* FrSky X10 board */
 /* Disabled for now
@@ -1249,7 +1240,6 @@ void registerOpenTxFirmwares()
   /* 9XR-Pro */
   firmware = new OpenTxFirmware("opentx-9xrpro", QObject::tr("Turnigy 9XR-PRO"), BOARD_9XRPRO);
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
-  firmware->addOption("templates", QObject::tr("Enable TEMPLATES menu"));
   firmware->addOption("nofp", QObject::tr("No flight modes"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
   firmware->addOption("potscroll", QObject::tr("Pots use in menus navigation"));
@@ -1260,6 +1250,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("nobold", QObject::tr("Don't use bold font for highlighting active items"));
   firmware->addOption("bluetooth", QObject::tr("Bluetooth interface"));
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
+  addOpenTxArmOptions(firmware);
   addOpenTxCommonOptions(firmware);
   registerOpenTxFirmware(firmware);
 
@@ -1397,7 +1388,6 @@ void registerOpenTxFirmwares()
   /* ar9x board */
   firmware = new OpenTxFirmware("opentx-ar9x", QObject::tr("9X with AR9X board"), BOARD_AR9X);
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
-  firmware->addOption("templates", QObject::tr("Enable TEMPLATES menu"));
   firmware->addOption("nofp", QObject::tr("No flight modes"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
   firmware->addOption("potscroll", QObject::tr("Pots use in menus navigation"));
@@ -1411,13 +1401,13 @@ void registerOpenTxFirmwares()
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
 //  firmware->addOption("rtc", QObject::tr("Optional RTC added"));
 //  firmware->addOption("volume", QObject::tr("i2c volume control added"));
+  addOpenTxArmOptions(firmware);
   addOpenTxCommonOptions(firmware);
   registerOpenTxFirmware(firmware);
 
   /* Sky9x board */
   firmware = new OpenTxFirmware("opentx-sky9x", QObject::tr("9X with Sky9x board"), BOARD_SKY9X);
   firmware->addOption("heli", QObject::tr("Enable HELI menu and cyclic mix support"));
-  firmware->addOption("templates", QObject::tr("Enable TEMPLATES menu"));
   firmware->addOption("nofp", QObject::tr("No flight modes"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
   firmware->addOption("potscroll", QObject::tr("Pots use in menus navigation"));
@@ -1429,6 +1419,7 @@ void registerOpenTxFirmwares()
   firmware->addOption("nobold", QObject::tr("Don't use bold font for highlighting active items"));
   firmware->addOption("bluetooth", QObject::tr("Bluetooth interface"));
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
+  addOpenTxArmOptions(firmware);
   addOpenTxCommonOptions(firmware);
   registerOpenTxFirmware(firmware);
 
@@ -1471,12 +1462,12 @@ void registerOpenTxFirmwares()
   firmware->addOption("nocurves", QObject::tr("Disable curves menus"));
   firmware->addOption("sdcard", QObject::tr("Support for SD memory card"));
   firmware->addOption("audio", QObject::tr("Support for radio modified with regular speaker"));
-  firmware->addOption("voice", QObject::tr("Used if you have modified your radio with voice mode"));
+  //firmware->addOption("voice", QObject::tr("Used if you have modified your radio with voice mode"));
+  addOpenTxVoiceOptions(firmware);
   firmware->addOption("haptic", QObject::tr("Used if you have modified your radio with haptic mode"));
   firmware->addOption("ppmca", QObject::tr("PPM center adjustment in limits"));
   firmware->addOption("gvars", QObject::tr("Global variables"), GVARS_VARIANT);
   firmware->addOption("symlimits", QObject::tr("Symetrical Limits"));
-  firmware->addOption("mixersmon", QObject::tr("Adds mixers output view to the CHANNELS MONITOR screen, pressing [ENT] switches between the views"));
   firmware->addOption("autosource", QObject::tr("In model setup menus automatically set source by moving the control"));
   firmware->addOption("autoswitch", QObject::tr("In model setup menus automatically set switch by moving the control"));
   firmware->addOption("dblkeys", QObject::tr("Enable resetting values by pressing up and down at the same time"));
@@ -1489,15 +1480,16 @@ void registerOpenTxFirmwares()
   addOpenTxCommonOptions(firmware);
   registerOpenTxFirmware(firmware);
 
-  default_firmware_variant = getFirmware("opentx-x9d+");
-  current_firmware_variant = default_firmware_variant;
+  Firmware::setDefaultVariant(Firmware::getFirmwareForId("opentx-x9d+"));
+  Firmware::setCurrentVariant(Firmware::getDefaultVariant());
 }
 
 void unregisterOpenTxFirmwares()
 {
-  foreach (Firmware * f, firmwares) {
+  foreach (Firmware * f, Firmware::getRegisteredFirmwares()) {
     delete f;
   }
+  unregisterEEpromInterfaces();
 }
 
 template <class T, class M>

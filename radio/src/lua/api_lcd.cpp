@@ -39,20 +39,28 @@ static int luaLcdRefresh(lua_State *L)
 }
 
 /*luadoc
-@function lcd.clear()
+@function lcd.clear([color])
 
 Clear the LCD screen
 
-@status current Introduced in 2.0.0
+@param color (optional, only on color screens)
+
+@status current Introduced in 2.0.0, `color` parameter introduced in 2.2.0 RC12
 
 @notice This function only works in stand-alone and telemetry scripts.
 */
 static int luaLcdClear(lua_State *L)
 {
-  if (luaLcdAllowed) lcdClear();
+  if (luaLcdAllowed) {
+#if defined(COLORLCD)
+    LcdFlags color = luaL_optunsigned(L, 1, TEXT_BGCOLOR);
+    lcd->clear(color);
+#else
+    lcdClear();
+#endif
+  }
   return 0;
 }
-
 
 /*luadoc
 @function lcd.drawPoint(x, y)
@@ -99,23 +107,23 @@ whole line will not be drawn (starting from OpenTX 2.1.5)
 static int luaLcdDrawLine(lua_State *L)
 {
   if (!luaLcdAllowed) return 0;
-  int x1 = luaL_checkinteger(L, 1);
-  int y1 = luaL_checkinteger(L, 2);
-  int x2 = luaL_checkinteger(L, 3);
-  int y2 = luaL_checkinteger(L, 4);
-  int pat = luaL_checkinteger(L, 5);
-  int flags = luaL_checkinteger(L, 6);
+  coord_t x1 = luaL_checkunsigned(L, 1);
+  coord_t y1 = luaL_checkunsigned(L, 2);
+  coord_t x2 = luaL_checkunsigned(L, 3);
+  coord_t y2 = luaL_checkunsigned(L, 4);
+  uint8_t pat = luaL_checkunsigned(L, 5);
+  LcdFlags flags = luaL_checkunsigned(L, 6);
 
-  if (x1 < 0 || x1 >= LCD_W || y1 < 0 || y1 >= LCD_H || x2 < 0 || x2 >= LCD_W || y2 < 0 || y2 >= LCD_H)
+  if (x1 > LCD_W || y1 > LCD_H || x2 > LCD_W || y2 > LCD_H)
     return 0;
 
   if (pat == SOLID) {
     if (x1 == x2) {
-      lcdDrawSolidVerticalLine(x1, y2 >= y1 ? y1 : y1+1, y2 >= y1 ? y2-y1+1 : y2-y1-1, flags);
+      lcdDrawSolidVerticalLine(x1, y1<y2 ? y1 : y2,  y1<y2 ? (y2-y1)+1 : (y1-y2)+1, flags);
       return 0;
     }
     else if (y1 == y2) {
-      lcdDrawSolidHorizontalLine(x2 >= x1 ? x1 : x1+1, y1, x2 >= x1 ? x2-x1+1 : x2-x1-1, flags);
+      lcdDrawSolidHorizontalLine(x1<x2 ? x1 : x2, y1, x1<x2 ? (x2-x1)+1 : (x1-x2)+1, flags);
       return 0;
     }
   }
@@ -128,20 +136,55 @@ static int luaLcdDrawLine(lua_State *L)
 /*luadoc
 @function lcd.getLastPos()
 
-Returns the last x position from previous output
+Returns the rightmost x position from previous output
 
 @retval number (integer) x position
 
 @notice Only available on Taranis
 
+@notice For added clarity, it is recommended to use lcd.getLastRightPos()
+
 @status current Introduced in 2.0.0
 */
+
+/*luadoc
+@function lcd.getLastRightPos()
+
+Returns the rightest x position from previous drawtext or drawNumber output
+
+@retval number (integer) x position
+
+@notice Only available on Taranis
+
+@notice This is strictly equivalent to former lcd.getLastPos()
+
+@status current Introduced in 2.2.0
+*/
+
 static int luaLcdGetLastPos(lua_State *L)
 {
-  lua_pushinteger(L, lcdLastPos);
+  lua_pushinteger(L, lcdLastRightPos);
   return 1;
 }
-//#endif
+
+/*luadoc
+@function lcd.getLastLeftPos()
+
+Returns the leftmost x position from previous drawtext or drawNumber output
+
+@retval number (integer) x position
+
+@notice Only available on Taranis
+
+@status current Introduced in 2.2.0
+*/
+static int luaLcdGetLeftPos(lua_State *L)
+{
+  lua_pushinteger(L, lcdLastLeftPos);
+  return 1;
+}
+
+#endif // COLORLCD
 
 /*luadoc
 @function lcd.drawText(x, y, text [, flags])
@@ -154,7 +197,7 @@ Draw a text beginning at (x,y)
 
 @param flags (unsigned number) drawing flags. All values can be
 combined together using the + character. ie BLINK + DBLSIZE.
-See the Appendix for available characters in each font set.
+See the [Appendix](../appendix/fonts.md) for available characters in each font set.
  * `0 or not specified` normal font
  * `XXLSIZE` jumbo sized font
  * `DBLSIZE` double size font
@@ -379,7 +422,6 @@ static int luaOpenBitmap(lua_State * L)
 static BitmapBuffer * checkBitmap(lua_State * L, int index)
 {
   BitmapBuffer ** b = (BitmapBuffer **)luaL_checkudata(L, index, LUA_BITMAPHANDLE);
-  if (!*b) luaL_error(L, "null Image");
   return *b;
 }
 
@@ -826,12 +868,16 @@ const luaL_Reg lcdLib[] = {
   { "RGB", luaRGB },
 #elif LCD_DEPTH > 1
   { "getLastPos", luaLcdGetLastPos },
+  { "getLastRightPos", luaLcdGetLastPos },
+  { "getLastLeftPos", luaLcdGetLeftPos },
   { "drawPixmap", luaLcdDrawPixmap },
   { "drawScreenTitle", luaLcdDrawScreenTitle },
   { "drawCombobox", luaLcdDrawCombobox },
 #else
   { "drawScreenTitle", luaLcdDrawScreenTitle },
   { "getLastPos", luaLcdGetLastPos },
+  { "getLastRightPos", luaLcdGetLastPos },
+  { "getLastLeftPos", luaLcdGetLeftPos },
   { "drawCombobox", luaLcdDrawCombobox },
 #endif
   { NULL, NULL }  /* sentinel */

@@ -176,7 +176,7 @@ bool evalSlopes(int * slopes, int startAngle, int endAngle)
     slopes[2] = -100000;
   }
   else {
-    float angle1 = float(startAngle) * PI / 180.0f;
+    float angle1 = float(startAngle) * (PI / 180.0f);
     if (startAngle >= 180) {
       slopes[1] = -100000;
       slopes[2] = cosf(angle1) * 100 / sinf(angle1);
@@ -192,7 +192,7 @@ bool evalSlopes(int * slopes, int startAngle, int endAngle)
     slopes[3] = 100000;
   }
   else {
-    float angle2 = float(endAngle) * PI / 180;
+    float angle2 = float(endAngle)  * (PI / 180.0f);
     if (endAngle >= 180) {
       slopes[0] = -100000;
       slopes[3] = -cosf(angle2) * 100 / sinf(angle2);
@@ -343,10 +343,19 @@ void BitmapBuffer::drawSizedText(coord_t x, coord_t y, const char * s, uint8_t l
       }
     }
     else if (fontindex == TINSIZE_INDEX) {
-      drawSolidFilledRect(x-INVERT_HORZ_MARGIN+2, y-INVERT_VERT_MARGIN+2, width+2*INVERT_HORZ_MARGIN-5, INVERT_LINE_HEIGHT-7, TEXT_INVERTED_BGCOLOR);
+      drawSolidFilledRect(x-INVERT_HORZ_MARGIN+2, y, width+2*INVERT_HORZ_MARGIN-5, height+2, TEXT_INVERTED_BGCOLOR);
     }
     else if (fontindex == SMLSIZE_INDEX) {
-      drawSolidFilledRect(x-INVERT_HORZ_MARGIN, y+1, width+2*INVERT_HORZ_MARGIN-2, INVERT_LINE_HEIGHT-5, TEXT_INVERTED_BGCOLOR);
+      drawSolidFilledRect(x-INVERT_HORZ_MARGIN, y, width+2*INVERT_HORZ_MARGIN-2, height+2, TEXT_INVERTED_BGCOLOR);
+    }
+    else if (fontindex == MIDSIZE_INDEX) {
+      drawSolidFilledRect(x-INVERT_HORZ_MARGIN, y-1, width+2*INVERT_HORZ_MARGIN-2, height+3, TEXT_INVERTED_BGCOLOR);  // MIDSIZE and DBLSIZE font are missing a pixel on top compared to others
+    }
+    else if (fontindex == DBLSIZE_INDEX) {
+      drawSolidFilledRect(x-INVERT_HORZ_MARGIN, y-1, width+2*INVERT_HORZ_MARGIN-2, height+3, TEXT_INVERTED_BGCOLOR); // MIDSIZE and DBLSIZE font are missing a pixel on top compared to others
+    }
+    else if (fontindex == XXLSIZE_INDEX) {
+      drawSolidFilledRect(x-INVERT_HORZ_MARGIN, y, width+2*INVERT_HORZ_MARGIN-2, height+2, TEXT_INVERTED_BGCOLOR);
     }
     else {
       drawSolidFilledRect(x-INVERT_HORZ_MARGIN, y, width+2*INVERT_HORZ_MARGIN, INVERT_LINE_HEIGHT, TEXT_INVERTED_BGCOLOR);
@@ -410,7 +419,6 @@ void BitmapBuffer::drawSizedText(coord_t x, coord_t y, const char * s, uint8_t l
     s++;
   }
   lcdNextPos = pos;
-  lcdLastPos = pos;
 }
 
 void BitmapBuffer::drawBitmapPie(int x0, int y0, const uint16_t * img, int startAngle, int endAngle)
@@ -702,6 +710,8 @@ BitmapBuffer * BitmapBuffer::load_bmp(const char * filename)
 #define STBI_ONLY_BMP
 #define STBI_ONLY_GIF
 #define STBI_NO_STDIO
+#define STBI_NO_HDR
+#define STBI_NO_LINEAR
 
 // #define TRACE_STB_MALLOC
 

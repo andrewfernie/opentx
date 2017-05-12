@@ -190,7 +190,6 @@ options_mega2560.update(tts_avr)
 
 options_sky9x = {
     "heli": ("HELI", "YES", "NO"),
-    "templates": ("TEMPLATES", "YES", "NO"),
     "nofp": ("FLIGHT_MODES", "NO", "YES"),
     "ppmus": ("PPM_UNIT", "US", "PERCENT_PREC1"),
     "gvars": ("GVARS", "YES", "NO"),
@@ -206,12 +205,12 @@ options_sky9x = {
     "bluetooth": ("BLUETOOTH", "YES", "NO"),
     "faimode": ("FAI", "YES", None),
     "faichoice": ("FAI", "CHOICE", None),
-    "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES")
+    "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
+    "multimodule": ("MULTIMODULE", "YES", "NO")
 }
 
 options_ar9x = {
     "heli": ("HELI", "YES", "NO"),
-    "templates": ("TEMPLATES", "YES", "NO"),
     "nofp": ("FLIGHT_MODES", "NO", "YES"),
     "ppmus": ("PPM_UNIT", "US", "PERCENT_PREC1"),
     "gvars": ("GVARS", "YES", "NO"),
@@ -229,6 +228,7 @@ options_ar9x = {
     "faichoice": ("FAI", "CHOICE", None),
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     # "rtc": ("RTCLOCK", "YES", "NO"),
+    "multimodule": ("MULTIMODULE", "YES", "NO")
 }
 
 options_taranis = {
@@ -244,11 +244,11 @@ options_taranis = {
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "massstorage": ("USB", "MASSSTORAGE", None),
     "cli": ("USB", "SERIAL", None),
-    "mixersmon": ("MIXERS_MONITOR", "YES", "NO"),
     "internalppm": ("TARANIS_INTERNAL_PPM", "YES", "NO"),
     "shutdownconfirm": ("SHUTDOWN_CONFIRMATION", "YES", "NO"),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
-    "multimodule": ("MULTIMODULE", "YES", "NO")
+    "multimodule": ("MULTIMODULE", "YES", "NO"),
+    "bindopt": ("BINDING_OPTIONS", "YES", "NO")
 }
 
 options_taranisplus = {
@@ -264,11 +264,11 @@ options_taranisplus = {
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "massstorage": ("USB", "MASSSTORAGE", None),
     "cli": ("USB", "SERIAL", None),
-    "mixersmon": ("MIXERS_MONITOR", "YES", "NO"),
     "internalppm": ("TARANIS_INTERNAL_PPM", "YES", "NO"),
     "shutdownconfirm": ("SHUTDOWN_CONFIRMATION", "YES", "NO"),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
-    "multimodule": ("MULTIMODULE", "YES", "NO")
+    "multimodule": ("MULTIMODULE", "YES", "NO"),
+    "bindopt": ("BINDING_OPTIONS", "YES", "NO")
 }
 
 options_taranisx9e = {
@@ -284,12 +284,12 @@ options_taranisx9e = {
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "massstorage": ("USB", "MASSSTORAGE", None),
     "cli": ("USB", "SERIAL", None),
-    "mixersmon": ("MIXERS_MONITOR", "YES", "NO"),
     "internalppm": ("TARANIS_INTERNAL_PPM", "YES", "NO"),
     "shutdownconfirm": ("SHUTDOWN_CONFIRMATION", "YES", "NO"),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "horussticks": ("STICKS", "HORUS", "STANDARD"),
-    "multimodule": ("MULTIMODULE", "YES", "NO")
+    "multimodule": ("MULTIMODULE", "YES", "NO"),
+    "bindopt": ("BINDING_OPTIONS", "YES", "NO")
 }
 
 options_x12s = {
@@ -306,6 +306,7 @@ options_x12s = {
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "multimodule": ("MULTIMODULE", "YES", "NO"),
     "pcbdev": ("PCBREV", "10", None),
+    "bindopt": ("BINDING_OPTIONS", "YES", "NO")
 }
 
 options_x10 = {
@@ -321,4 +322,5 @@ options_x10 = {
     "cli": ("USB", "SERIAL", None),
     "eu": ("SUPPORT_D16_EU_ONLY", "YES", "NO"),
     "multimodule": ("MULTIMODULE", "YES", "NO"),
+    "bindopt": ("BINDING_OPTIONS", "YES", "NO")
 }
