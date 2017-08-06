@@ -445,7 +445,14 @@
 
 #define LEN2_VTEMPLATES        15  // max String Länge für Menü (original=13)
 #define LEN_VTEMPLATES         "\017"  // max String Länge 15+cr+lf
-#define TR_VTEMPLATES          "Misch. Lösch.\0 ""Einfach. 4-CH\0 ""Fixe Gassperre\0""V-Leitwerk\0    ""Delta Mischer\0 ""eCCPM\0         ""Hubschrauber\0  ""Servo Tester\0  "
+#define TR_TEMPLATE_CLEAR_MIXES        "Misch. Lösch.\0 "
+#define TR_TEMPLATE_SIMPLE_4CH         "Einfach. 4-CH\0 "
+#define TR_TEMPLATE_STICKY_TCUT        "Fixe Gassperre\0"
+#define TR_TEMPLATE_VTAIL              "V-Leitwerk\0    "
+#define TR_TEMPLATE_DELTA              "Delta Mischer\0 "
+#define TR_TEMPLATE_ECCPM              "eCCPM\0         "
+#define TR_TEMPLATE_HELI               "Hubschrauber\0  "
+#define TR_TEMPLATE_SERVO_TEST         "Servo Tester\0  "
 
 #define LEN_VSWASHTYPE         "\004"
 #define TR_VSWASHTYPE          "--- ""120 ""120X""140 ""90\0"
@@ -504,9 +511,9 @@
 #endif
 
 #if defined(CPUARM)
-  #define TR_LOGICALSW         "L1\0""L2\0""L3\0""L4\0""L5\0""L6\0""L7\0""L8\0""L9\0""L10""L11""L12""L13""L14""L15""L16""L17""L18""L19""L20""L21""L22""L23""L24""L25""L26""L27""L28""L29""L30""L31""L32"
+  #define TR_LOGICALSW         "L01""L02""L03""L04""L05""L06""L07""L08""L09""L10""L11""L12""L13""L14""L15""L16""L17""L18""L19""L20""L21""L22""L23""L24""L25""L26""L27""L28""L29""L30""L31""L32"
 #else
-  #define TR_LOGICALSW         "L1\0""L2\0""L3\0""L4\0""L5\0""L6\0""L7\0""L8\0""L9\0""L10""L11""L12"
+  #define TR_LOGICALSW         "L01""L02""L03""L04""L05""L06""L07""L08""L09""L10""L11""L12"
 #endif
 
 #if defined(PCBHORUS)
@@ -724,6 +731,9 @@
 #define TR_INACTIVITYALARM     TR(INDENT "Inaktivität", INDENT "Inaktivität nach") //9XR-Pro
 #define TR_MEMORYWARNING       INDENT "Speicher voll"
 #define TR_ALARMWARNING        TR(INDENT "Alle Töne aus?", INDENT "Alle Töne ganz aus?")
+#define TR_RSSISHUTDOWNALARM   TR(INDENT "Rssi Shutdown", INDENT "Check Rssi on Shutdown")
+#define TR_MODEL_STILL_POWERED "Model still powered"
+#define TR_PRESS_ENTER_TO_CONFIRM      "Press enter to confirm"
 #define TR_RENAVIG             "Drehgeb. Navig."
 #define TR_THROTTLE_LABEL      "----Gas-Kontrolle----"
 #define TR_THROTTLEREVERSE     TR("Gas invers", INDENT "Vollgas hinten?") //Änderung wg TH9x, Taranis
@@ -1044,6 +1054,9 @@
 #define TR_ANTENNACONFIRM2     "Ist eine externe Antenne installiert?"
 #define TR_LOWALARM            INDENT "Vor-Alarm bei"
 #define TR_CRITICALALARM       INDENT "Kritisch-Alarm"
+#define TR_RSSIALARM_WARN             "Telemetry"
+#define TR_NO_RSSIALARM                "Audiowarnungen ausgeschaltet"
+#define TR_DISABLE_ALARM               INDENT "Audiowarnungen ausschalten"
 #define TR_ENABLE_POPUP        "Freigabe Popup-Fenster"
 #define TR_DISABLE_POPUP       "Sperren  Popup-Fenster"
 #define TR_POPUP               "Popup"

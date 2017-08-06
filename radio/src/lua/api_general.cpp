@@ -56,11 +56,11 @@ Return OpenTX version
 
 @retval multiple (available since 2.1.7) returns 5 values:
  * (string) OpenTX version (ie "2.1.5")
- * (string) radio version: `taranisx9e`, `taranisplus` or `taranis`.
+ * (string) radio version: `x9e`, `x9d+` or `x9d`.
 If running in simulator the "-simu" is added
  * (number) major version (ie 2 if version 2.1.5)
  * (number) minor version (ie 1 if version 2.1.5)
- * (number) revison number (ie 5 if version 2.1.5)
+ * (number) revision number (ie 5 if version 2.1.5)
 
 @status current Introduced in 2.0.0, expanded in 2.1.7
 
@@ -107,6 +107,9 @@ Return the time since the radio was started in multiple of 10ms
 
 @retval number Number of 10ms ticks since the radio was started Example:
 run time: 12.54 seconds, return value: 1254
+
+The timer internally uses a 32-bit counter which is enough for 30year so
+overflows will not happen.
 
 @status current Introduced in 2.0.0
 */
@@ -304,7 +307,9 @@ bool luaFindFieldByName(const char * name, LuaField & field, unsigned int flags)
 /*luadoc
 @function sportTelemetryPop()
 
-Pops a received SPORT packet from the queue. Please note that only packets using a data ID within 0x5000 to 0x52FF (frame ID == 0x10), as well as packets with a frame ID equal 0x32 (regardless of the data ID) will be passed to the LUA telemetry receive queue.
+Pops a received SPORT packet from the queue. Please note that only packets using a data ID within 0x5000 to 0x52FF
+(frame ID == 0x10), as well as packets with a frame ID equal 0x32 (regardless of the data ID) will be passed to
+the LUA telemetry receive queue.
 
 @retval SPORT paket as a quadruple:
  * sensor ID (number)
@@ -1080,8 +1085,8 @@ Get RSSI value as well as low and critical RSSI alarm levels (in dB)
 static int luaGetRSSI(lua_State * L)
 {
   lua_pushunsigned(L, min((uint8_t)99, TELEMETRY_RSSI()));
-  lua_pushunsigned(L, getRssiAlarmValue(0));
-  lua_pushunsigned(L, getRssiAlarmValue(1));
+  lua_pushunsigned(L, g_model.rssiAlarms.getWarningRssi());
+  lua_pushunsigned(L, g_model.rssiAlarms.getCriticalRssi());
   return 3;
 }
 
@@ -1233,6 +1238,7 @@ const luaR_value_entry opentxConstants[] = {
   { "MIXSRC_CH1", MIXSRC_CH1 },
   { "SWSRC_LAST", SWSRC_LAST_LOGICAL_SWITCH },
 #if defined(COLORLCD)
+  { "SHADOWED", SHADOWED },
   { "COLOR", ZoneOption::Color },
   { "CUSTOM_COLOR", CUSTOM_COLOR },
   { "TEXT_COLOR", TEXT_COLOR },

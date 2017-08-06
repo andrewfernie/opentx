@@ -174,7 +174,7 @@ void telemetryWakeup()
         }
       }
     }
-    if (sensor_lost && TELEMETRY_STREAMING()) {
+    if (sensor_lost && TELEMETRY_STREAMING() &&  !g_model.rssiAlarms.disabled) {
       audioEvent(AU_SENSOR_LOST);
     }
 
@@ -188,27 +188,29 @@ void telemetryWakeup()
     }
 #endif
 
-    if (TELEMETRY_STREAMING()) {
-      if (getRssiAlarmValue(1) && TELEMETRY_RSSI() < getRssiAlarmValue(1)) {
-        AUDIO_RSSI_RED();
-        SCHEDULE_NEXT_ALARMS_CHECK(10/*seconds*/);
+    if (!g_model.rssiAlarms.disabled) {
+      if (TELEMETRY_STREAMING()) {
+        if (TELEMETRY_RSSI() < g_model.rssiAlarms.getCriticalRssi() ) {
+          AUDIO_RSSI_RED();
+          SCHEDULE_NEXT_ALARMS_CHECK(10/*seconds*/);
+        }
+        else if (TELEMETRY_RSSI() < g_model.rssiAlarms.getWarningRssi() ) {
+          AUDIO_RSSI_ORANGE();
+          SCHEDULE_NEXT_ALARMS_CHECK(10/*seconds*/);
+        }
       }
-      else if (getRssiAlarmValue(0) && TELEMETRY_RSSI() < getRssiAlarmValue(0)) {
-        AUDIO_RSSI_ORANGE();
-        SCHEDULE_NEXT_ALARMS_CHECK(10/*seconds*/);
-      }
-    }
-  }
 
-  if (TELEMETRY_STREAMING()) {
-    if (telemetryState == TELEMETRY_KO) {
-      AUDIO_TELEMETRY_BACK();
+      if (TELEMETRY_STREAMING()) {
+        if (telemetryState == TELEMETRY_KO) {
+          AUDIO_TELEMETRY_BACK();
+        }
+        telemetryState = TELEMETRY_OK;
+      }
+      else if (telemetryState == TELEMETRY_OK) {
+        telemetryState = TELEMETRY_KO;
+        AUDIO_TELEMETRY_LOST();
+      }
     }
-    telemetryState = TELEMETRY_OK;
-  }
-  else if (telemetryState == TELEMETRY_OK) {
-    telemetryState = TELEMETRY_KO;
-    AUDIO_TELEMETRY_LOST();
   }
 #endif
 }
@@ -320,19 +322,12 @@ void telemetryReset()
   telemetryData.hub.gpsFix = -1;
 #endif
 
-#if defined(SIMU)
-
-#if defined(CPUARM)
-  telemetryData.swr.value = 30;
-  telemetryData.rssi.value = 75;
-#else
+#if defined(SIMU) && !defined(CPUARM)
   telemetryData.rssi[0].value = 75;
   telemetryData.rssi[1].value = 75;
   telemetryData.analog[TELEM_ANA_A1].set(120, UNIT_VOLTS);
   telemetryData.analog[TELEM_ANA_A2].set(240, UNIT_VOLTS);
-#endif
 
-#if !defined(CPUARM)
   telemetryData.hub.fuelLevel = 75;
   telemetryData.hub.rpm = 12000;
   telemetryData.hub.vfas = 100;
@@ -380,32 +375,6 @@ void telemetryReset()
 
   telemetryData.hub.current = 55;
   telemetryData.hub.maxCurrent = 65;
-#endif
-#endif
-
-/*Add some default sensor values to the simulator*/
-#if defined(CPUARM) && defined(SIMU)
-  for (int i=0; i<MAX_TELEMETRY_SENSORS; i++) {
-    const TelemetrySensor & sensor = g_model.telemetrySensors[i];
-    switch (sensor.id)
-    {
-      case RSSI_ID:
-        setTelemetryValue(TELEM_PROTO_FRSKY_SPORT, RSSI_ID, 0, sensor.instance , 75, UNIT_RAW, 0);
-        break;
-      case ADC1_ID:
-        setTelemetryValue(TELEM_PROTO_FRSKY_SPORT, ADC1_ID, 0, sensor.instance, 100, UNIT_RAW, 0);
-        break;
-      case ADC2_ID:
-        setTelemetryValue(TELEM_PROTO_FRSKY_SPORT, ADC2_ID, 0, sensor.instance, 245, UNIT_RAW, 0);
-        break;
-      case SWR_ID:
-        setTelemetryValue(TELEM_PROTO_FRSKY_SPORT, SWR_ID, 0, sensor.instance, 30, UNIT_RAW, 0);
-        break;
-      case BATT_ID:
-        setTelemetryValue(TELEM_PROTO_FRSKY_SPORT, BATT_ID, 0, sensor.instance, 100, UNIT_RAW, 0);
-        break;
-    }
-  }
 #endif
 }
 
@@ -472,10 +441,12 @@ void telemetryInit()
 }
 #endif
 
+#if !defined(CPUARM)
 NOINLINE uint8_t getRssiAlarmValue(uint8_t alarm)
 {
   return (45 - 3*alarm + g_model.frsky.rssiAlarms[alarm].value);
 }
+#endif
 
 #if defined(LOG_TELEMETRY) && !defined(SIMU)
 extern FIL g_telemetryFile;

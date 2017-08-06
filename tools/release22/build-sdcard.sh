@@ -2,7 +2,7 @@
 
 set -e
 
-branch=master
+branch=2.2
 workdir=/home/opentx/release22
 output=/var/www/html/2.2
 
@@ -27,12 +27,18 @@ else
   mkdir -p ${workdir}/sdcard/horus/IMAGES
   cp /home/opentx/horus-bitmaps/* ${workdir}/sdcard/horus/IMAGES/
 
+  # Get images for Taranis x9
+  mkdir -p ${workdir}/sdcard/taranis-x9/IMAGES
+  cp /home/opentx/x9-bitmaps/* ${workdir}/sdcard/taranis-x9/IMAGES/
+
   # Request sound pack generation
   python3 -B ${workdir}/code/tools/release22/tts.py en csv files
   python3 -B ${workdir}/code/tools/release22/tts.py fr csv files
   python3 -B ${workdir}/code/tools/release22/tts.py es csv files
   python3 -B ${workdir}/code/tools/release22/tts.py it csv files
   python3 -B ${workdir}/code/tools/release22/tts.py de csv files
+  python3 -B ${workdir}/code/tools/nightly22/tts.py cz csv files
+  python3 -B ${workdir}/code/tools/nightly22/tts.py pt csv files
 
   # Create sdcards.zips for supported platforms
   mv /tmp/SOUNDS ${workdir}/sdcard/horus/

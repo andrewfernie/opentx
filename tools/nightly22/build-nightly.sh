@@ -2,11 +2,11 @@
 
 set -e
 
-branch=next
+branch=2.2
 docker=nightly22
 workdir=/home/opentx/nightly22
-output=/var/www/html/2.2/nightly
-version=2.2.0
+output=/var/www/html/2.2/nightlies
+version=2.2.1
 
 # Incrementnightly index
 index=`cat index.txt`
@@ -30,7 +30,7 @@ docker run -dit --name companion -v /home/opentx/${docker}:/opentx ${docker}
 docker exec companion sh -c "mkdir -p build && cd build && cmake /opentx/code && cp radio/src/stamp.h /opentx/binaries/stamp-opentx.txt"
 docker exec companion rm -rf build
 if [ ! -f ${output}/companion/linux/companion22_${version}${suffix}_amd64.deb ]; then
-  docker exec companion /opentx/code/tools/build-companion.sh /opentx/code /opentx/binaries/ ${suffix}
+  docker exec companion /opentx/code/tools/build-companion-nightly.sh /opentx/code /opentx/binaries/ ${suffix}
   cp -f  binaries/*.deb ${output}/companion/linux/companion22_${version}${suffix}_amd64.deb
 fi
 docker stop companion
@@ -55,10 +55,9 @@ fi
 
 # Update stamps
 cp -f  ${workdir}/binaries/stamp-opentx.txt ${output}/firmware
-rm -f ${output}/companion/windows/companion-windows.stamp
-echo "#define VERSION  "'"2.2.0'$suffix'"' >> ${output}/companion/windows/companion-windows.stamp
-cp -f ${output}/companion/windows/companion-windows.stamp ${output}/companion/linux/companion-windows.stamp
-cp -f ${output}/companion/windows/companion-windows.stamp ${output}/companion/linux/companion-macosx.stamp
+echo "#define VERSION  \"${version}${suffix}\"" > ${output}/companion/companion-windows.stamp
+cp -f ${output}/companion/companion-windows.stamp ${output}/companion/companion-linux.stamp
+cp -f ${output}/companion/companion-windows.stamp ${output}/companion/companion-macosx.stamp
 
 # Clean binaries It will be hosting built on demand firmware
 rm -rf ${workdir}/binaries/*

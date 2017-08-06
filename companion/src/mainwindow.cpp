@@ -53,22 +53,28 @@
 #include <QFileInfo>
 #include <QDesktopServices>
 
+#define OPENTX_DOWNLOADS_PAGE_URL         "http://www.open-tx.org/downloads"
 #define OPENTX_COMPANION_DOWNLOADS        "http://downloads-22.open-tx.org/companion"
 #define DONATE_STR                        "https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QUZ48K4SEXDP2"
 
 #ifdef __APPLE__
   #define COMPANION_STAMP                 "companion-macosx.stamp"
-  #define COMPANION_INSTALLER             "companion-macosx-%1.dmg"
-#else
+  #define COMPANION_INSTALLER             "macosx/opentx-companion-%1.dmg"
+  #define COMPANION_FILEMASK              tr("Diskimage (*.dmg)")
+  #define COMPANION_INSTALL_QUESTION      tr("Would you like to open the disk image to install the new version?")
+#elif WIN32
   #define COMPANION_STAMP                 "companion-windows.stamp"
-  #define COMPANION_INSTALLER             "companion-windows-%1.exe"
+  #define COMPANION_INSTALLER             "windows/companion-windows-%1.exe"
+  #define COMPANION_FILEMASK              tr("Executable (*.exe)")
+  #define COMPANION_INSTALL_QUESTION      tr("Would you like to launch the installer?")
+#else
+  #define COMPANION_STAMP                 "companion-linux.stamp"
+  #define COMPANION_INSTALLER             ""   // no automatated updates for linux
+  #define COMPANION_FILEMASK              "*.*"
+  #define COMPANION_INSTALL_QUESTION      tr("Would you like to launch the installer?")
 #endif
 
-#ifdef WIN32
-  #define OPENTX_NIGHT_COMPANION_DOWNLOADS  "http://downloads-22.open-tx.org/nightly/companion/windows"
-#else
-  #define OPENTX_NIGHT_COMPANION_DOWNLOADS  "http://downloads-22.open-tx.org/nightly/companion/linux"
-#endif
+#define OPENTX_NIGHT_COMPANION_DOWNLOADS  "http://downloads-22.open-tx.org/nightlies/companion"
 
 MainWindow::MainWindow():
   downloadDialog_forWait(NULL),
@@ -109,7 +115,16 @@ MainWindow::MainWindow():
   if (showSplash) {
     updateDelay += (SPLASH_TIME*1000);
   }
-  QTimer::singleShot(updateDelay, this, SLOT(doAutoUpdates()));
+
+  if (g.isFirstUse()) {
+    g.warningId(g.warningId() | AppMessages::MSG_WELCOME);
+    QTimer::singleShot(updateDelay-500, this, SLOT(appPrefs()));  // must be shown before warnings dialog but after splash
+  }
+  else {
+    if (!g.previousVersion().isEmpty())
+      g.warningId(g.warningId() | AppMessages::MSG_UPGRADED);
+    QTimer::singleShot(updateDelay, this, SLOT(doAutoUpdates()));
+  }
   QTimer::singleShot(updateDelay, this, SLOT(displayWarnings()));
 
   QStringList strl = QApplication::arguments();
@@ -162,21 +177,39 @@ MainWindow::~MainWindow()
 
 void MainWindow::displayWarnings()
 {
-  int warnId = g.warningId();
-  if (warnId<WARNING_ID && warnId!=0) {
-    int res=0;
-    if (WARNING_LEVEL>0)
-      QMessageBox::warning(this, "Companion", WARNING);
-    else
-      QMessageBox::about(this, "Companion", WARNING);
-    res = QMessageBox::question(this, "Companion", tr("Display previous warning again at startup ?"), QMessageBox::Yes | QMessageBox::No);
-    if (res == QMessageBox::No) {
-      g.warningId(WARNING_ID);
-    }
+  using namespace AppMessages;
+  static uint shownMsgs = 0;
+  int showMsgs = g.warningId();
+  int msgId;
+  QString infoTxt;
+
+  if ((showMsgs & MSG_WELCOME) && !(shownMsgs & MSG_WELCOME)) {
+    infoTxt = CPN_STR_MSG_WELCOME.arg(VERSION);
+    msgId = MSG_WELCOME;
   }
-  else if (warnId==0) {
-    g.warningId(WARNING_ID);
+  else if ((showMsgs & MSG_UPGRADED) && !(shownMsgs & MSG_UPGRADED)) {
+    infoTxt = CPN_STR_MSG_UPGRADED.arg(VERSION);
+    msgId = MSG_UPGRADED;
   }
+  else {
+    return;
+  }
+
+  QMessageBox msgBox(this);
+  msgBox.setWindowTitle(tr("Companion"));
+  msgBox.setIcon(QMessageBox::Information);
+  msgBox.setStandardButtons(QMessageBox::Ok);
+  msgBox.setInformativeText(infoTxt);
+  QCheckBox * cb = new QCheckBox(tr("Show this message again at next startup?"), &msgBox);
+  msgBox.setCheckBox(cb);
+
+  msgBox.exec();
+
+  shownMsgs |= msgId;
+  if (!cb->isChecked())
+    g.warningId(showMsgs & ~msgId);
+
+  displayWarnings();  // in case more warnings need showing
 }
 
 void MainWindow::doAutoUpdates()
@@ -289,20 +322,20 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
   if (version.isNull())
     return onUpdatesError();
 
-  int vnum = version2index(version);
+  int webVersion = version2index(version);
 
-  QString c9xversion = QString(VERSION);
-  int c9xver = version2index(c9xversion);
+  int ownVersion = version2index(VERSION);
 
-  if (c9xver < vnum) {
-#if defined WIN32 || !defined __GNUC__ // || defined __APPLE__  // OSX should only notify of updates since no update packages are available.
+  if (ownVersion < webVersion) {
+#if defined WIN32 || defined __APPLE__
     int ret = QMessageBox::question(this, "Companion", tr("A new version of Companion is available (version %1)<br>"
                                                         "Would you like to download it?").arg(version) ,
                                     QMessageBox::Yes | QMessageBox::No);
 
     if (ret == QMessageBox::Yes) {
       QDir dir(g.updatesDir());
-      QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), dir.absoluteFilePath(QString(COMPANION_INSTALLER).arg(version)), tr("Executable (*.exe)"));
+      QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), dir.absoluteFilePath(QString(COMPANION_INSTALLER).arg(version)), COMPANION_FILEMASK);
+
       if (!fileName.isEmpty()) {
         g.updatesDir(QFileInfo(fileName).dir().absolutePath());
         downloadDialog * dd = new downloadDialog(this, QString("%1/%2").arg(getCompanionUpdateBaseUrl()).arg(QString(COMPANION_INSTALLER).arg(version)), fileName);
@@ -312,7 +345,7 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
       }
     }
 #else
-    QMessageBox::warning(this, tr("New release available"), tr("A new release of Companion is available, please check the OpenTX website!"));
+    QMessageBox::warning(this, tr("New release available"), tr("A new release of Companion is available, please check the <a href='%1'>OpenTX website!</a>").arg(OPENTX_DOWNLOADS_PAGE_URL));
 #endif
   }
   else {
@@ -326,8 +359,7 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
 
 void MainWindow::updateDownloaded()
 {
-  int ret = QMessageBox::question(this, "Companion", tr("Would you like to launch the installer?") ,
-                                   QMessageBox::Yes | QMessageBox::No);
+  int ret = QMessageBox::question(this, "Companion", COMPANION_INSTALL_QUESTION, QMessageBox::Yes | QMessageBox::No);
   if (ret == QMessageBox::Yes) {
     if (QDesktopServices::openUrl(QUrl::fromLocalFile(installer_fileName)))
       QApplication::exit();

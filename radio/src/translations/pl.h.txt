@@ -442,7 +442,14 @@
 
 #define LEN2_VTEMPLATES        13
 #define LEN_VTEMPLATES         "\015" /*13 decimal*/
-#define TR_VTEMPLATES          "Usuń Miksy ""Prosty. 4kn\0 ""Przełą-T-Cut\0""V-Tail      \0""Elevon-Delta\0""eCCPM       \0""Ustaw Heli  \0""Test serwa  \0"
+#define TR_TEMPLATE_CLEAR_MIXES        "Usuń Miksy   "
+#define TR_TEMPLATE_SIMPLE_4CH         "Prosty. 4kn\0 "
+#define TR_TEMPLATE_STICKY_TCUT        "Przełą-T-Cut\0"
+#define TR_TEMPLATE_VTAIL              "V-Tail       "
+#define TR_TEMPLATE_DELTA              "Elevon\\Delta "
+#define TR_TEMPLATE_ECCPM              "eCCPM        "
+#define TR_TEMPLATE_HELI               "Ustaw Heli  \0"
+#define TR_TEMPLATE_SERVO_TEST         "Test serwa  \0"
 
 #define LEN_VSWASHTYPE         "\004"
 #define TR_VSWASHTYPE          "---\0""120\0""120X""140\0""90\0"
@@ -490,9 +497,9 @@
 #endif
 
 #if defined(CPUARM)
-  #define TR_LOGICALSW         "L1\0""L2\0""L3\0""L4\0""L5\0""L6\0""L7\0""L8\0""L9\0""L10""L11""L12""L13""L14""L15""L16""L17""L18""L19""L20""L21""L22""L23""L24""L25""L26""L27""L28""L29""L30""L31""L32"
+  #define TR_LOGICALSW         "L01""L02""L03""L04""L05""L06""L07""L08""L09""L10""L11""L12""L13""L14""L15""L16""L17""L18""L19""L20""L21""L22""L23""L24""L25""L26""L27""L28""L29""L30""L31""L32"
 #else
-  #define TR_LOGICALSW         "L1\0""L2\0""L3\0""L4\0""L5\0""L6\0""L7\0""L8\0""L9\0""L10""L11""L12"
+  #define TR_LOGICALSW         "L01""L02""L03""L04""L05""L06""L07""L08""L09""L10""L11""L12"
 #endif
 
 #if defined(PCBHORUS)
@@ -711,6 +718,9 @@
 #define TR_INACTIVITYALARM     INDENT"Alarm bezczynności"
 #define TR_MEMORYWARNING       INDENT"Pełna pamięć"
 #define TR_ALARMWARNING        INDENT"Wyłącz dźwięk"
+#define TR_RSSISHUTDOWNALARM   TR(INDENT "Rssi Shutdown", INDENT "Check Rssi on Shutdown")
+#define TR_MODEL_STILL_POWERED "Model still powered"
+#define TR_PRESS_ENTER_TO_CONFIRM      "Press enter to confirm"
 #define TR_RENAVIG             "Nawigacja potencjometrem"
 #define TR_THROTTLE_LABEL      "Gaz    "
 #define TR_THROTTLEREVERSE     TR("OdwrGaz", INDENT "OdwrGaz")
@@ -1029,6 +1039,9 @@
 #define TR_ANTENNACONFIRM2     "Make sure antenna is installed!"
 #define TR_LOWALARM            INDENT "Alarm niski"
 #define TR_CRITICALALARM       INDENT "Alarm krytyczny"
+#define TR_RSSIALARM_WARN             TR("RSSI","TELEMETRY RSSI")
+#define TR_NO_RSSIALARM                TR(INDENT "Alarms disabled", INDENT "Telemetry alarms disabled")
+#define TR_DISABLE_ALARM               TR(INDENT "Disable alarms", INDENT "Disable telemetry alarms")
 #define TR_ENABLE_POPUP        "Aktywuj Popup"
 #define TR_DISABLE_POPUP       "Wyłącz Popup"
 #define TR_POPUP               "Popup"

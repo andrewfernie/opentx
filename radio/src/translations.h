@@ -173,6 +173,7 @@ extern const pm_char STR_OPEN9X[];
   #define OFS_VTEMPLATES        (OFS_VTELEMCHNS + sizeof(TR_VTELEMCHNS))
 #endif
 #if defined(TEMPLATES)
+  #define TR_VTEMPLATES         TR_TEMPLATE_CLEAR_MIXES TR_TEMPLATE_SIMPLE_4CH TR_TEMPLATE_STICKY_TCUT TR_TEMPLATE_VTAIL TR_TEMPLATE_DELTA TR_TEMPLATE_ECCPM TR_TEMPLATE_HELI TR_TEMPLATE_SERVO_TEST
   #define OFS_VSWASHTYPE        (OFS_VTEMPLATES + sizeof(TR_VTEMPLATES))
 #else
   #define OFS_VSWASHTYPE        (OFS_VTEMPLATES)
@@ -466,6 +467,9 @@ extern const pm_char STR_BATTERYWARNING[];
 extern const pm_char STR_INACTIVITYALARM[];
 extern const pm_char STR_MEMORYWARNING[];
 extern const pm_char STR_ALARMWARNING[];
+extern const pm_char STR_RSSISHUTDOWNALARM[];
+extern const pm_char STR_MODEL_STILL_POWERED[];
+extern const pm_char STR_PRESS_ENTER_TO_CONFIRM[];
 extern const pm_char STR_RENAVIG[];
 extern const pm_char STR_THROTTLEREVERSE[];
 extern const pm_char STR_TIMER_NAME[];
@@ -896,6 +900,9 @@ extern const pm_char STR_BLCOLOR[];
   extern const pm_char STR_RESET_SUBMENU[];
   extern const pm_char STR_LOWALARM[];
   extern const pm_char STR_CRITICALALARM[];
+extern const pm_char STR_RSSIALARM_WARN[];
+extern const pm_char STR_NO_RSSIALARM[];
+extern const pm_char STR_DISABLE_ALARM[];
   extern const pm_char STR_TELEMETRY_TYPE[];
   extern const pm_char STR_TELEMETRY_SENSORS[];
   extern const pm_char STR_VALUE[];

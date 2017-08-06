@@ -2,9 +2,9 @@
 
 set -e
 
-branch=next
+branch=2.2
 workdir=/home/opentx/nightly22
-output=/var/www/html/2.2/nightly
+output=/var/www/html/2.2/nightlies
 
 # Handle opentx.sdcard.version
 sdcard_version="2.2V"$(grep 'set(SDCARD_REVISION' ${workdir}/code/CMakeLists.txt | grep -o '".*"' | sed 's/"//g')

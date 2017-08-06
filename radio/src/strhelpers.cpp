@@ -49,7 +49,7 @@ int8_t char2idx(char c)
 {
   if (c == '_') return 37;
 #if LEN_SPECIAL_CHARS > 0
-  if (c < 0 && c+128 <= LEN_SPECIAL_CHARS) return 41 + (c+128);
+  if ((int8_t)c < 0 && c+128 <= LEN_SPECIAL_CHARS) return 41 + (c+128);
 #endif
   if (c >= 'a') return 'a' - c - 1;
   if (c >= 'A') return c - 'A' + 1;
@@ -163,14 +163,14 @@ char * getTimerString(char * dest, putstime_t tme, uint8_t hours)
 {
   char * s = dest;
   div_t qr;
-  
+
   if (tme < 0) {
     tme = -tme;
     *s++ = '-';
   }
-  
+
   qr = div((int)tme, 60);
-  
+
   if (hours) {
     div_t qr2 = div(qr.quot, 60);
     *s++ = '0' + (qr2.quot / 10);
@@ -178,14 +178,14 @@ char * getTimerString(char * dest, putstime_t tme, uint8_t hours)
     *s++ = ':';
     qr.quot = qr2.rem;
   }
-  
+
   *s++ = '0' + (qr.quot / 10);
   *s++ = '0' + (qr.quot % 10);
   *s++ = ':';
   *s++ = '0' + (qr.rem / 10);
   *s++ = '0' + (qr.rem % 10);
   *s = '\0';
-  
+
   return dest;
 }
 
@@ -194,18 +194,18 @@ char * getCurveString(char * dest, int idx)
   if (idx == 0) {
     return getStringAtIndex(dest, STR_MMMINV, 0);
   }
-  
+
   char * s = dest;
   if (idx < 0) {
     *s++ = '!';
     idx = -idx;
   }
-  
+
   if (ZEXIST(g_model.curves[idx - 1].name))
     zchar2str(s, g_model.curves[idx - 1].name, LEN_CURVE_NAME);
   else
     strAppendStringWithIndex(s, STR_CV, idx);
-    
+
   return dest;
 }
 
@@ -233,13 +233,13 @@ char * getSwitchString(char * dest, swsrc_t idx)
   else if (idx == SWSRC_OFF) {
     return getStringAtIndex(dest, STR_OFFON, 0);
   }
-  
+
   char * s = dest;
   if (idx < 0) {
     *s++ = '!';
     idx = -idx;
   }
-  
+
 #if defined(PCBSKY9X)
   #define IDX_TRIMS_IN_STR_VSWITCHES   (1+SWSRC_LAST_SWITCH)
   #define IDX_ON_IN_STR_VSWITCHES      (IDX_TRIMS_IN_STR_VSWITCHES+SWSRC_LAST_TRIM-SWSRC_FIRST_TRIM+2)
@@ -294,7 +294,8 @@ char * getSwitchString(char * dest, swsrc_t idx)
 #endif
 
   else if (idx <= SWSRC_LAST_LOGICAL_SWITCH) {
-    strAppendStringWithIndex(s, "L", idx-SWSRC_FIRST_LOGICAL_SWITCH+1);
+    *s++ = 'L';
+    strAppendUnsigned(s, idx-SWSRC_FIRST_LOGICAL_SWITCH+1, 2);
   }
   else if (idx <= SWSRC_ONE) {
     getStringAtIndex(s, STR_VSWITCHES, IDX_ON_IN_STR_VSWITCHES + idx - SWSRC_ON);
@@ -325,7 +326,7 @@ char * getSourceString(char * dest, mixsrc_t idx)
       dest[LEN_INPUT_NAME] = '\0';
     }
     else {
-      strAppendUnsigned(dest, idx, 2);
+      strAppendUnsigned(dest, idx+1, 2);
     }
   }
 #if defined(LUA_INPUTS)
@@ -389,7 +390,7 @@ char * getSourceString(char * dest, mixsrc_t idx)
     if (qr.rem) dest[pos++] = (qr.rem==2 ? '+' : '-');
     dest[pos] = '\0';
   }
-  
+
   return dest;
 }
 #endif
