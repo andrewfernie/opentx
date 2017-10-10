@@ -194,11 +194,8 @@ void init_dsm2(uint32_t module_index);
 void disable_dsm2(uint32_t module_index);
 void init_crossfire(uint32_t module_index);
 void disable_crossfire(uint32_t module_index);
-
-#if defined(MULTIMODULE)
-void init_multimodule(uint32_t module_index);
-void disable_multimodule(uint32_t module_index);
-#endif
+void init_sbusOut(uint32_t module_index);
+void disable_sbusOut(uint32_t module_index);
 
 // Trainer driver
 void init_trainer_ppm(void);
@@ -331,8 +328,10 @@ void watchdogInit(unsigned int duration);
 #define NUM_XPOTS                      NUM_POTS
 #if defined(PCBX10)
   #define NUM_SLIDERS                  2
+  #define NUM_PWMANALOGS               4
 #else
   #define NUM_SLIDERS                  4
+  #define NUM_PWMANALOGS               0
 #endif
 enum Analogs {
   STICK1,
@@ -392,6 +391,14 @@ void adcInit(void);
 void adcRead(void);
 uint16_t getAnalogValue(uint8_t index);
 uint16_t getBatteryVoltage();   // returns current battery voltage in 10mV steps
+#if NUM_PWMANALOGS > 0
+extern uint8_t analogs_pwm_disabled;
+#define ANALOGS_PWM_ENABLED()          (analogs_pwm_disabled == false)
+void pwmInit(void);
+void pwmRead(uint16_t * values);
+void pwmCheck();
+extern volatile uint32_t pwm_interrupt_count;
+#endif
 
 #if defined(__cplusplus) && !defined(SIMU)
 extern "C" {
@@ -463,7 +470,7 @@ void usbJoystickUpdate();
   #define USB_MANUFACTURER             'F', 'r', 'S', 'k', 'y', ' ', ' ', ' '  /* 8 bytes */
   #define USB_PRODUCT                  'H', 'o', 'r', 'u', 's', ' ', ' ', ' '  /* 8 Bytes */
 #elif defined(PCBX10)
-  #define USB_NAME                     "FrSky HX10"
+  #define USB_NAME                     "FrSky X10"
   #define USB_MANUFACTURER             'F', 'r', 'S', 'k', 'y', ' ', ' ', ' '  /* 8 bytes */
   #define USB_PRODUCT                  'X', '1', '0', ' ', ' ', ' ', ' ', ' '  /* 8 Bytes */
 #endif
