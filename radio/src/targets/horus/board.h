@@ -456,7 +456,7 @@ void backlightEnable(uint8_t dutyCycle);
 #if defined(PCBX12S)
 #define BACKLIGHT_LEVEL_MIN   5
 #else
-#define BACKLIGHT_LEVEL_MIN   42
+#define BACKLIGHT_LEVEL_MIN   46
 #endif
 #define BACKLIGHT_ENABLE()    backlightEnable(unexpectedShutdown ? BACKLIGHT_LEVEL_MAX : BACKLIGHT_LEVEL_MAX-g_eeGeneral.backlightBright)
 #define BACKLIGHT_DISABLE()   backlightEnable(unexpectedShutdown ? BACKLIGHT_LEVEL_MAX : g_eeGeneral.blOffBright)
@@ -501,10 +501,18 @@ void telemetryPortInit(uint32_t baudrate, uint8_t mode);
 void telemetryPortSetDirectionOutput(void);
 void sportSendBuffer(uint8_t * buffer, uint32_t count);
 uint8_t telemetryGetByte(uint8_t * byte);
+extern uint32_t telemetryErrors;
 
 // Sport update driver
+#if defined(PCBX10)
+void sportUpdatePowerOn(void);
+void sportUpdatePowerOff(void);
+#define SPORT_UPDATE_POWER_ON()        sportUpdatePowerOn()
+#define SPORT_UPDATE_POWER_OFF()       sportUpdatePowerOff()
+#else
 #define SPORT_UPDATE_POWER_ON()        EXTERNAL_MODULE_ON()
 #define SPORT_UPDATE_POWER_OFF()       EXTERNAL_MODULE_OFF()
+#endif
 
 // Haptic driver
 void hapticInit(void);
