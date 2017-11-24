@@ -36,7 +36,7 @@ bool menuStatsGraph(event_t event)
       break;
   }
 
-  MENU(STR_STATISTICS, STATS_ICONS, menuTabStats, e_StatsGraph, 0, { 0 });
+  SIMPLE_MENU(STR_STATISTICS, STATS_ICONS, menuTabStats, e_StatsGraph, 1);
 
   lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP, "Session");
   drawTimer(MENU_STATS_COLUMN1, MENU_CONTENT_TOP, sessionTimer, TIMEHOUR);
@@ -89,7 +89,7 @@ bool menuStatsGraph(event_t event)
     prev_yv = yv;
   }
 
-  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP+1, STR_MENUTORESET, MENU_TITLE_COLOR | CENTERED);
+  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP, STR_MENUTORESET, MENU_TITLE_COLOR | CENTERED);
   return true;
 }
 
@@ -106,7 +106,7 @@ bool menuStatsDebug(event_t event)
       break;
   }
 
-  MENU("Debug", STATS_ICONS, menuTabStats, e_StatsDebug, 0, { 0 });
+  SIMPLE_MENU("Debug", STATS_ICONS, menuTabStats, e_StatsDebug, 1);
 
   lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP, "Free Mem");
   lcdDrawNumber(MENU_STATS_COLUMN1, MENU_CONTENT_TOP, availableMemory(), LEFT, 0, NULL, "b");
@@ -152,13 +152,13 @@ bool menuStatsDebug(event_t event)
   lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP+line*FH, "Tlm RX Errs");
   lcdDrawNumber(MENU_STATS_COLUMN1, MENU_CONTENT_TOP+line*FH, telemetryErrors, LEFT);
 
-  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP+1, STR_MENUTORESET, MENU_TITLE_COLOR | CENTERED);
+  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP, STR_MENUTORESET, MENU_TITLE_COLOR | CENTERED);
   return true;
 }
 
 bool menuStatsAnalogs(event_t event)
 {
-  MENU("Analogs", STATS_ICONS, menuTabStats, e_StatsAnalogs, 0, { 0 });
+  SIMPLE_MENU("Analogs", STATS_ICONS, menuTabStats, e_StatsAnalogs, 1);
 
   for (uint8_t i=0; i<NUM_ANALOGS; i++) {
     coord_t y = MENU_CONTENT_TOP + (i/2)*FH;

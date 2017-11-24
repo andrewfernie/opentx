@@ -117,6 +117,7 @@ void menuStatisticsView(event_t event)
   #define MENU_DEBUG_COL2_OFS          (17*FW)
   #define MENU_DEBUG_Y_CURRENT         (1*FH)
   #define MENU_DEBUG_ROW1              (1*FH+1)
+  #define MENU_DEBUG_ROW2              (2*FH+1)
   #define MENU_DEBUG_Y_MAH             (2*FH)
   #define MENU_DEBUG_Y_CPU_TEMP        (3*FH)
   #define MENU_DEBUG_Y_COPROC          (4*FH)
@@ -223,7 +224,7 @@ void menuStatisticsDebug(event_t event)
 #endif
 
 #if defined(PCBTARANIS)
-#if !defined(SIMU) && defined(USB_SERIAL)
+#if !defined(SIMU) && defined(DEBUG)
   lcdDrawTextAlignedLeft(MENU_DEBUG_Y_USB, "Usb");
   lcdDrawNumber(MENU_DEBUG_COL1_OFS, MENU_DEBUG_Y_USB, charsWritten, LEFT);
   lcdDrawText(lcdLastRightPos, MENU_DEBUG_Y_USB, " ");
@@ -307,6 +308,9 @@ void menuStatisticsDebug2(event_t event)
 
   lcdDrawTextAlignedLeft(MENU_DEBUG_ROW1, "Tlm RX Err");
   lcdDrawNumber(MENU_DEBUG_COL1_OFS, MENU_DEBUG_ROW1, telemetryErrors, RIGHT);
+
+  lcdDrawTextAlignedLeft(MENU_DEBUG_ROW2, "BT status");
+  lcdDrawNumber(MENU_DEBUG_COL1_OFS, MENU_DEBUG_ROW2, btChipPresent, RIGHT);
 
   lcdDrawText(4*FW, 7*FH+1, STR_MENUTORESET);
   lcdInvertLastLine();

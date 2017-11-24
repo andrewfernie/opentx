@@ -101,7 +101,12 @@ extern "C" {
 extern uint16_t sessionTimer;
 
 #define SLAVE_MODE()                   (g_model.trainerMode == TRAINER_MODE_SLAVE)
-#define TRAINER_CONNECTED()            (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == Bit_RESET)
+
+#if defined(PCBX10)
+  #define TRAINER_CONNECTED()            (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == Bit_SET)
+#else
+  #define TRAINER_CONNECTED()            (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == Bit_RESET)
+#endif
 
 // Board driver
 void boardInit(void);
@@ -416,7 +421,7 @@ uint32_t pwrPressedDuration(void);
 #if defined(SIMU) || defined(NO_UNEXPECTED_SHUTDOWN)
   #define UNEXPECTED_SHUTDOWN()                 (false)
 #else
-  #define UNEXPECTED_SHUTDOWN()                 (powerupReason == DIRTY_SHUTDOWN)
+  #define UNEXPECTED_SHUTDOWN()                 ((powerupReason == DIRTY_SHUTDOWN) || WAS_RESET_BY_WATCHDOG_OR_SOFTWARE())
 #endif
 
 // Led driver

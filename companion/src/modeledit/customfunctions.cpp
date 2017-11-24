@@ -411,23 +411,28 @@ void CustomFunctionsPanel::refreshCustomFunction(int i, bool modified)
         widgetsMask |= CUSTOM_FUNCTION_NUMERIC_PARAM;
       }
       else if (func>=FuncAdjustGV1 && func<=FuncAdjustGVLast) {
+        int gvidx = func - FuncAdjustGV1;
         if (modified)
           cfn.adjustMode = fswtchGVmode[i]->currentIndex();
         widgetsMask |= CUSTOM_FUNCTION_GV_MODE | CUSTOM_FUNCTION_ENABLE;
         if (cfn.adjustMode==FUNC_ADJUST_GVAR_CONSTANT || cfn.adjustMode==FUNC_ADJUST_GVAR_INCDEC) {
           if (modified)
-            cfn.param = fswtchParam[i]->value();
-          fswtchParam[i]->setDecimals(0);
-          fswtchParam[i]->setSingleStep(1);
+            cfn.param = fswtchParam[i]->value() * model->gvarData[gvidx].multiplierSet();
           if (IS_ARM(getCurrentBoard())) {
-            fswtchParam[i]->setMinimum(-500);
-            fswtchParam[i]->setMaximum(500);
+            fswtchParam[i]->setDecimals(model->gvarData[gvidx].prec);
+            fswtchParam[i]->setSingleStep(model->gvarData[gvidx].multiplierGet());
+            fswtchParam[i]->setSuffix(model->gvarData[gvidx].unitToString());
+            fswtchParam[i]->setMinimum(model->gvarData[gvidx].getMinPrec());
+            fswtchParam[i]->setMaximum(model->gvarData[gvidx].getMaxPrec());
+            fswtchParam[i]->setValue(cfn.param * model->gvarData[gvidx].multiplierGet());
           }
           else {
+            fswtchParam[i]->setDecimals(0);
+            fswtchParam[i]->setSingleStep(1);
             fswtchParam[i]->setMinimum(-125);
             fswtchParam[i]->setMaximum(125);
+            fswtchParam[i]->setValue(cfn.param);
           }
-          fswtchParam[i]->setValue(cfn.param);
           widgetsMask |= CUSTOM_FUNCTION_NUMERIC_PARAM;
         }
         else {
@@ -652,10 +657,10 @@ void CustomFunctionsPanel::fsw_customContextMenuRequested(QPoint pos)
     bool hasData = mimeData->hasFormat("application/x-companion-fsw");
 
     QMenu contextMenu;
-    contextMenu.addAction(CompanionIcon("copy.png"), tr("&Copy"),this,SLOT(fswCopy()),tr("Ctrl+C"));
-    contextMenu.addAction(CompanionIcon("cut.png"), tr("&Cut"),this,SLOT(fswCut()),tr("Ctrl+X"));
-    contextMenu.addAction(CompanionIcon("paste.png"), tr("&Paste"),this,SLOT(fswPaste()),tr("Ctrl+V"))->setEnabled(hasData);
-    contextMenu.addAction(CompanionIcon("clear.png"), tr("&Delete"),this,SLOT(fswDelete()),tr("Delete"));
+    contextMenu.addAction(CompanionIcon("copy.png"), tr("&Copy"),this,SLOT(fswCopy()));
+    contextMenu.addAction(CompanionIcon("cut.png"), tr("&Cut"),this,SLOT(fswCut()));
+    contextMenu.addAction(CompanionIcon("paste.png"), tr("&Paste"),this,SLOT(fswPaste()))->setEnabled(hasData);
+    contextMenu.addAction(CompanionIcon("clear.png"), tr("&Delete"),this,SLOT(fswDelete()));
 
     contextMenu.exec(globalPos);
 }
