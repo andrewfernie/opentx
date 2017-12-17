@@ -39,7 +39,7 @@ void editGVarValue(coord_t x, coord_t y, event_t event, uint8_t gvar, uint8_t fl
   }
 
   if (flags & INVERS) {
-    if (event == EVT_KEY_LONG(KEY_ENTER)) {
+    if (event == EVT_KEY_LONG(KEY_ENTER) && flightMode > 0) {
       v = (v > GVAR_MAX ? 0 : GVAR_MAX+1);
       storageDirty(EE_MODEL);
     }
@@ -114,7 +114,7 @@ void menuModelGVarOne(event_t event)
   }
 }
 
-void onGVARSMenu(const char *result)
+void onGVARSMenu(const char * result)
 {
   int sub = menuVerticalPosition;
 
@@ -165,16 +165,18 @@ void menuModelGVars(event_t event)
 
       LcdFlags attr = ((sub == i && menuHorizontalPosition == j) ? (s_editMode > 0 ? BLINK | INVERS : INVERS) : 0);
       coord_t x = GVARS_FM_COLUMN(j);
+      coord_t yval = y;
       if (v > GVAR_MAX) {
         attr |= SMLSIZE;
       }
       else if (g_model.gvars[i].prec > 0 || abs(v) >= 100) {
         attr |= TINSIZE | NO_UNIT;
+        ++yval;
       }
       else {
         attr |= SMLSIZE | NO_UNIT;
       }
-      editGVarValue(x, y, event, i, j, attr);
+      editGVarValue(x, yval, event, i, j, attr);
     }
   }
 

@@ -98,7 +98,9 @@ enum ScriptReference {
   SCRIPT_MIX_FIRST,
   SCRIPT_MIX_LAST=SCRIPT_MIX_FIRST+MAX_SCRIPTS-1,
   SCRIPT_FUNC_FIRST,
-  SCRIPT_FUNC_LAST=SCRIPT_FUNC_FIRST+MAX_SPECIAL_FUNCTIONS-1,
+  SCRIPT_FUNC_LAST=SCRIPT_FUNC_FIRST+MAX_SPECIAL_FUNCTIONS-1,    // model functions
+  SCRIPT_GFUNC_FIRST,
+  SCRIPT_GFUNC_LAST=SCRIPT_GFUNC_FIRST+MAX_SPECIAL_FUNCTIONS-1,  // global functions
   SCRIPT_TELEMETRY_FIRST,
   SCRIPT_TELEMETRY_LAST=SCRIPT_TELEMETRY_FIRST+MAX_SCRIPTS, // telem0 and telem1 .. telem7
 };
@@ -151,6 +153,7 @@ extern struct our_longjmp * global_lj;
 
 extern uint16_t maxLuaInterval;
 extern uint16_t maxLuaDuration;
+extern uint8_t instructionsPercent;
 
 #if defined(PCBTARANIS)
   #define IS_MASKABLE(key) ((key) != KEY_EXIT && (key) != KEY_ENTER && ((luaState & INTERPRETER_RUNNING_STANDALONE_SCRIPT) || (key) != KEY_PAGE))
@@ -167,10 +170,24 @@ void luaRegisterLibraries(lua_State * L);
 void registerBitmapClass(lua_State * L);
 void luaSetInstructionsLimit(lua_State* L, int count);
 int luaLoadScriptFileToState(lua_State * L, const char * filename, const char * mode);
+
+struct LuaMemTracer {
+  const char * script;
+  int lineno;
+  uint32_t alloc;
+  uint32_t free;
+};
+
+void * tracer_alloc(void * ud, void * ptr, size_t osize, size_t nsize);
+void luaHook(lua_State * L, lua_Debug *ar);
+
+
 #else  // defined(LUA)
+
 #define luaInit()
 #define LUA_INIT_THEMES_AND_WIDGETS()
 #define LUA_LOAD_MODEL_SCRIPTS()
+
 #endif // defined(LUA)
 
 #endif // _LUA_API_H_

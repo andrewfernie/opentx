@@ -54,12 +54,15 @@ class ModelPrinter: public QObject
     ModelPrinter(Firmware * firmware, const GeneralSettings & generalSettings, const ModelData & model);
     virtual ~ModelPrinter();
 
+    QString printBoolean(bool val);
     QString printEEpromSize();
     QString printTrimIncrementMode();
     QString printThrottleTrimMode();
     static QString printModuleProtocol(unsigned int protocol);
     static QString printMultiRfProtocol(int rfProtocol, bool custom);
-    static QString printMultiSubType(int rfProtocol, bool custom, unsigned int subType);
+    static QString printR9MPowerValue(unsigned subType, unsigned val, bool telem);
+    static QString printMultiSubType(unsigned rfProtocol, bool custom, unsigned int subType);
+    static QString printModuleSubType(unsigned protocol, unsigned subType, unsigned rfProtocol = 0, bool custom = false);
     QString printFlightModeSwitch(const RawSwitch & swtch);
     QString printFlightModeName(int index);
     QString printFlightModes(unsigned int flightModes);
@@ -82,6 +85,19 @@ class ModelPrinter: public QObject
     QString printCurveName(int idx);
     QString printCurve(int idx);
     QString createCurveImage(int idx, QTextDocument * document);
+    QString printGlobalVarUnit(int idx);
+    QString printGlobalVarPrec(int idx);
+    QString printGlobalVarMin(int idx);
+    QString printGlobalVarMax(int idx);
+    QString printGlobalVarPopup(int idx);
+    QString printOutputValueGVar(int val);
+    QString printOutputOffset(int idx);
+    QString printOutputMin(int idx);
+    QString printOutputMax(int idx);
+    QString printOutputRevert(int idx);
+    QString printOutputCurve(int idx);
+    QString printOutputPpmCenter(int idx);
+    QString printOutputSymetrical(int idx);
 
   private:
     Firmware * firmware;

@@ -666,7 +666,7 @@ Volkov Victor
 Bryan Anderson
 Daniel Garber
 Pavel Stein
-Ravi Gupta
+RCdiy
 Patrick Tuxbury
 Mark Deverell
 John Capell
@@ -844,7 +844,6 @@ Luke Mole
 NorthSide
 Hannes Mössler
 James Kaufman
-Ravi Gupta
 Lexington S Morley
 Ralph Segar
 Frédéric Devillard
@@ -979,7 +978,6 @@ Ulf Reinhardt
 Wolfgang Renisch
 Trevor Hinze
 Mohammad Zargari
-Dr. Willutzki
 Jean Pierre Bernard
 Patrick Castellan
 Udo Tödter
@@ -1271,3 +1269,46 @@ CG Tech Inc
 Alexander Röhlich
 Peter Goodrich
 Randy Melton
+Paul Pridday
+Jörgen Norman
+Peter Glassey
+Carlos Vicente
+Nael Bishtawi
+Paul Dr. Willutzki
+Heart of NM LLC
+Ulf Hedlund
+Meinolph Kaufmann
+Bill Keenan
+Ralf Kosel
+Lukas Hucik
+Uwe Jordt
+Tuan Le
+Burt Pickard-Richardson
+Robert Rubio
+Merv Dale
+Michel Garbarino
+Geoff Graham
+Georges Pezet
+Robert Wilhelm
+Francis Herzog
+Bo Hjeresen
+Danny Koch
+John Eppling
+Thierry Malosse
+Johann Antretter
+Jan Kaiser
+Rachel Berkhahn
+Luca Massimiliano Comolli
+Mario Wesierski
+Evening Shade Pottery
+Jean Desmet
+Alexis Pons
+Roger Bergevin
+Eddie Ehlin
+Bernard Avisse
+Brent Warman
+Tim Johnson
+Reinhard Herden
+Mark Hanson
+Sander Helling
+Anthony Hrabusicky

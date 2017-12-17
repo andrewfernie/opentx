@@ -113,7 +113,6 @@ ZoneOption * createOptionsArray(int reference, uint8_t maxOptions)
             }
             else if (option->type == ZoneOption::Source ||
                      option->type == ZoneOption::TextSize ||
-                     option->type == ZoneOption::Source ||
                      option->type == ZoneOption::Color) {
               luaL_checktype(lsWidgets, -1, LUA_TNUMBER); // value is number
               option->deflt.unsignedValue = lua_tounsigned(lsWidgets, -1);
@@ -234,14 +233,17 @@ void luaLoadThemeCallback()
   }
 
   if (name) {
-    ZoneOption * options = createOptionsArray(themeOptions, MAX_THEME_OPTIONS);
-    if (options) {
-      LuaTheme * theme = new LuaTheme(name, options);
-      theme->loadFunction = loadFunction;
-      theme->drawBackgroundFunction = drawBackgroundFunction;
-      theme->drawTopbarBackgroundFunction = drawTopbarBackgroundFunction;
-      TRACE("Loaded Lua theme %s", name);
+    ZoneOption * options = NULL;
+    if (themeOptions) {
+      options = createOptionsArray(themeOptions, MAX_THEME_OPTIONS);
+      if (!options)
+        return;
     }
+    LuaTheme * theme = new LuaTheme(name, options);
+    theme->loadFunction = loadFunction;
+    theme->drawBackgroundFunction = drawBackgroundFunction;
+    theme->drawTopbarBackgroundFunction = drawTopbarBackgroundFunction;   // NOSONAR
+    TRACE("Loaded Lua theme %s", name);
   }
 }
 
@@ -446,7 +448,7 @@ void luaLoadWidgetCallback()
       LuaWidgetFactory * factory = new LuaWidgetFactory(name, options, createFunction);
       factory->updateFunction = updateFunction;
       factory->refreshFunction = refreshFunction;
-      factory->backgroundFunction = backgroundFunction;
+      factory->backgroundFunction = backgroundFunction;   // NOSONAR
       TRACE("Loaded Lua widget %s", name);
     }
   }
@@ -514,18 +516,30 @@ void luaLoadFiles(const char * directory, void (*callback)())
   f_closedir(&dir);
 }
 
+#if defined(LUA_ALLOCATOR_TRACER)
+LuaMemTracer lsWidgetsTrace;
+#endif
+
 void luaInitThemesAndWidgets()
 {
   TRACE("luaInitThemesAndWidgets");
 
 #if defined(USE_BIN_ALLOCATOR)
   lsWidgets = lua_newstate(bin_l_alloc, NULL);   //we use our own allocator!
+#elif defined(LUA_ALLOCATOR_TRACER)
+  memset(&lsWidgetsTrace, 0 , sizeof(lsWidgetsTrace));
+  lsWidgetsTrace.script = "lua_newstate(widgets)";
+  lsWidgets = lua_newstate(tracer_alloc, &lsWidgetsTrace);   //we use tracer allocator
 #else
   lsWidgets = lua_newstate(l_alloc, NULL);   //we use Lua default allocator
 #endif
   if (lsWidgets) {
     // install our panic handler
     lua_atpanic(lsWidgets, &custom_lua_atpanic);
+
+#if defined(LUA_ALLOCATOR_TRACER)
+    lua_sethook(lsWidgets, luaHook, LUA_MASKLINE, 0);
+#endif
 
     // protect libs and constants registration
     PROTECT_LUA() {

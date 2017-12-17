@@ -45,6 +45,14 @@ ModelPrinter::~ModelPrinter()
 {
 }
 
+QString ModelPrinter::printBoolean(bool val)
+{
+  if (val)
+    return tr("Y");
+  else
+    return tr("N");
+}
+
 void debugHtml(const QString & html)
 {
   QFile file("foo.html");
@@ -132,7 +140,7 @@ QString ModelPrinter::printMultiRfProtocol(int rfProtocol, bool custom)
   static const char *strings[] = {
     "FlySky", "Hubsan", "FrSky", "Hisky", "V2x2", "DSM", "Devo", "YD717", "KN", "SymaX", "SLT", "CX10", "CG023",
     "Bayang", "ESky", "MT99XX", "MJXQ", "Shenqi", "FY326", "SFHSS", "J6 PRO","FQ777","Assan","Hontai","OLRS",
-    "FlySky AFHDS2A", "Q2x2", "Walkera", "Q303", "GW008", "DM002"
+    "FlySky AFHDS2A", "Q2x2", "Walkera", "Q303", "GW008", "DM002", "CABELL", "Esky 150", "H8 3D"
   };
   if (custom)
     return "Custom - proto " + QString::number(rfProtocol);
@@ -140,7 +148,7 @@ QString ModelPrinter::printMultiRfProtocol(int rfProtocol, bool custom)
     return CHECK_IN_ARRAY(strings, rfProtocol);
 }
 
-QString ModelPrinter::printMultiSubType(int rfProtocol, bool custom, unsigned int subType) {
+QString ModelPrinter::printMultiSubType(unsigned rfProtocol, bool custom, unsigned int subType) {
   /* custom protocols */
 
   if (custom)
@@ -152,6 +160,39 @@ QString ModelPrinter::printMultiSubType(int rfProtocol, bool custom, unsigned in
     return qApp->translate("Multiprotocols", qPrintable(pdef.subTypeStrings[subType]));
   else
     return "???";
+}
+
+QString ModelPrinter::printR9MPowerValue(unsigned subType, unsigned val, bool telem)
+{
+  static const QStringList strFTC = QStringList() << tr("10mW") << tr("100mW") << tr("500mW") << tr("1W");
+  static const QStringList strLBT = QStringList() << tr("25mW") << tr("500mW");
+
+
+  if (subType == 0 && (int)val < strFTC.size())
+    return strFTC.at(val);
+  else if (subType == 1)
+    return (telem ? strLBT.at(0) : strLBT.at(1));
+  else
+    return "???";
+}
+
+QString ModelPrinter::printModuleSubType(unsigned protocol, unsigned subType, unsigned rfProtocol, bool custom)
+{
+  static const char * strings[] = {
+    "FCC",
+    "LBT(EU)"
+  };
+
+  switch (protocol) {
+    case PULSES_MULTIMODULE:
+      return printMultiSubType(rfProtocol, custom, subType);
+
+    case PULSES_PXX_R9M:
+      return CHECK_IN_ARRAY(strings, subType);
+
+    default:
+      return "???";
+  }
 }
 
 QString ModelPrinter::printModule(int idx) {
@@ -167,6 +208,8 @@ QString ModelPrinter::printModule(int idx) {
     }
     if (module.protocol == PULSES_MULTIMODULE)
       result += " " + tr("radio Protocol %1, subType %2, option value %3").arg(printMultiRfProtocol(module.multi.rfProtocol, module.multi.customProto)).arg(printMultiSubType(module.multi.rfProtocol, module.multi.customProto, module.subType)).arg(module.multi.optionValue);
+    else if (module.protocol == PULSES_PXX_R9M)
+      result += " " + tr("Module Type: %1, Power: %2, Telemetry Enabled: %3").arg(printModuleSubType(module.protocol, module.subType)).arg(printR9MPowerValue(module.subType, module.pxx.power, module.pxx.sport_out)).arg(printBoolean(module.pxx.sport_out));
     return result;
   }
 }
@@ -305,7 +348,8 @@ QString ModelPrinter::printGlobalVar(int flightModeIndex, int gvarIndex)
   const FlightModeData & fm = model.flightModeData[flightModeIndex];
 
   if (fm.gvars[gvarIndex] <= 1024) {
-    return QString("%1").arg(fm.gvars[gvarIndex]);
+    //double val = fm.gvars[gvarIndex] * model.gvarData[gvarIndex].multiplierGet();
+    return QString("%1").arg(fm.gvars[gvarIndex] * model.gvarData[gvarIndex].multiplierGet());
   }
   else {
     int num = fm.gvars[gvarIndex] - 1025;
@@ -685,3 +729,80 @@ QString ModelPrinter::createCurveImage(int idx, QTextDocument * document)
   // qDebug() << "ModelPrinter::createCurveImage()" << idx << filename;
   return filename;
 }
+
+QString ModelPrinter::printGlobalVarUnit(int idx)
+{
+  return model.gvarData[idx].unitToString().toHtmlEscaped();
+}
+
+QString ModelPrinter::printGlobalVarPrec(int idx)
+{
+  return model.gvarData[idx].precToString().toHtmlEscaped();
+}
+
+QString ModelPrinter::printGlobalVarMin(int idx)
+{
+  return QString::number(model.gvarData[idx].getMinPrec());
+}
+
+QString ModelPrinter::printGlobalVarMax(int idx)
+{
+  return QString::number(model.gvarData[idx].getMaxPrec());
+}
+
+QString ModelPrinter::printGlobalVarPopup(int idx)
+{
+  return printBoolean(model.gvarData[idx].popup);
+}
+
+QString ModelPrinter::printOutputValueGVar(int val)
+{
+  QString result = "";
+  if (abs(val) > 10000) {
+    if (val < 0)
+      result = "-";
+    result.append(RawSource(SOURCE_TYPE_GVAR, abs(val)-10001).toString(&model));
+  }
+  else {
+    if (val >= 0)
+      result = "+";
+    result.append(QString::number((qreal)val/10, 'f', 1) + "%");
+  }
+  return result;
+}
+
+QString ModelPrinter::printOutputOffset(int idx)
+{
+  return printOutputValueGVar(model.limitData[idx].offset);
+}
+
+QString ModelPrinter::printOutputMin(int idx)
+{
+  return printOutputValueGVar(model.limitData[idx].min);
+}
+
+QString ModelPrinter::printOutputMax(int idx)
+{
+  return printOutputValueGVar(model.limitData[idx].max);
+}
+
+QString ModelPrinter::printOutputRevert(int idx)
+{
+  return model.limitData[idx].revertToString();
+}
+
+QString ModelPrinter::printOutputPpmCenter(int idx)
+{
+  return QString::number(model.limitData[idx].ppmCenter + 1500);
+}
+
+QString ModelPrinter::printOutputCurve(int idx)
+{
+  return CurveReference(CurveReference::CURVE_REF_CUSTOM, model.limitData[idx].curve.value).toString(&model, false);
+}
+
+QString ModelPrinter::printOutputSymetrical(int idx)
+{
+  return printBoolean(model.limitData[idx].symetrical);
+}
+

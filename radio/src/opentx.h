@@ -200,6 +200,12 @@
   #define CASE_PCBX9E(x)
 #endif
 
+#if defined(PCBX10)
+  #define CASE_PCBX10(x) x,
+#else
+  #define CASE_PCBX10(x)
+#endif
+
 #if defined(BLUETOOTH) && !(defined(PCBX9E) && !defined(USEHORUSBT))
   #define CASE_BLUETOOTH(x) x,
 #else
@@ -448,7 +454,9 @@ void memswap(void * a, void * b, uint8_t size);
   #define MAX_CHANNELS(idx)                 (idx==EXTERNAL_MODULE ? MAX_EXTERNAL_MODULE_CHANNELS() : MAX_TRAINER_CHANNELS_M8())
   #define NUM_CHANNELS(idx)                 (8+g_model.moduleData[idx].channelsCount)
 #endif
-#define IS_MODULE_R9M(idx)                (g_model.moduleData[idx].type==MODULE_TYPE_R9M)
+#define IS_MODULE_R9M(idx)                (g_model.moduleData[idx].type == MODULE_TYPE_R9M)
+#define IS_MODULE_R9M_FCC(idx)            (IS_MODULE_R9M(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_FCC)
+#define IS_MODULE_R9M_LBT(idx)            (IS_MODULE_R9M(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_LBT)
 #define IS_MODULE_PXX(idx)                (IS_MODULE_XJT(idx) || IS_MODULE_R9M(idx))
 
 #if defined(DSM2)
@@ -1674,7 +1682,7 @@ FORCEINLINE void convertUnit(getvalue_t & val, uint8_t & unit)
   extern const pm_uchar logo_taranis[];
 #endif
 
-#if defined(USB_MASS_STORAGE)
+#if defined(STM32)
 void usbPluggedIn();
 #endif
 

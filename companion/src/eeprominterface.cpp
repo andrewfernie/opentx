@@ -598,7 +598,7 @@ QString RawSource::toString(const ModelData * model, const GeneralSettings * con
     {
       const char * name = NULL;
       if (getCurrentFirmware()->getCapability(GvarsName) && model)
-        name = model->gvars_names[index];
+        name = model->gvarData[index].name;
       return getElementName(QCoreApplication::translate("Global Variable", "GV"), index + 1, name);
     }
 
@@ -1178,7 +1178,6 @@ GeneralSettings::GeneralSettings()
   memset(this, 0, sizeof(GeneralSettings));
 
   contrast  = 25;
-  vBatWarn  = 90;
 
   for (int i=0; i < CPN_MAX_ANALOGS; ++i) {
     calibMid[i]     = 0x200;
@@ -1189,7 +1188,29 @@ GeneralSettings::GeneralSettings()
   Firmware * firmware = Firmware::getCurrentVariant();
   Board::Type board = firmware->getBoard();
 
-  for (int i=0; i<getBoardCapability(board, Board::FactoryInstalledSwitches); i++) {
+  // vBatWarn is voltage in 100mV, vBatMin is in 100mV but with -9V offset, vBatMax has a -12V offset
+  vBatWarn  = 90;
+  if (IS_TARANIS_X9E(board) || IS_HORUS_X12S(board)) {
+    // NI-MH 9.6V
+    vBatWarn = 87;
+    vBatMin = -5;   //8,5V
+    vBatMax = -5;   //11,5V
+  }
+  else if (IS_HORUS_X10(board)) {
+    // Lipo 2V
+    vBatWarn = 66;
+    vBatMin = -28; // 6.2V
+    vBatMax = -38;   // 8.2V
+  }
+  else if (IS_TARANIS(board)) {
+    // NI-MH 7.2V, X9D, X9D+ and X7
+    vBatWarn = 65;
+    vBatMin = -30; //6V
+    vBatMax = -40; //8V
+  }
+
+
+    for (int i=0; i<getBoardCapability(board, Board::FactoryInstalledSwitches); i++) {
     switchConfig[i] = Boards::getSwitchInfo(board, i).config;
   }
 
@@ -1219,13 +1240,13 @@ GeneralSettings::GeneralSettings()
     potConfig[2] = Board::POT_WITHOUT_DETENT;
   }
 
-  if (IS_HORUS(board) || IS_TARANIS_X9E(board)) {
+  if (IS_HORUS_X12S(board) || IS_TARANIS_X9E(board)) {
     sliderConfig[0] = Board::SLIDER_WITH_DETENT;
     sliderConfig[1] = Board::SLIDER_WITH_DETENT;
     sliderConfig[2] = Board::SLIDER_WITH_DETENT;
     sliderConfig[3] = Board::SLIDER_WITH_DETENT;
   }
-  else if (IS_TARANIS(board) && !IS_TARANIS_X7(board)) {
+  else if (IS_TARANIS_X9(board) || IS_HORUS_X10(board)) {
     sliderConfig[0] = Board::SLIDER_WITH_DETENT;
     sliderConfig[1] = Board::SLIDER_WITH_DETENT;
   }
@@ -1564,6 +1585,9 @@ void ModelData::clear()
   for (int i=0; i<CPN_MAX_FLIGHT_MODES; i++) {
     flightModeData[i].clear(i);
   }
+  for (int i=0; i<CPN_MAX_GVARS; i++) {
+    gvarData[i].clear();
+  }
   clearInputs();
   clearMixes();
   for (int i=0; i<CPN_MAX_CHNOUT; i++)
@@ -1697,8 +1721,8 @@ bool ModelData::isGVarLinked(int phaseIdx, int gvarIdx)
 int ModelData::getGVarFieldValue(int phaseIdx, int gvarIdx)
 {
   int idx = flightModeData[phaseIdx].gvars[gvarIdx];
-  for (int i=0; idx>1024 && i<CPN_MAX_FLIGHT_MODES; i++) {
-    int nextPhase = idx - 1025;
+  for (int i=0; idx>GVAR_MAX_VALUE && i<CPN_MAX_FLIGHT_MODES; i++) {
+    int nextPhase = idx - GVAR_MAX_VALUE - 1;
     if (nextPhase >= phaseIdx) nextPhase += 1;
     phaseIdx = nextPhase;
     idx = flightModeData[phaseIdx].gvars[gvarIdx];
@@ -1783,6 +1807,11 @@ bool ModelData::isAvailable(const RawSwitch & swtch) const
   else {
     return true;
   }
+}
+
+float ModelData::getGVarFieldValuePrec(int phaseIdx, int gvarIdx)
+{
+  return getGVarFieldValue(phaseIdx, gvarIdx) * gvarData[gvarIdx].multiplierGet();
 }
 
 QList<EEPROMInterface *> eepromInterfaces;
@@ -1918,4 +1947,68 @@ void FlightModeData::clear(const int phase)
       rotaryEncoders[idx] = 1025;
     }
   }
+}
+
+QString GVarData::unitToString() const
+{
+  switch (unit) {
+    case GVAR_UNIT_NUMBER:
+      return QObject::tr("");
+    case GVAR_UNIT_PERCENT:
+      return QObject::tr("%");
+    default:
+      return QObject::tr("?");  //  highlight unknown value
+  }
+}
+
+QString GVarData::precToString() const
+{
+  switch (prec) {
+    case GVAR_PREC_MUL10:
+      return QObject::tr("0._");
+    case GVAR_PREC_MUL1:
+      return QObject::tr("0.0");
+    default:
+      return QObject::tr("?.?");  //  highlight unknown value
+  }
+}
+
+int GVarData::multiplierSet()
+{
+  return (prec == 0 ? 1 : 10);
+}
+
+float GVarData::multiplierGet() const
+{
+  return (prec == 0 ? 1 : 0.1);
+}
+
+void GVarData::setMin(float val)
+{
+  min = (val * multiplierSet()) - GVAR_MIN_VALUE;
+}
+
+void GVarData::setMax(float val)
+{
+  max = GVAR_MAX_VALUE - (val * multiplierSet());
+}
+
+int GVarData::getMin() const
+{
+  return GVAR_MIN_VALUE + min;
+}
+
+int GVarData::getMax() const
+{
+  return GVAR_MAX_VALUE - max;
+}
+
+float GVarData::getMinPrec() const
+{
+  return getMin() * multiplierGet();
+}
+
+float GVarData::getMaxPrec() const
+{
+  return getMax() * multiplierGet();
 }

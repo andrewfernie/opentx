@@ -30,8 +30,11 @@
 
 using namespace Board;
 
-#define OPENTX_FIRMWARE_DOWNLOADS        "https://downloads-22.open-tx.org/firmware"
-#define OPENTX_NIGHT_FIRMWARE_DOWNLOADS  "https://downloads-22.open-tx.org/nightlies/firmware"
+const char * const OPENTX_FIRMWARE_DOWNLOAD_URL[] = {
+  "https://downloads.open-tx.org/2.2/release/firmware",
+  "https://downloads.open-tx.org/2.2/rc/firmware",
+  "https://downloads.open-tx.org/2.2/nightlies/firmware"
+};
 
 #define FILE_TYP_GENERAL 1
 #define FILE_TYP_MODEL   2
@@ -334,7 +337,7 @@ int OpenTxEepromInterface::save(uint8_t * eeprom, const RadioData & radioData, u
   }
 
   for (int i = 0; i < getCurrentFirmware()->getCapability(Models); i++) {
-    if (!radioData.models[i].isEmpty()) {
+    if (i < (int)radioData.models.size() && !radioData.models[i].isEmpty()) {
       OpenTxModelData generator((ModelData &)radioData.models[i], board, version, variant);
       // generator.Dump();
       QByteArray data;
@@ -540,6 +543,16 @@ int OpenTxFirmware::getCapability(::Capability capability)
         return 0;
     case MaxVolume:
       return (IS_ARM(board) ? 23 : 7);
+    case MaxContrast:
+      if (IS_TARANIS_X7(board))
+        return 30;
+      else
+        return 45;
+    case MinContrast:
+      if (IS_TARANIS_X9(board))
+        return 0;
+      else
+        return 10;
     case HasSoundMixer:
       return (IS_ARM(board) ? 1 : 0);
     case ExtraInputs:
@@ -746,7 +759,7 @@ QString OpenTxFirmware::getAnalogInputName(unsigned int index)
     };
     return CHECK_IN_ARRAY(pots, index);
   }
-  else if (IS_HORUS(board)) {
+  else if (IS_HORUS_X12S(board)) {
     const QString pots[] = {
       QObject::tr("S1"),
       QObject::tr("6P"),
@@ -757,6 +770,16 @@ QString OpenTxFirmware::getAnalogInputName(unsigned int index)
       QObject::tr("RS"),
       QObject::tr("JSx"),
       QObject::tr("JSy")
+    };
+    return CHECK_IN_ARRAY(pots, index);
+  }
+  else if (IS_HORUS_X10(board)) {
+    const QString pots[] = {
+      QObject::tr("S1"),
+      QObject::tr("6P"),
+      QObject::tr("S2"),
+      QObject::tr("LS"),
+      QObject::tr("RS")
     };
     return CHECK_IN_ARRAY(pots, index);
   }
@@ -1077,11 +1100,7 @@ unsigned long OpenTxEepromInterface::loadBackup(RadioData &radioData, const uint
 
 QString OpenTxFirmware::getFirmwareBaseUrl()
 {
-#if defined(ALLOW_NIGHTLY_BUILDS)
-  return (g.useFirmwareNightlyBuilds() ? OPENTX_NIGHT_FIRMWARE_DOWNLOADS : OPENTX_FIRMWARE_DOWNLOADS);
-#else
-  return OPENTX_FIRMWARE_DOWNLOADS;
-#endif
+  return OPENTX_FIRMWARE_DOWNLOAD_URL[g.boundedOpenTxBranch()];
 }
 
 QString OpenTxFirmware::getFirmwareUrl()
@@ -1132,9 +1151,8 @@ void addOpenTxFrskyOptions(OpenTxFirmware * firmware)
   addOpenTxArmOptions(firmware);
   firmware->addOption("noheli", QObject::tr("Disable HELI menu and cyclic mix support"));
   firmware->addOption("nogvars", QObject::tr("Disable Global variables"));
-  firmware->addOption("lua", QObject::tr("Support for Lua model scripts"));
+  firmware->addOption("lua", QObject::tr("Enable Lua custom scripts screen"));
   firmware->addOption("luac", QObject::tr("Enable Lua compiler"));
-  firmware->addOption("bindopt", QObject::tr("Enable bindings options"));
 }
 
 void addOpenTxTaranisOptions(OpenTxFirmware * firmware)
@@ -1221,23 +1239,22 @@ void registerOpenTxFirmwares()
   registerOpenTxFirmware(firmware);
 
   /* FrSky X7 board */
-  firmware = new OpenTxFirmware("opentx-x7", QObject::tr("FrSky Taranis X7"), BOARD_TARANIS_X7);
+  firmware = new OpenTxFirmware("opentx-x7", QObject::tr("FrSky Taranis X7 / X7S"), BOARD_TARANIS_X7);
   // No mixersmon for now
   addOpenTxFrskyOptions(firmware);
   firmware->addOption("internalppm", QObject::tr("Support for PPM internal module hack"));
   firmware->addOption("sqt5font", QObject::tr("Use alternative SQT5 font"));
   registerOpenTxFirmware(firmware);
 
-  /* FrSky Horus board */
-  firmware = new OpenTxFirmware("opentx-x12s", QObject::tr("FrSky Horus"), BOARD_X12S);
+  /* FrSky X10 board */
+  firmware = new OpenTxFirmware("opentx-x10", QObject::tr("FrSky Horus X10 / X10S"), BOARD_X10);
   addOpenTxFrskyOptions(firmware);
-  firmware->addOption("pcbdev", QObject::tr("Use ONLY with first DEV pcb version"));
   registerOpenTxFirmware(firmware);
 
-
-  /* FrSky X10 board */
-  firmware = new OpenTxFirmware("opentx-x10", QObject::tr("FrSky X10"), BOARD_X10);
+  /* FrSky Horus board */
+  firmware = new OpenTxFirmware("opentx-x12s", QObject::tr("FrSky Horus X12S"), BOARD_X12S);
   addOpenTxFrskyOptions(firmware);
+  firmware->addOption("pcbdev", QObject::tr("Use ONLY with first DEV pcb version"));
   registerOpenTxFirmware(firmware);
 
   /* 9XR-Pro */

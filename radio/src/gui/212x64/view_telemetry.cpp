@@ -144,7 +144,7 @@ bool displayNumbersTelemetryScreen(FrSkyScreenData & screen)
           }
         }
 
-        if(isSensorUnit(1+(field-MIXSRC_FIRST_TELEM)/3, UNIT_DATETIME)) {
+        if(isSensorUnit(1+(field-MIXSRC_FIRST_TELEM)/3, UNIT_DATETIME) && field >= MIXSRC_FIRST_TELEM) {
           drawTelemScreenDate(x, y, field, att);
         }
         else {

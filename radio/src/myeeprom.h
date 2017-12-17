@@ -107,6 +107,8 @@
 #define CFN_RESET(p)                   ((p)->active=0, (p)->clear.val1=0, (p)->clear.val2=0)
 #define CFN_GVAR_CST_MIN               -GVAR_MAX
 #define CFN_GVAR_CST_MAX               GVAR_MAX
+#define MODEL_GVAR_MIN(idx)            (CFN_GVAR_CST_MIN + g_model.gvars[idx].min)
+#define MODEL_GVAR_MAX(idx)            (CFN_GVAR_CST_MAX - g_model.gvars[idx].max)
 #elif defined(CPUM2560)
 #define CFN_SWITCH(p)       ((p)->swtch)
 #define CFN_FUNC(p)         ((p)->func)
@@ -501,6 +503,12 @@ enum XJTRFProtocols {
   RF_PROTO_LAST = RF_PROTO_LR12
 };
 
+enum R9MSubTypes
+{
+  MODULE_SUBTYPE_R9M_FCC,
+  MODULE_SUBTYPE_R9M_LBT,
+};
+
 enum MultiModuleRFProtocols {
   MM_RF_PROTO_CUSTOM = -1,
   MM_RF_PROTO_FIRST = MM_RF_PROTO_CUSTOM,
@@ -535,7 +543,10 @@ enum MultiModuleRFProtocols {
   MM_RF_PROTO_Q303,
   MM_RF_PROTO_GW008,
   MM_RF_PROTO_DM002,
-  MM_RF_PROTO_LAST= MM_RF_PROTO_DM002
+  MM_RF_PROTO_CABELL,
+  MM_RF_PROTO_ESKY150,
+  MM_RF_PROTO_H83D,
+  MM_RF_PROTO_LAST= MM_RF_PROTO_H83D
 };
 
 enum MMDSM2Subtypes {

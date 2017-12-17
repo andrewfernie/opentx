@@ -279,15 +279,27 @@ void simuSetSwitch(uint8_t swtch, int8_t state)
     // SWITCH_3_CASE(5, SWITCHES_GPIO_REG_F_H, SWITCHES_GPIO_REG_F_L, SWITCHES_GPIO_PIN_F_H, SWITCHES_GPIO_PIN_F_L)
 #elif defined(PCBTARANIS) || defined(PCBHORUS)
     SWITCH_3_CASE(0,  SWITCHES_GPIO_REG_A_L, SWITCHES_GPIO_REG_A_H, SWITCHES_GPIO_PIN_A_L, SWITCHES_GPIO_PIN_A_H)
+#if !defined(PCBX10)
     SWITCH_3_CASE(1,  SWITCHES_GPIO_REG_B_L, SWITCHES_GPIO_REG_B_H, SWITCHES_GPIO_PIN_B_L, SWITCHES_GPIO_PIN_B_H)
+#else
+    SWITCH_3_CASE(1,  SWITCHES_GPIO_REG_B_H, SWITCHES_GPIO_REG_B_L, SWITCHES_GPIO_PIN_B_H, SWITCHES_GPIO_PIN_B_L)
+#endif
     SWITCH_3_CASE(2,  SWITCHES_GPIO_REG_C_L, SWITCHES_GPIO_REG_C_H, SWITCHES_GPIO_PIN_C_L, SWITCHES_GPIO_PIN_C_H)
+#if !defined(PCBX10)
     SWITCH_3_CASE(3,  SWITCHES_GPIO_REG_D_L, SWITCHES_GPIO_REG_D_H, SWITCHES_GPIO_PIN_D_L, SWITCHES_GPIO_PIN_D_H)
+#else
+    SWITCH_3_CASE(3,  SWITCHES_GPIO_REG_D_H, SWITCHES_GPIO_REG_D_L, SWITCHES_GPIO_PIN_D_H, SWITCHES_GPIO_PIN_D_L)
+#endif
 #if defined(PCBX7)
     SWITCH_CASE(4, SWITCHES_GPIO_REG_F, SWITCHES_GPIO_PIN_F)
     SWITCH_CASE(5, SWITCHES_GPIO_REG_H, SWITCHES_GPIO_PIN_H)
 #else
+#if !defined(PCBX10)
     SWITCH_3_CASE(4,  SWITCHES_GPIO_REG_E_L, SWITCHES_GPIO_REG_E_H, SWITCHES_GPIO_PIN_E_L, SWITCHES_GPIO_PIN_E_H)
-#if defined(PCBHORUS)
+#else
+    SWITCH_3_CASE(4,  SWITCHES_GPIO_REG_E_H, SWITCHES_GPIO_REG_E_L, SWITCHES_GPIO_PIN_E_H, SWITCHES_GPIO_PIN_E_L)
+#endif
+#if defined(PCBX12S)
     SWITCH_CASE_NEGATIVE(5, SWITCHES_GPIO_REG_F, SWITCHES_GPIO_PIN_F)
 #else
     SWITCH_CASE(5, SWITCHES_GPIO_REG_F, SWITCHES_GPIO_PIN_F)
@@ -308,40 +320,40 @@ void simuSetSwitch(uint8_t swtch, int8_t state)
     SWITCH_3_CASE(17, SWITCHES_GPIO_REG_R_L, SWITCHES_GPIO_REG_R_H, SWITCHES_GPIO_PIN_R_L, SWITCHES_GPIO_PIN_R_H)
 #endif
 #elif defined(PCBSKY9X)
-    SWITCH_CASE(0, PIOC->PIO_PDSR, 1<<20)
-    SWITCH_CASE(1, PIOA->PIO_PDSR, 1<<15)
-    SWITCH_CASE(2, PIOC->PIO_PDSR, 1<<31)
-    SWITCH_3_CASE(3, PIOC->PIO_PDSR, PIOC->PIO_PDSR, 0x00004000, 0x00000800)
+    SWITCH_3_CASE(0, PIOC->PIO_PDSR, PIOC->PIO_PDSR, 0x00004000, 0x00000800)
+    SWITCH_CASE(1, PIOC->PIO_PDSR, 1<<20)
+    SWITCH_CASE(2, PIOA->PIO_PDSR, 1<<15)
+    SWITCH_CASE(3, PIOC->PIO_PDSR, 1<<31)
     SWITCH_CASE(4, PIOA->PIO_PDSR, 1<<2)
     SWITCH_CASE(5, PIOC->PIO_PDSR, 1<<16)
     SWITCH_CASE(6, PIOC->PIO_PDSR, 1<<8)
 #elif defined(PCBGRUVIN9X)
-    SWITCH_CASE(0, ping, 1<<INP_G_ThrCt)
-    SWITCH_CASE(1, ping, 1<<INP_G_RuddDR)
-    SWITCH_CASE(2, pinc, 1<<INP_C_ElevDR)
-    SWITCH_3_CASE(3, ping, pinb, (1<<INP_G_ID1), (1<<INP_B_ID2))
+    SWITCH_3_CASE(0, ping, pinb, (1<<INP_G_ID1), (1<<INP_B_ID2))
+    SWITCH_CASE(1, ping, 1<<INP_G_ThrCt)
+    SWITCH_CASE(2, ping, 1<<INP_G_RuddDR)
+    SWITCH_CASE(3, pinc, 1<<INP_C_ElevDR)
     SWITCH_CASE(4, pinc, 1<<INP_C_AileDR)
     SWITCH_CASE(5, ping, 1<<INP_G_Gear)
     SWITCH_CASE(6, pinb, 1<<INP_B_Trainer)
 #elif defined(PCBMEGA2560)
-    SWITCH_CASE(0, ping, 1<<INP_G_ThrCt)
-    SWITCH_CASE(1, ping, 1<<INP_G_RuddDR)
-    SWITCH_CASE(2, pinc, 1<<INP_L_ElevDR)
-    SWITCH_3_CASE(3, pinc, pinc, (1<<INP_C_ID1), (1<<INP_C_ID2))
+    SWITCH_3_CASE(0, pinc, pinc, (1<<INP_C_ID1), (1<<INP_C_ID2))
+    SWITCH_CASE(1, ping, 1<<INP_G_ThrCt)
+    SWITCH_CASE(2, ping, 1<<INP_G_RuddDR)
+    SWITCH_CASE(3, pinc, 1<<INP_L_ElevDR)
     SWITCH_CASE(4, pinc, 1<<INP_C_AileDR)
     SWITCH_CASE(5, ping, 1<<INP_G_Gear)
     SWITCH_CASE(6, pinb, 1<<INP_L_Trainer)
 #else // PCB9X
+    SWITCH_3_CASE(0, ping, pine, (1<<INP_G_ID1), (1<<INP_E_ID2))
 #if defined(TELEMETRY_JETI) || defined(TELEMETRY_FRSKY) || defined(TELEMETRY_NMEA) || defined(TELEMETRY_ARDUPILOT) || defined(TELEMETRY_MAVLINK)
-    SWITCH_CASE(0, pinc, 1<<INP_C_ThrCt)
+    SWITCH_CASE(1, pinc, 1<<INP_C_ThrCt)
     SWITCH_CASE(4, pinc, 1<<INP_C_AileDR)
 #else
-    SWITCH_CASE(0, pine, 1<<INP_E_ThrCt)
+    SWITCH_CASE(1, pine, 1<<INP_E_ThrCt)
     SWITCH_CASE(4, pine, 1<<INP_E_AileDR)
 #endif
-    SWITCH_3_CASE(3, ping, pine, (1<<INP_G_ID1), (1<<INP_E_ID2))
-    SWITCH_CASE(1, ping, 1<<INP_G_RuddDR)
-    SWITCH_CASE(2, pine, 1<<INP_E_ElevDR)
+    SWITCH_CASE(2, ping, 1<<INP_G_RuddDR)
+    SWITCH_CASE(3, pine, 1<<INP_E_ElevDR)
     SWITCH_CASE(5, pine, 1<<INP_E_Gear)
     SWITCH_CASE(6, pine, 1<<INP_E_Trainer)
 #endif
@@ -683,6 +695,7 @@ void GPIO_PinAFConfig(GPIO_TypeDef* GPIOx, uint16_t GPIO_PinSource, uint8_t GPIO
 void USART_Init(USART_TypeDef* USARTx, USART_InitTypeDef* USART_InitStruct) { }
 void USART_Cmd(USART_TypeDef* USARTx, FunctionalState NewState) { }
 void USART_ClearITPendingBit(USART_TypeDef*, unsigned short) { }
+uint16_t USART_ReceiveData(USART_TypeDef*) { return 0; }
 void USART_DMACmd(USART_TypeDef* USARTx, uint16_t USART_DMAReq, FunctionalState NewState) { }
 void USART_ITConfig(USART_TypeDef* USARTx, uint16_t USART_IT, FunctionalState NewState) { }
 // void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseInitStruct) { }

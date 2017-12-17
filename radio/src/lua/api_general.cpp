@@ -56,13 +56,13 @@ Return OpenTX version
 
 @retval multiple (available since 2.1.7) returns 5 values:
  * (string) OpenTX version (ie "2.1.5")
- * (string) radio version: `x9e`, `x9d+` or `x9d`.
+ * (string) radio type: `x12s`, `x10`, `x9e`, `x9d+`, `x9d` or `x7`.
 If running in simulator the "-simu" is added
  * (number) major version (ie 2 if version 2.1.5)
  * (number) minor version (ie 1 if version 2.1.5)
  * (number) revision number (ie 5 if version 2.1.5)
 
-@status current Introduced in 2.0.0, expanded in 2.1.7
+@status current Introduced in 2.0.0, expanded in 2.1.7, radio type strings changed in 2.2.0
 
 ### Example
 
@@ -122,13 +122,28 @@ static int luaGetTime(lua_State * L)
 static void luaPushDateTime(lua_State * L, uint32_t year, uint32_t mon, uint32_t day,
                             uint32_t hour, uint32_t min, uint32_t sec)
 {
-  lua_createtable(L, 0, 6);
+  uint32_t hour12 = hour;
+
+  if (hour == 0) {
+    hour12 = 12;
+  }
+  else if (hour > 12) {
+    hour12 = hour - 12;
+  }
+  lua_createtable(L, 0, 8);
   lua_pushtableinteger(L, "year", year);
   lua_pushtableinteger(L, "mon", mon);
   lua_pushtableinteger(L, "day", day);
   lua_pushtableinteger(L, "hour", hour);
   lua_pushtableinteger(L, "min", min);
   lua_pushtableinteger(L, "sec", sec);
+  lua_pushtableinteger(L, "hour12", hour12);
+  if (hour < 12) {
+    lua_pushtablestring(L, "suffix", "am");
+  }
+  else {
+    lua_pushtablestring(L, "suffix", "pm");
+  }
 }
 
 /*luadoc
@@ -141,8 +156,10 @@ Return current system date and time that is kept by the RTC unit
  * `mon` (number) month
  * `day` (number) day of month
  * `hour` (number) hours
+ * `hour12` (number) hours in US format
  * `min` (number) minutes
  * `sec` (number) seconds
+ * `suffix` (text) am or pm
 */
 static int luaGetDateTime(lua_State * L)
 {
@@ -773,6 +790,8 @@ static int luaPlayHaptic(lua_State * L)
   int pause = luaL_checkinteger(L, 2);
   int flags = luaL_optinteger(L, 3, 0);
   haptic.play(length, pause, flags);
+#else
+  UNUSED(L);
 #endif
   return 0;
 }
@@ -824,6 +843,7 @@ static int luaGrey(lua_State * L)
 Returns (some of) the general radio settings
 
 @retval table with elements:
+ * `battWarn` (number) radio battery range - warning value
  * `battMin` (number) radio battery range - minimum value
  * `battMax` (number) radio battery range - maximum value
  * `imperial` (number) set to a value different from 0 if the radio is set to the
@@ -838,6 +858,7 @@ Returns (some of) the general radio settings
 static int luaGetGeneralSettings(lua_State * L)
 {
   lua_newtable(L);
+  lua_pushtablenumber(L, "battWarn", (g_eeGeneral.vBatWarn) * 0.1f);
   lua_pushtablenumber(L, "battMin", (90+g_eeGeneral.vBatMin) * 0.1f);
   lua_pushtablenumber(L, "battMax", (120+g_eeGeneral.vBatMax) * 0.1f);
   lua_pushtableinteger(L, "imperial", g_eeGeneral.imperial);
@@ -1169,6 +1190,21 @@ static int luaLoadScript(lua_State * L)
   }
 }
 
+/*luadoc
+@function getUsage()
+
+Get percent of already used Lua instructions in current script execution cycle.
+
+@retval usage (number) a value from 0 to 100 (percent)
+
+@status current Introduced in 2.2.1
+*/
+static int luaGetUsage(lua_State * L)
+{
+  lua_pushinteger(L, instructionsPercent);
+  return 1;
+}
+
 const luaL_Reg opentxLib[] = {
   { "getTime", luaGetTime },
   { "getDateTime", luaGetDateTime },
@@ -1191,6 +1227,7 @@ const luaL_Reg opentxLib[] = {
   { "getRSSI", luaGetRSSI },
   { "killEvents", luaKillEvents },
   { "loadScript", luaLoadScript },
+  { "getUsage", luaGetUsage },
 #if LCD_DEPTH > 1 && !defined(COLORLCD)
   { "GREY", luaGrey },
 #endif

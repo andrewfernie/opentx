@@ -162,7 +162,7 @@ QString MultiModelPrinter::print(QTextDocument * document)
     str += printFlightModes();
   str += printInputs();
   str += printMixers();
-  str += printLimits();
+  str += printOutputs();
   str += printCurves(document);
   if (firmware->getCapability(Gvars) && !firmware->getCapability(GvarsFlightModes))
     str += printGvars();
@@ -307,18 +307,64 @@ QString MultiModelPrinter::printFlightModes()
   if ((gvars && firmware->getCapability(GvarsFlightModes)) || firmware->getCapability(RotaryEncoders)) {
     MultiColumns columns(modelPrinterMap.size());
     columns.append("<table cellspacing='0' cellpadding='1' width='100%' border='0' style='border-collapse:collapse'>");
-    columns.append("<tr><td><b>" + tr("Flight mode") + "</b></td>");
+    columns.append("<tr><td><b>" + tr("Global variables") + "</b></td>");
     if (firmware->getCapability(GvarsFlightModes)) {
       for (int i=0; i<gvars; i++) {
-        columns.append("<td><b>" + tr("GV%1").arg(i+1) + "</b><br/>");
-        COMPARE(model->gvars_names[i]);
-        columns.append("</td>");
+        columns.append("<td><b>" + tr("GV%1").arg(i+1) + "</b></td>");
       }
     }
     for (int i=0; i<firmware->getCapability(RotaryEncoders); i++) {
       columns.append("<td><b>" + tr("RE%1").arg(i+1) + "</b></td>");
     }
     columns.append("</tr>");
+
+    if (firmware->getCapability(GvarsFlightModes)) {
+      columns.append("<tr><td><b>Name</b></td>");
+      for (int i=0; i<gvars; i++) {
+        columns.append("<td>");
+        COMPARE(model->gvarData[i].name);
+        columns.append("</td>");
+      }
+      columns.append("</tr>");
+      columns.append("<tr><td><b>Unit</b></td>");
+      for (int i=0; i<gvars; i++) {
+        columns.append("<td>");
+        COMPARE(modelPrinter->printGlobalVarUnit(i));
+        columns.append("</td>");
+      }
+      columns.append("</tr>");
+      columns.append("<tr><td><b>Prec</b></td>");
+      for (int i=0; i<gvars; i++) {
+        columns.append("<td>");
+        COMPARE(modelPrinter->printGlobalVarPrec(i));
+        columns.append("</td>");
+      }
+      columns.append("</tr>");
+      columns.append("<tr><td><b>Min</b></td>");
+      for (int i=0; i<gvars; i++) {
+        columns.append("<td>");
+        COMPARE(modelPrinter->printGlobalVarMin(i));
+        columns.append("</td>");
+      }
+      columns.append("</tr>");
+      columns.append("<tr><td><b>Max</b></td>");
+      for (int i=0; i<gvars; i++) {
+        columns.append("<td>");
+        COMPARE(modelPrinter->printGlobalVarMax(i));
+        columns.append("</td>");
+      }
+      columns.append("</tr>");
+      columns.append("<tr><td><b>Popup</b></td>");
+      for (int i=0; i<gvars; i++) {
+        columns.append("<td>");
+        COMPARE(modelPrinter->printGlobalVarPopup(i));
+        columns.append("</td>");
+      }
+      columns.append("</tr>");
+    }
+
+    columns.append("<tr><td><b>" + tr("Flight mode") + "</b></td></tr>");
+
     for (int i=0; i<firmware->getCapability(FlightModes); i++) {
       columns.append("<tr><td><b>" + tr("FM%1").arg(i) + "</b>&nbsp;");
       COMPARE(model->flightModeData[i].name);
@@ -344,18 +390,24 @@ QString MultiModelPrinter::printFlightModes()
   return str;
 }
 
-QString MultiModelPrinter::printLimits()
+QString MultiModelPrinter::printOutputs()
 {
-  QString str = printTitle(tr("Limits"));
+  QString str = printTitle(tr("Outputs"));
   MultiColumns columns(modelPrinterMap.size());
   columns.append("<table border='0' cellspacing='0' cellpadding='1' width='100%'>" \
                  "<tr>" \
-                 " <td><b>" + tr("Channel") + "</b></td>" \
-                 " <td><b>" + tr("Offset") + "</b></td>" \
-                 " <td><b>" + tr("Min") + "</b></td>" \
-                 " <td><b>" + tr("Max") + "</b></td>" \
-                 " <td><b>" + tr("Invert") + "</b></td>" \
-                 "</tr>");
+                 "<td><b>" + tr("Channel") + "</b></td>" \
+                 "<td><b>" + tr("Subtrim") + "</b></td>" \
+                 "<td><b>" + tr("Min") + "</b></td>" \
+                 "<td><b>" + tr("Max") + "</b></td>" \
+                 "<td><b>" + tr("Direct") + "</b></td>");
+  if (IS_HORUS_OR_TARANIS(firmware->getBoard()))
+    columns.append(" <td><b>" + tr("Curve") + "</b></td>");
+  if (firmware->getCapability(PPMCenter))
+    columns.append(" <td><b>" + tr("PPM") + "</b></td>");
+  if (firmware->getCapability(SYMLimits))
+    columns.append(" <td><b>" + tr("Linear") + "</b></td>");
+  columns.append("</tr>");
   for (int i=0; i<firmware->getCapability(Outputs); i++) {
     int count = 0;
     for (int k=0; k < modelPrinterMap.size(); k++)
@@ -365,15 +417,30 @@ QString MultiModelPrinter::printLimits()
     columns.append("<tr><td><b>");
     COMPARE(modelPrinter->printChannelName(i));
     columns.append("</td><td>");
-    COMPARE(model->limitData[i].offsetToString());
+    COMPARE(modelPrinter->printOutputOffset(i));
     columns.append("</td><td>");
-    COMPARE(model->limitData[i].minToString());
+    COMPARE(modelPrinter->printOutputMin(i));
     columns.append("</td><td>");
-    COMPARE(model->limitData[i].maxToString());
+    COMPARE(modelPrinter->printOutputMax(i));
     columns.append("</td><td>");
-    COMPARE(model->limitData[i].revertToString());
-    columns.append("</td></tr>");
-
+    COMPARE(modelPrinter->printOutputRevert(i));
+    columns.append("</td>");
+    if (IS_HORUS_OR_TARANIS(firmware->getBoard())) {
+      columns.append("<td>");
+      COMPARE(modelPrinter->printOutputCurve(i));
+      columns.append("</td>");
+    }
+    if (firmware->getCapability(PPMCenter)) {
+      columns.append("<td>");
+      COMPARE(modelPrinter->printOutputPpmCenter(i));
+      columns.append("</td>");
+    }
+    if (firmware->getCapability(SYMLimits)) {
+      columns.append("<td>");
+      COMPARE(modelPrinter->printOutputSymetrical(i));
+      columns.append("</td>");
+    }
+    columns.append("</tr>");
   }
   columns.append("</table>");
   str.append(columns.print());

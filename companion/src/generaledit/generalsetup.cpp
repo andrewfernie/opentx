@@ -31,7 +31,6 @@ ui(new Ui::GeneralSetup)
   QSlider *tpmsld[] = {ui->chkSA, ui->chkSB, ui->chkSC, ui->chkSD, ui->chkSE, ui->chkSF, ui->chkSG, ui->chkSH, NULL};
 
   if (IS_TARANIS(firmware->getBoard())) {
-    ui->contrastSB->setMinimum(0);
     if (firmware->getId().contains("readonly")) {
       uint16_t switchstate = generalSettings.switchUnlockStates;
       ui->chkSA->setValue(switchstate & 0x3);
@@ -165,6 +164,9 @@ ui(new Ui::GeneralSetup)
     ui->displayTypeCB->setDisabled(true);
     ui->displayTypeCB->hide();
   }
+  else {
+    ui->displayTypeCB->setCurrentIndex(generalSettings.optrexDisplay);
+  }
 
   if (!firmware->getCapability(HasVolume)) {
     ui->volume_SB->hide();
@@ -213,7 +215,10 @@ ui(new Ui::GeneralSetup)
     populateRotEncCB(reCount);
   }
 
+  ui->contrastSB->setMinimum(firmware->getCapability(MinContrast));
+  ui->contrastSB->setMaximum(firmware->getCapability(MaxContrast));
   ui->contrastSB->setValue(generalSettings.contrast);
+
   ui->battwarningDSB->setValue((double)generalSettings.vBatWarn/10);
   ui->backlightautoSB->setValue(generalSettings.backlightDelay*5);
   ui->inactimerSB->setValue(generalSettings.inactivityTimer);

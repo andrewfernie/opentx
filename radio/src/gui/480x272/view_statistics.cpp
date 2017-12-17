@@ -36,7 +36,7 @@ bool menuStatsGraph(event_t event)
       break;
   }
 
-  MENU(STR_STATISTICS, STATS_ICONS, menuTabStats, e_StatsGraph, 0, { 0 });
+  SIMPLE_MENU(STR_STATISTICS, STATS_ICONS, menuTabStats, e_StatsGraph, 1);
 
   lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP, "Session");
   drawTimer(MENU_STATS_COLUMN1, MENU_CONTENT_TOP, sessionTimer, TIMEHOUR);
@@ -89,8 +89,7 @@ bool menuStatsGraph(event_t event)
     prev_yv = yv;
   }
 
-  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP+2, STR_MENUTORESET, CENTERED);
-
+  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP, STR_MENUTORESET, MENU_TITLE_COLOR | CENTERED);
   return true;
 }
 
@@ -107,7 +106,7 @@ bool menuStatsDebug(event_t event)
       break;
   }
 
-  MENU("Debug", STATS_ICONS, menuTabStats, e_StatsDebug, 0, { 0 });
+  SIMPLE_MENU("Debug", STATS_ICONS, menuTabStats, e_StatsDebug, 1);
 
   lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP, "Free Mem");
   lcdDrawNumber(MENU_STATS_COLUMN1, MENU_CONTENT_TOP, availableMemory(), LEFT, 0, NULL, "b");
@@ -148,17 +147,18 @@ bool menuStatsDebug(event_t event)
   lcdDrawText(lcdNextPos+20, MENU_CONTENT_TOP+line*FH+1, "[B]", HEADER_COLOR|SMLSIZE);
   lcdDrawNumber(lcdNextPos+5, MENU_CONTENT_TOP+line*FH, luaExtraMemoryUsage, LEFT);
   ++line;
-
 #endif
 
-  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP+2, STR_MENUTORESET, CENTERED);
+  lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP+line*FH, "Tlm RX Errs");
+  lcdDrawNumber(MENU_STATS_COLUMN1, MENU_CONTENT_TOP+line*FH, telemetryErrors, LEFT);
 
+  lcdDrawText(LCD_W/2, MENU_FOOTER_TOP, STR_MENUTORESET, MENU_TITLE_COLOR | CENTERED);
   return true;
 }
 
 bool menuStatsAnalogs(event_t event)
 {
-  MENU("Analogs", STATS_ICONS, menuTabStats, e_StatsAnalogs, 0, { 0 });
+  SIMPLE_MENU("Analogs", STATS_ICONS, menuTabStats, e_StatsAnalogs, 1);
 
   for (uint8_t i=0; i<NUM_ANALOGS; i++) {
     coord_t y = MENU_CONTENT_TOP + (i/2)*FH;
@@ -178,12 +178,11 @@ bool menuStatsAnalogs(event_t event)
   }
 
   // SWR
-  if((IS_MODULE_XJT(INTERNAL_MODULE) && IS_INTERNAL_MODULE_ON()) || (IS_MODULE_PXX(EXTERNAL_MODULE) && !IS_INTERNAL_MODULE_ON())) {
+  if ((IS_MODULE_XJT(INTERNAL_MODULE) && IS_INTERNAL_MODULE_ON()) || (IS_MODULE_PXX(EXTERNAL_MODULE) && !IS_INTERNAL_MODULE_ON())) {
     lcdDrawText(MENUS_MARGIN_LEFT, MENU_CONTENT_TOP+7*FH, "RAS");
     lcdDrawNumber(MENUS_MARGIN_LEFT+100, MENU_CONTENT_TOP+7*FH, telemetryData.swr.value);
     lcdDrawText(MENUS_MARGIN_LEFT + LCD_W/2, MENU_CONTENT_TOP+7*FH, "XJTVER");
     lcdDrawNumber(LCD_W/2 + MENUS_MARGIN_LEFT+100, MENU_CONTENT_TOP+7*FH, telemetryData.xjtVersion);
-
   }
 
   return true;
