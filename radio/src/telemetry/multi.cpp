@@ -35,6 +35,7 @@ enum MultiPacketTypes : uint8_t {
   FlyskyIBusTelemetry,
   ConfigCommand,
   InputSync,
+  FrskySportPolling
 };
 
 enum MultiBufferState : uint8_t {
@@ -46,7 +47,8 @@ enum MultiBufferState : uint8_t {
   FrskyTelemetryFallback,
   FrskyTelemetryFallbackFirstByte,
   FrskyTelemetryFallbackNextBytes,
-  FlyskyTelemetryFallback
+  FlyskyTelemetryFallback,
+  MultiStatusOrFrskyData
 };
 
 MultiBufferState guessProtocol()
@@ -82,6 +84,7 @@ static void processMultiSyncPacket(const uint8_t *data)
   multiSyncStatus.target = data[5];
 #if !defined(PPM_PIN_SERIAL)
   auto oldlag = multiSyncStatus.inputLag;
+  (void) oldlag;
 #endif
 
   multiSyncStatus.calcAdjustedRefreshRate(data[0] << 8 | data[1], data[2] << 8 | data[3]);
@@ -144,6 +147,14 @@ static void processMultiTelemetryPaket(const uint8_t *packet)
       break;
     case ConfigCommand:
       // Just an ack to our command, ignore for now
+      break;
+    case FrskySportPolling:
+      #if defined(LUA)
+      if (len >= 1 && outputTelemetryBufferSize > 0 && data[0] == outputTelemetryBufferTrigger) {
+        TRACE("MP Sending sport data out.");
+        sportSendBuffer(outputTelemetryBuffer, outputTelemetryBufferSize);
+      }
+      #endif
       break;
     default:
       TRACE("[MP] Unkown multi packet type 0x%02X, len %d", type, len);
@@ -272,7 +283,7 @@ void MultiModuleSyncStatus::getRefreshString(char *statusText)
 
 void MultiModuleStatus::getStatusString(char *statusText)
 {
-  if (get_tmr10ms() - lastUpdate > 200) {
+  if (!isValid()) {
 #if defined(PCBTARANIS) || defined(PCBHORUS)
     if (IS_INTERNAL_MODULE_ENABLED())
       strcpy(statusText, STR_DISABLE_INTERNAL);
@@ -293,6 +304,11 @@ void MultiModuleStatus::getStatusString(char *statusText)
     strcpy(statusText, STR_MODULE_NO_INPUT);
     return;
   }
+  else if(isWaitingforBind()) {
+    strcpy(statusText, STR_MODULE_WAITFORBIND);
+    return;
+  }
+
 
   strcpy(statusText, "V");
   appendInt(statusText, major);
@@ -341,6 +357,7 @@ static void processMultiTelemetryByte(const uint8_t data)
 
 void processMultiTelemetryData(const uint8_t data)
 {
+  // debugPrintf("State: %d, byte received %02X, buflen: %d\r\n", multiTelemetryBufferState, data, telemetryRxBufferCount);
   switch (multiTelemetryBufferState) {
     case NoProtocolDetected:
       if (data == 'M') {
@@ -363,18 +380,22 @@ void processMultiTelemetryData(const uint8_t data)
       break;
 
     case FrskyTelemetryFallbackFirstByte:
-      processFrskyTelemetryData(data);
-      multiTelemetryBufferState = FrskyTelemetryFallbackNextBytes;
+      if (data == 'M') {
+        multiTelemetryBufferState = MultiStatusOrFrskyData;
+      }
+      else {
+        processFrskyTelemetryData(data);
+        if (data != 0x7e)
+          multiTelemetryBufferState = FrskyTelemetryFallbackNextBytes;
+      }
+
       break;
 
     case FrskyTelemetryFallbackNextBytes:
       processFrskyTelemetryData(data);
       if (data == 0x7e)
-        // might start a new packet
+        // end of packet or start of new packet
         multiTelemetryBufferState = FrskyTelemetryFallbackFirstByte;
-      else if (telemetryRxBufferCount == 0 && data != 0x7d)
-        // Should be in a frame (no bytestuff), but the Frsky parser has discarded the byte
-        multiTelemetryBufferState = NoProtocolDetected;
       break;
 
     case FlyskyTelemetryFallback:
@@ -398,7 +419,7 @@ void processMultiTelemetryData(const uint8_t data)
         // Protocol indented for er9x/ersky9, accept only 5-10 as packet length to have
         // a bit of validation
         multiTelemetryBufferState = ReceivingMultiStatus;
-
+        processMultiTelemetryData(data);
       }
       else {
         TRACE("[MP] invalid second byte 0x%02X", data);
@@ -410,14 +431,35 @@ void processMultiTelemetryData(const uint8_t data)
       processMultiTelemetryByte(data);
       break;
 
+    case MultiStatusOrFrskyData:
+      // Check len byte if it makes sense for multi
+      if (data >= 5 && data <= 10) {
+        multiTelemetryBufferState = ReceivingMultiStatus;
+        telemetryRxBufferCount = 0;
+      }
+      else {
+        multiTelemetryBufferState = FrskyTelemetryFallbackNextBytes;
+        processMultiTelemetryData('M');
+      }
+      processMultiTelemetryData(data);
+      break;
+
     case ReceivingMultiStatus:
-      // Ignore multi status
       telemetryRxBuffer[telemetryRxBufferCount++] = data;
-      if (telemetryRxBufferCount > 5) {
-        processMultiStatusPacket(telemetryRxBuffer);
+      if (telemetryRxBufferCount > 5 && telemetryRxBuffer[0] == telemetryRxBufferCount-1) {
+        processMultiStatusPacket(telemetryRxBuffer+1);
         telemetryRxBufferCount = 0;
         multiTelemetryBufferState = NoProtocolDetected;
       }
+      if (telemetryRxBufferCount > 10) {
+        // too long ignore
+        TRACE("Overlong multi status packet detected ignoring, wanted %d", telemetryRxBuffer[0]);
+        telemetryRxBufferCount =0;
+        multiTelemetryBufferState = NoProtocolDetected;
+      }
+
+
   }
 
 }
+

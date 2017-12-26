@@ -3,7 +3,7 @@ include(Bitmaps)
 
 set(PCB_TYPES X7 X9D X9D+ X9E X10 X12S 9X 9XR 9X128 9XR128 9X2561 GRUVIN9X MEGA2560 SKY9X 9XRPRO AR9X)
 set(GUI_LANGUAGES CZ DE EN ES FR IT PT SK SE PL HU NL)
-set(TTS_LANGUAGES CZ DE EN ES FR IT PT SK SE PL HU)
+set(TTS_LANGUAGES CZ DE EN ES FR IT PT SK SE PL HU RU)
 
 set(PCB "X9D+" CACHE STRING "Radio type, one of: ${PCB_TYPES}")
 set_property(CACHE PCB PROPERTY STRINGS ${PCB_TYPES})
@@ -41,7 +41,6 @@ option(FAS_PROTOTYPE "Support of old FAS prototypes (different resistors)" OFF)
 option(TEMPLATES "Model templates menu" OFF)
 option(TRACE_SIMPGMSPACE "Turn on traces in simpgmspace.cpp" ON)
 option(TRACE_LUA_INTERNALS "Turn on traces for Lua internals" OFF)
-option(BINDING_OPTIONS "Allow advanced frsky bindings" OFF)
 option(FRSKY_STICKS "Reverse sticks for FrSky sticks" OFF)
 option(NANO "Use nano newlib and binalloc")
 option(NIGHTLY_BUILD_WARNING "Warn this is a nightly build" OFF)
@@ -166,7 +165,7 @@ else()
   add_definitions(-DEEPROM -DEEPROM_RAW)
 endif()
 
-if(ARCH STREQUAL ARM AND NOT PCB STREQUAL X12S AND NOT PCB STREQUAL X10 AND NOT PCB STREQUAL FLAMENCO)
+if(ARCH STREQUAL ARM AND NOT PCB STREQUAL X12S AND NOT PCB STREQUAL X10)
   set(SRC ${SRC} storage/eeprom_conversions.cpp)
 endif()
 
@@ -325,10 +324,6 @@ endif()
 
 if(TRACE_LUA_INTERNALS)
   add_definitions(-DTRACE_LUA_INTERNALS_ENABLED)
-endif()
-
-if(BINDING_OPTIONS)
-  add_definitions(-DBINDING_OPTIONS)
 endif()
 
 if(FRSKY_STICKS)
@@ -491,9 +486,9 @@ if(NOT MSVC)
     endif()
 
 
-    if(PCB STREQUAL X9D OR PCB STREQUAL X9D+ OR PCB STREQUAL X9E OR PCB STREQUAL X7)
-      add_subdirectory(targets/${TARGET_DIR}/bootloader)
-      include_directories(${CMAKE_CURRENT_BINARY_DIR}/targets/${TARGET_DIR}/bootloader)
+    if(PCB STREQUAL X9D OR PCB STREQUAL X9D+ OR PCB STREQUAL X9E OR PCB STREQUAL X7 OR PCB STREQUAL X10 OR PCB STREQUAL X12S)
+      add_subdirectory(targets/common/arm/stm32/bootloader)
+      include_directories(${CMAKE_CURRENT_BINARY_DIR}/targets/common/arm/stm32/bootloader)
       set(FIRMWARE_DEPENDENCIES ${FIRMWARE_DEPENDENCIES} bootloader)
     elseif(OPENRC_BOOTLOADER)
       # We fetch Mike's bootloader as it is not included inside OpenTX

@@ -1,3 +1,19 @@
+---- #########################################################################
+---- #                                                                       #
+---- # Copyright (C) OpenTX                                                  #
+-----#                                                                       #
+---- # License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html               #
+---- #                                                                       #
+---- # This program is free software; you can redistribute it and/or modify  #
+---- # it under the terms of the GNU General Public License version 2 as     #
+---- # published by the Free Software Foundation.                            #
+---- #                                                                       #
+---- # This program is distributed in the hope that it will be useful        #
+---- # but WITHOUT ANY WARRANTY; without even the implied warranty of        #
+---- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+---- # GNU General Public License for more details.                          #
+---- #                                                                       #
+---- #########################################################################
 -- Plane Wizard pages
 local ENGINE_PAGE = 0
 local AILERONS_PAGE = 1
@@ -166,7 +182,7 @@ local function engineMenu(event)
 end
 
 -- Ailerons Menu
-local aileronsModeItems = {"No", "Yes", "Yes, 2 channels"}
+local aileronsModeItems = {"No", "Yes, 1 channel", "Yes, 2 channels"}
 local function drawAileronsMenu()
   lcd.clear()
   if aileronsMode == 2 then
@@ -211,7 +227,7 @@ local function aileronsMenu(event)
 end
 
 -- Flaps Menu
-local flapsModeItems = {"No", "Yes", "Yes, 2 channels"}
+local flapsModeItems = {"No", "Yes, 1 channel", "Yes, 2 channels"}
 local function drawFlapsMenu()
   lcd.clear()
   if flapsMode == 0 then
@@ -256,7 +272,7 @@ local function flapsMenu(event)
 end
 
 -- Airbrakes Menu
-local brakesModeItems = {"No", "Yes", "Yes, 2 channels"}
+local brakesModeItems = {"No", "Yes, 1 channel", "Yes, 2 channels"}
 local function drawBrakesMenu()
   lcd.clear()
   if brakesMode == 0 then

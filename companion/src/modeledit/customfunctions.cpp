@@ -23,6 +23,8 @@
 #include "helpers.h"
 #include "appdata.h"
 
+#include <TimerEdit>
+
 RepeatComboBox::RepeatComboBox(QWidget *parent, int & repeatParam):
   QComboBox(parent),
   repeatParam(repeatParam)
@@ -33,14 +35,14 @@ RepeatComboBox::RepeatComboBox(QWidget *parent, int & repeatParam):
   setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
 
   if (step == 1) {
-    addItem(QObject::tr("Played once, not during startup"), -1);
+    addItem(tr("Played once, not during startup"), -1);
     value++;
   }
 
-  addItem(QObject::tr("No repeat"), 0);
+  addItem(tr("No repeat"), 0);
 
   for (unsigned int i=step; i<=60; i+=step) {
-    addItem(QObject::tr("%1s").arg(i), i);
+    addItem(tr("%1s").arg(i), i);
   }
 
   setCurrentIndex(value);
@@ -178,10 +180,8 @@ CustomFunctionsPanel::CustomFunctionsPanel(QWidget * parent, ModelData * model, 
     connect(fswtchParam[i], SIGNAL(editingFinished()), this, SLOT(customFunctionEdited()));
     paramLayout->addWidget(fswtchParam[i]);
 
-    fswtchParamTime[i] = new QTimeEdit(this);
+    fswtchParamTime[i] = new TimerEdit(this);
     fswtchParamTime[i]->setProperty("index", i);
-    fswtchParamTime[i]->setAccelerated(true);
-    fswtchParamTime[i]->setDisplayFormat("hh:mm:ss");
     connect(fswtchParamTime[i], SIGNAL(editingFinished()), this, SLOT(customFunctionEdited()));
     paramLayout->addWidget(fswtchParamTime[i]);
 
@@ -306,7 +306,7 @@ void CustomFunctionsPanel::playMusic()
     }
     QFile file(track);
     if (!file.exists()) {
-      QMessageBox::critical(this, tr("Error"), tr("Unable to find sound file %1!").arg(track));
+      QMessageBox::critical(this, CPN_STR_TTL_ERROR, tr("Unable to find sound file %1!").arg(track));
       return;
     }
 
@@ -450,10 +450,10 @@ void CustomFunctionsPanel::refreshCustomFunction(int i, bool modified)
       }
       else if (func>=FuncSetTimer1 && func<=FuncSetTimer3) {
         if (modified)
-          cfn.param = QTimeS(fswtchParamTime[i]->time()).seconds();
-        fswtchParamTime[i]->setMinimumTime(QTime(0, 0, 0));
-        fswtchParamTime[i]->setMaximumTime(firmware->getMaxTimerStart());
-        fswtchParamTime[i]->setTime(QTimeS(cfn.param));
+          cfn.param = fswtchParamTime[i]->timeInSeconds();
+        RawSourceRange range = RawSource(SOURCE_TYPE_SPECIAL, func - FuncSetTimer1 + 2).getRange(model, generalSettings);
+        fswtchParamTime[i]->setTimeRange((int)range.min, (int)range.max);
+        fswtchParamTime[i]->setTime(cfn.param);
         widgetsMask |= CUSTOM_FUNCTION_TIME_PARAM | CUSTOM_FUNCTION_ENABLE;
       }
       else if (func>=FuncSetFailsafeInternalModule && func<=FuncBindExternalModule) {
@@ -696,10 +696,10 @@ void CustomFunctionsPanel::populateFuncCB(QComboBox *b, unsigned int value)
 void CustomFunctionsPanel::populateGVmodeCB(QComboBox *b, unsigned int value)
 {
   b->clear();
-  b->addItem(QObject::tr("Value"));
-  b->addItem(QObject::tr("Source"));
-  b->addItem(QObject::tr("GVAR"));
-  b->addItem(QObject::tr("Increment"));
+  b->addItem(tr("Value"));
+  b->addItem(tr("Source"));
+  b->addItem(tr("GVAR"));
+  b->addItem(tr("Increment"));
   b->setCurrentIndex(value);
 }
 

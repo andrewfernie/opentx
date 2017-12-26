@@ -654,7 +654,7 @@ PACK(struct ModuleData {
   int8_t  rfProtocol:4;
   uint8_t channelsStart;
   int8_t  channelsCount; // 0=8 channels
-  uint8_t failsafeMode:4;  //only 3 bits used
+  uint8_t failsafeMode:4;  // only 3 bits used
   uint8_t subType:3;
   uint8_t invertedSerial:1; // telemetry serial inverted from standard
   int16_t failsafeChannels[MAX_OUTPUT_CHANNELS];
@@ -667,23 +667,23 @@ PACK(struct ModuleData {
     } ppm;
     NOBACKUP(struct {
       uint8_t rfProtocolExtra:2;
-      uint8_t spare:3;
+      uint8_t spare1:3;
       uint8_t customProto:1;
       uint8_t autoBindMode:1;
       uint8_t lowPowerMode:1;
       int8_t optionValue;
     } multi);
     NOBACKUP(struct {
-      uint8_t power:2;                   // 0 10 mW, 1 100 mW, 2 500 mW, 3 1W
-      uint8_t spare:2;
+      uint8_t power:2;                  // 0=10 mW, 1=100 mW, 2=500 mW, 3=1W
+      uint8_t spare1:2;
       uint8_t receiver_telem_off:1;     // false = receiver telem enabled
       uint8_t receiver_channel_9_16:1;  // false = pwm out 1-8, true 9-16
-      uint8_t external_antenna:1; // false = internal antenna, true = external antenna
+      uint8_t external_antenna:1;       // false = internal antenna, true = external antenna
       uint8_t sport_out:1;
-      uint8_t spare3;
+      uint8_t spare2;
     } pxx);
     NOBACKUP(struct {
-      uint8_t spare:6;
+      uint8_t spare1:6;
       uint8_t noninverted:1;
       uint8_t spare2:1;
       int8_t refreshRate;  // definition as framelength for ppm (* 5 + 225 = time in 1/10 ms)
@@ -794,8 +794,6 @@ PACK(struct CustomScreenData {
   #define MODELDATA_EXTRA   NOBACKUP(uint8_t spare:3); NOBACKUP(uint8_t trainerMode:3); NOBACKUP(uint8_t potsWarnMode:2); ModuleData moduleData[NUM_MODULES+1]; NOBACKUP(ScriptData scriptsData[MAX_SCRIPTS]); NOBACKUP(char inputNames[MAX_INPUTS][LEN_INPUT_NAME]); NOBACKUP(uint8_t potsWarnEnabled); NOBACKUP(int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS]);
 #elif defined(PCBX10)
   #define MODELDATA_EXTRA   NOBACKUP(uint8_t spare:3); NOBACKUP(uint8_t trainerMode:3); NOBACKUP(uint8_t potsWarnMode:2); ModuleData moduleData[NUM_MODULES+1]; NOBACKUP(ScriptData scriptsData[MAX_SCRIPTS]); NOBACKUP(char inputNames[MAX_INPUTS][LEN_INPUT_NAME]); NOBACKUP(uint8_t potsWarnEnabled); NOBACKUP(int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS]); NOBACKUP(uint8_t potsWarnSpares[NUM_DUMMY_ANAS]);
-#elif defined(PCBFLAMENCO)
-  #define MODELDATA_EXTRA   uint8_t spare:3; uint8_t trainerMode:3; uint8_t potsWarnMode:2; ModuleData moduleData[NUM_MODULES+1]; ScriptData scriptsData[MAX_SCRIPTS]; char inputNames[MAX_INPUTS][LEN_INPUT_NAME]; uint8_t potsWarnEnabled; int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS];
 #elif defined(PCBTARANIS)
   #define MODELDATA_EXTRA   uint8_t spare:3; uint8_t trainerMode:3; uint8_t potsWarnMode:2; ModuleData moduleData[NUM_MODULES+1]; ScriptData scriptsData[MAX_SCRIPTS]; char inputNames[MAX_INPUTS][LEN_INPUT_NAME]; uint8_t potsWarnEnabled; int8_t potsWarnPosition[NUM_POTS+NUM_SLIDERS];
 #elif defined(PCBSKY9X)
@@ -929,15 +927,6 @@ PACK(struct TrainerData {
     NOBACKUP(uint8_t spare:1); \
     NOBACKUP(uint8_t blOffBright:7); \
     NOBACKUP(char bluetoothName[LEN_BLUETOOTH_NAME]);
-#elif defined(PCBFLAMENCO)
-  #define EXTRA_GENERAL_FIELDS \
-    EXTRA_GENERAL_FIELDS_ARM \
-    uint8_t  serial2Mode:4; \
-    uint8_t  spareExtra:4; \
-    uint32_t switchConfig; \
-    uint8_t  potsType; /*two bits for every pot*/\
-    char switchNames[NUM_SWITCHES][LEN_SWITCH_NAME]; \
-    char anaNames[NUM_STICKS+NUM_POTS+NUM_SLIDERS][LEN_ANA_NAME];
 #elif defined(PCBTARANIS)
   #if defined(PCBX9E) || defined(PCBX7)
     #define BLUETOOTH_FIELDS \
@@ -1120,8 +1109,6 @@ static inline void check_struct()
   CHKSIZE(RadioData, 872);
   CHKSIZE(ModelData, 6507);
 #endif
-
-#elif defined(PCBFLAMENCO)
 
 #elif defined(PCBHORUS)
   CHKSIZE(MixData, 20);

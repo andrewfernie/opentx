@@ -29,8 +29,6 @@
   #include "lua/lua_exports_x12s.inc"   // this line must be after lua headers
 #elif defined(PCBX10)
   #include "lua/lua_exports_x10.inc"
-#elif defined(PCBFLAMENCO)
-  #include "lua/lua_exports_flamenco.inc"
 #elif defined(PCBX9E)
   #include "lua/lua_exports_x9e.inc"
 #elif defined(PCBX7)
@@ -168,6 +166,25 @@ static int luaGetDateTime(lua_State * L)
   luaPushDateTime(L, utm.tm_year + TM_YEAR_BASE, utm.tm_mon + 1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec);
   return 1;
 }
+
+/*luadoc
+@function getRtcTime()
+
+Return current RTC system date as unix timstamp (in seconds since 1. Jan 1970)
+
+Please note the RTC timestamp is kept internally as a 32bit integer, which will overflow
+in 2038.
+
+@retval number Number of seconds elapsed since 1. Jan 1970
+*/
+
+#if defined(RTCLOCK)
+static int luaGetRtcTime(lua_State * L)
+{
+  lua_pushunsigned(L, g_rtcTime);  
+  return 1;
+}
+#endif
 
 static void luaPushLatLon(lua_State* L, TelemetrySensor & telemetrySensor, TelemetryItem & telemetryItem)
 /* result is lua table containing members ["lat"] and ["lon"] as lua_Number (doubles) in decimal degrees */
@@ -1208,6 +1225,9 @@ static int luaGetUsage(lua_State * L)
 const luaL_Reg opentxLib[] = {
   { "getTime", luaGetTime },
   { "getDateTime", luaGetDateTime },
+#if defined(RTCLOCK)
+  { "getRtcTime", luaGetRtcTime },
+#endif
   { "getVersion", luaGetVersion },
   { "getGeneralSettings", luaGetGeneralSettings },
   { "getValue", luaGetValue },

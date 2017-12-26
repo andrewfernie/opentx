@@ -130,7 +130,7 @@ class CurveGroup : public QObject {
 namespace Helpers
 {
   void addRawSourceItems(QStandardItemModel * itemModel, const RawSourceType & type, int count, const GeneralSettings * const generalSettings = NULL,
-                         const ModelData * const model = NULL, const int start = 0, const QList<int> exclude = QList<int>());
+                         const ModelData * const model = NULL, const int start = 0);
   QStandardItemModel * getRawSourceItemModel(const GeneralSettings * const generalSettings = NULL, const ModelData * const model = NULL, unsigned int flags = 0);
 
   void populateGvarUseCB(QComboBox *b, unsigned int phase);
@@ -149,9 +149,6 @@ int findmult(float value, float base);
 /* FrSky helpers */
 QString getFrSkyAlarmType(int alarm);
 QString getFrSkyUnits(int units);
-QString getFrSkyProtocol(int protocol);
-QString getFrSkyMeasure(int units);
-QString getFrSkySrc(int index);
 
 void startSimulation(QWidget * parent, RadioData & radioData, int modelIdx);
 

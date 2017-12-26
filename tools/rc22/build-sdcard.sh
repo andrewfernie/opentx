@@ -25,11 +25,17 @@ else
 
   # Get images for Horus
   mkdir -p ${workdir}/sdcard/horus/IMAGES
-  cp /home/opentx/horus-bitmaps/* ${workdir}/sdcard/horus/IMAGES/
+  imgdir=/home/opentx/horus-bitmaps
+  if [ "$(ls -A $imgdir)" ]; then
+    cp /$imgdir/* ${workdir}/sdcard/horus/IMAGES/
+  fi
 
   # Get images for Taranis x9
   mkdir -p ${workdir}/sdcard/taranis-x9/IMAGES
-  cp /home/opentx/x9-bitmaps/* ${workdir}/sdcard/taranis-x9/IMAGES/
+  imgdir=/home/opentx/x9-bitmaps
+  if [ "$(ls -A $imgdir)" ]; then
+    cp $imgdir/* ${workdir}/sdcard/taranis-x9/IMAGES/
+  fi
 
   # Request sound pack generation
   python3 -B ${workdir}/code/tools/rc22/tts.py en csv files
@@ -39,6 +45,7 @@ else
   python3 -B ${workdir}/code/tools/rc22/tts.py de csv files
   python3 -B ${workdir}/code/tools/nightly22/tts.py cz csv files
   python3 -B ${workdir}/code/tools/nightly22/tts.py pt csv files
+  python3 -B ${workdir}/code/tools/nightly22/tts.py ru csv psv files
 
   # Create sdcards.zips for supported platforms
   mv /tmp/SOUNDS ${workdir}/sdcard/horus/
@@ -46,8 +53,8 @@ else
   mkdir ${workdir}/sdcard/taranis-x7/SOUNDS
   cp -r ${workdir}/sdcard/horus/SOUNDS ${workdir}/sdcard/taranis-x9/
   cp -r ${workdir}/sdcard/horus/SOUNDS ${workdir}/sdcard/taranis-x7/
-  cd ${workdir}/sdcard/horus && zip -r ${output}/x12/sdcard-horus-${sdcard_version}.zip *
-  cd ${workdir}/sdcard/taranis-x9 && zip -r ${output}/x9/sdcard-taranis-x9-${sdcard_version}.zip *
-  cd ${workdir}/sdcard/taranis-x7 && zip -r ${output}/x7/sdcard-taranis-x7-${sdcard_version}.zip *
+  cd ${workdir}/sdcard/horus && zip -r ${output}/opentx-x12s/sdcard-horus-${sdcard_version}.zip *
+  cd ${workdir}/sdcard/taranis-x9 && zip -r ${output}/opentx-x9d/sdcard-taranis-x9-${sdcard_version}.zip *
+  cd ${workdir}/sdcard/taranis-x7 && zip -r ${output}/opentx-x7/sdcard-taranis-x7-${sdcard_version}.zip *
   rm -Rf ${workdir}/sdcard
 fi

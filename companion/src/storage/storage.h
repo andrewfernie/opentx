@@ -22,6 +22,8 @@
 #define _STORAGE_H_
 
 #include "radiodata.h"
+
+#include <QtCore>
 #include <QString>
 #include <QDebug>
 
@@ -41,6 +43,8 @@ StorageType getStorageType(const QString & filename);
 
 class StorageFormat
 {
+  Q_DECLARE_TR_FUNCTIONS(StorageFormat)
+
   public:
     StorageFormat(const QString & filename, uint8_t version=0):
       filename(filename),
@@ -65,41 +69,6 @@ class StorageFormat
     virtual Board::Type getBoard()
     {
       return board;
-    }
-
-    static uint32_t getFourCC(Board::Type board)
-    {
-      switch (board) {
-        case Board::BOARD_X12S:
-        case Board::BOARD_X10:
-          return 0x3478746F;
-        case Board::BOARD_TARANIS_X7:
-          return 0x3678746F;
-        case Board::BOARD_TARANIS_X9E:
-          return 0x3578746F;
-        case Board::BOARD_TARANIS_X9D:
-        case Board::BOARD_TARANIS_X9DP:
-          return 0x3378746F;
-        case Board::BOARD_SKY9X:
-        case Board::BOARD_AR9X:
-        case Board::BOARD_9XRPRO:
-          return 0x3278746F;
-        case Board::BOARD_MEGA2560:
-        case Board::BOARD_GRUVIN9X:
-          return 0x3178746F;
-        default:
-          return 0;
-      }
-    }
-
-    uint32_t getFourCC()
-    {
-      return getFourCC(board);
-    }
-
-    virtual bool isBoardCompatible(Board::Type board)
-    {
-      return getFourCC() == getFourCC(board);
     }
 
   protected:
@@ -164,6 +133,8 @@ class DefaultStorageFactory : public StorageFactory
 
 class Storage : public StorageFormat
 {
+  Q_DECLARE_TR_FUNCTIONS(Storage)
+
   public:
     Storage(const QString & filename):
       StorageFormat(filename)

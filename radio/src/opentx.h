@@ -200,12 +200,6 @@
   #define CASE_PCBX9E(x)
 #endif
 
-#if defined(PCBX10)
-  #define CASE_PCBX10(x) x,
-#else
-  #define CASE_PCBX10(x)
-#endif
-
 #if defined(BLUETOOTH) && !(defined(PCBX9E) && !defined(USEHORUSBT))
   #define CASE_BLUETOOTH(x) x,
 #else
@@ -294,8 +288,7 @@
 
 #include "debug.h"
 
-#if defined(PCBFLAMENCO)
-#elif defined(PCBTARANIS) || defined(PCBHORUS)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   #define SWSRC_THR                    SWSRC_SF2
   #define SWSRC_GEA                    SWSRC_SG2
   #define SWSRC_ID0                    SWSRC_SA0
@@ -327,11 +320,6 @@ void memswap(void * a, void * b, uint8_t size);
   #define IS_POT_SLIDER_AVAILABLE(x)   (IS_POT_AVAILABLE(x) || IS_SLIDER_AVAILABLE(x))
   #define IS_MULTIPOS_CALIBRATED(cal)  (cal->count>0 && cal->count<XPOTS_MULTIPOS_COUNT)
 #elif defined(PCBX7)
-  #define IS_POT_MULTIPOS(x)           (false)
-  #define IS_POT_WITHOUT_DETENT(x)     (false)
-  #define IS_POT_SLIDER_AVAILABLE(x)   (true)
-  #define IS_MULTIPOS_CALIBRATED(cal)  (false)
-#elif defined(PCBFLAMENCO)
   #define IS_POT_MULTIPOS(x)           (false)
   #define IS_POT_WITHOUT_DETENT(x)     (false)
   #define IS_POT_SLIDER_AVAILABLE(x)   (true)
@@ -454,7 +442,9 @@ void memswap(void * a, void * b, uint8_t size);
   #define MAX_CHANNELS(idx)                 (idx==EXTERNAL_MODULE ? MAX_EXTERNAL_MODULE_CHANNELS() : MAX_TRAINER_CHANNELS_M8())
   #define NUM_CHANNELS(idx)                 (8+g_model.moduleData[idx].channelsCount)
 #endif
-#define IS_MODULE_R9M(idx)                (g_model.moduleData[idx].type==MODULE_TYPE_R9M)
+#define IS_MODULE_R9M(idx)                (g_model.moduleData[idx].type == MODULE_TYPE_R9M)
+#define IS_MODULE_R9M_FCC(idx)            (IS_MODULE_R9M(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_FCC)
+#define IS_MODULE_R9M_LBT(idx)            (IS_MODULE_R9M(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_LBT)
 #define IS_MODULE_PXX(idx)                (IS_MODULE_XJT(idx) || IS_MODULE_R9M(idx))
 
 #if defined(DSM2)
@@ -542,7 +532,7 @@ extern uint8_t channel_order(uint8_t x);
   #define SPLASH_TIMEOUT               0 /* we use the splash duration to load stuff from the SD */
 #elif defined(FSPLASH)
   #define SPLASH_TIMEOUT               (g_eeGeneral.splashMode == 0 ? 60000/*infinite=10mn*/ : ((4*100) * (g_eeGeneral.splashMode & 0x03)))
-#elif defined(PCBTARANIS) || defined(PCBFLAMENCO)
+#elif defined(PCBTARANIS)
   #define SPLASH_TIMEOUT               (g_eeGeneral.splashMode==-4 ? 1500 : (g_eeGeneral.splashMode<=0 ? (400-g_eeGeneral.splashMode*200) : (400-g_eeGeneral.splashMode*100)))
 #else
   #define SPLASH_TIMEOUT               (4*100)  // 4 seconds
@@ -569,7 +559,7 @@ extern uint8_t channel_order(uint8_t x);
 
 #define HEART_TIMER_10MS               1
 #define HEART_TIMER_PULSES             2 // when multiple modules this is the first one
-#if defined(PCBTARANIS) || defined(PCBFLAMENCO) || defined(PCBHORUS)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
 #define HEART_WDT_CHECK                (HEART_TIMER_10MS + (HEART_TIMER_PULSES << 0) + (HEART_TIMER_PULSES << 1))
 #else
 #define HEART_WDT_CHECK                (HEART_TIMER_10MS + HEART_TIMER_PULSES)
@@ -612,7 +602,7 @@ int zchar2str(char *dest, const char *src, int size);
 #include "keys.h"
 #include "pwr.h"
 
-#if defined(PCBTARANIS) || defined(PCBFLAMENCO) || defined(PCBHORUS)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
 div_t switchInfo(int switchPosition);
 extern uint8_t potsPos[NUM_XPOTS];
 #endif
@@ -723,7 +713,7 @@ void logicalSwitchesReset();
   #define LS_RECURSIVE_EVALUATION_RESET() s_last_switch_used = 0
 #endif
 
-#if defined(PCBTARANIS) || defined(PCBFLAMENCO) || defined(PCBHORUS)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   void getSwitchesPosition(bool startup);
 #else
   #define getSwitchesPosition(...)
@@ -779,6 +769,8 @@ int getTrimValue(uint8_t phase, uint8_t idx);
   #define ROTARY_ENCODER_GRANULARITY (1)
 #elif defined(PCBSKY9X)
   #define ROTARY_ENCODER_GRANULARITY (2 << g_eeGeneral.rotarySteps)
+#elif defined(PCBHORUS)
+  #define ROTARY_ENCODER_GRANULARITY (1)
 #else
   #define ROTARY_ENCODER_GRANULARITY (2)
 #endif
@@ -988,6 +980,12 @@ extern const char eeprom_stamp[];
 #else
 extern const char vers_stamp[];
 #endif
+/**
+ * Tries to find opentx version in the first 1024 byte of either firmware/bootloader (the one not running) or the buffer
+ * @param buffer If non-null find the firmware version in the buffer instead
+ * @return The opentx version string starting with "opentx-" or "no version found" if the version string is not found
+ */
+const char* getOtherVersion(char* buffer);
 
 extern uint8_t g_vbat100mV;
 #if LCD_W > 128
@@ -1018,17 +1016,55 @@ extern uint16_t           BandGap;
 int expo(int x, int k);
 
 #if defined(CPUARM)
-  inline int getMaximumValue(int source)
-  {
-    if (source < MIXSRC_FIRST_CH)
-      return 100;
-    else if (source <= MIXSRC_LAST_CH)
-      return g_model.extendedLimits ? 150 : 100;
-    else if (source >= MIXSRC_FIRST_TIMER && source <= MIXSRC_LAST_TIMER)
-      return (23*60)+59;
-    else
-      return 30000;
+inline void getMixSrcRange(const int source, int16_t & valMin, int16_t & valMax, LcdFlags * flags = 0)
+{
+  if (source >= MIXSRC_FIRST_TRIM && source <= MIXSRC_LAST_TRIM) {
+    valMax = g_model.extendedTrims ? TRIM_EXTENDED_MAX : TRIM_MAX;
+    valMin = -valMax;
   }
+#if defined(LUA_INPUTS)
+  else if (source >= MIXSRC_FIRST_LUA && source <= MIXSRC_LAST_LUA) {
+    valMax = 30000;
+    valMin = -valMax;
+  }
+#endif
+  else if (source < MIXSRC_FIRST_CH) {
+    valMax = 100;
+    valMin = -valMax;
+  }
+  else if (source <= MIXSRC_LAST_CH) {
+    valMax = g_model.extendedLimits ? LIMIT_EXT_PERCENT : 100;
+    valMin = -valMax;
+  }
+#if defined(GVARS)
+  else if (source >= MIXSRC_FIRST_GVAR && source <= MIXSRC_LAST_GVAR) {
+    valMax = min<int>(CFN_GVAR_CST_MAX, MODEL_GVAR_MAX(source-MIXSRC_FIRST_GVAR));
+    valMin = max<int>(CFN_GVAR_CST_MIN, MODEL_GVAR_MIN(source-MIXSRC_FIRST_GVAR));
+    if (flags && g_model.gvars[source-MIXSRC_FIRST_GVAR].prec)
+      *flags |= PREC1;
+  }
+#endif
+  else if (source == MIXSRC_TX_VOLTAGE) {
+    valMax =  255;
+    valMin = 0;
+    if (flags)
+      *flags |= PREC1;
+  }
+  else if (source == MIXSRC_TX_TIME) {
+    valMax =  23 * 60 + 59;
+    valMin = 0;
+  }
+  else if (source >= MIXSRC_FIRST_TIMER && source <= MIXSRC_LAST_TIMER) {
+    valMax =  9 * 60 * 60 - 1;
+    valMin = -valMax;
+    if (flags)
+      *flags |= TIMEHOUR;
+  }
+  else {
+    valMax = 30000;
+    valMin = -valMax;
+  }
+}
 #endif
 
 // Curves
@@ -1288,7 +1324,7 @@ enum AUDIO_SOUNDS {
   AU_STICK3_MIDDLE,
   AU_STICK4_MIDDLE,
 #endif
-#if defined(PCBTARANIS) || defined(PCBFLAMENCO) || defined(PCBHORUS)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   AU_POT1_MIDDLE,
   AU_POT2_MIDDLE,
   AU_SLIDER1_MIDDLE,
@@ -1439,7 +1475,7 @@ union ReusableBuffer
     int16_t loVals[NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_MOUSE_ANALOGS];
     int16_t hiVals[NUM_STICKS+NUM_POTS+NUM_SLIDERS+NUM_MOUSE_ANALOGS];
     uint8_t state;
-#if defined(PCBTARANIS) || defined(PCBFLAMENCO) || defined(PCBHORUS)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
     struct {
       uint8_t stepsCount;
       int16_t steps[XPOTS_MULTIPOS_COUNT];

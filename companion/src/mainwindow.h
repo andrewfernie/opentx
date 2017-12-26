@@ -100,9 +100,10 @@ class MainWindow : public QMainWindow
     void openFile();
     void save();
     void saveAs();
+    void saveAll();
     void closeFile();
     void openRecentFile();
-    void loadProfileId(const unsigned pid);
+    bool loadProfileId(const unsigned pid);
     void loadProfile();
     void logFile();
     void writeEeprom();
@@ -117,7 +118,6 @@ class MainWindow : public QMainWindow
     void contributors();
     void sdsync();
     void changelog();
-    void fwchangelog();
     void customizeSplash();
     void about();
     void compare();
@@ -155,6 +155,7 @@ class MainWindow : public QMainWindow
     MdiChild * createMdiChild();
     MdiChild * activeMdiChild();
     QMdiSubWindow * findMdiChild(const QString & fileName);
+    bool anyChildrenDirty();
 
     bool readEepromFromRadio(const QString & filename);
     bool readFirmwareFromRadio(const QString & filename);
@@ -201,7 +202,6 @@ class MainWindow : public QMainWindow
     QAction *contributorsAct;
     QAction *sdsyncAct;
     QAction *changelogAct;
-    QAction *fwchangelogAct;
     QAction *compareAct;
     QAction *editSplashAct;
     QAction *writeEepromAct;

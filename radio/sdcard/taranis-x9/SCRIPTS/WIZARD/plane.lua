@@ -1,4 +1,3 @@
-
 ---- #########################################################################
 ---- #                                                                       #
 ---- # Copyright (C) OpenTX                                                  #
@@ -186,7 +185,7 @@ local function engineMenu(event)
 end
 
 -- Ailerons Menu
-local aileronsModeItems = {"No", "Yes", "Yes, 2 channels"}
+local aileronsModeItems = {"No", "Yes, 1 channel", "Yes, 2 channels"}
 local function drawAileronsMenu()
   lcd.clear()
   lcd.drawText(1, 0, "Has your model got ailerons?", 0)
@@ -233,7 +232,7 @@ local function aileronsMenu(event)
 end
 
 -- Flaps Menu
-local flapsModeItems = {"No", "Yes", "Yes, 2 channels"}
+local flapsModeItems = {"No", "Yes, 1 channel", "Yes, 2 channels"}
 local function drawFlapsMenu()
   lcd.clear()
   lcd.drawText(1, 0, "Has your model got flaps?", 0)
@@ -280,7 +279,7 @@ local function flapsMenu(event)
 end
 
 -- Airbrakes Menu
-local brakesModeItems = {"No", "Yes", "Yes, 2 channels"}
+local brakesModeItems = {"No", "Yes, 1 channel", "Yes, 2 channels"}
 local function drawBrakesMenu()
   lcd.clear()
   lcd.drawText(1, 0, "Has your model got air brakes?", 0)
@@ -327,7 +326,7 @@ local function brakesMenu(event)
 end
 
 -- Tail Menu
-local tailModeItems = {"Ele(1ch)", "Ele(1ch) + Rudder(1ch)", "Ele(2ch) + Rudder(1ch)", "V-Tail(2ch)"}
+local tailModeItems = {"Ele(1ch)", "Ele(1ch) + Rud(1ch)", "Ele(2ch) + Rud(1ch)", "V-Tail(2ch)"}
 local function drawTailMenu()
   lcd.clear()
   lcd.drawText(1, 0, "Which is the tail config on your model?", 0)
@@ -462,7 +461,7 @@ local function drawConfirmationMenu()
   end
   if flapsMode == 1 then
     x, y = drawNextLine(x, y, "Flaps", flapsCH1)
-  elsif flapsMode == 2 then
+  elseif flapsMode == 2 then
     x, y = drawNextLine(x, y, "Flap L", flapsCH1)
     x, y = drawNextLine(x, y, "Flap R", flapsCH2)
   end
@@ -510,35 +509,35 @@ local function applySettings()
   if aileronsMode == 1 then
     addMix(ailCH1, MIXSRC_FIRST_INPUT+defaultChannel(3), "Ail")
   elseif aileronsMode == 2 then
-    addMix(ailCH1, MIXSRC_FIRST_INPUT+defaultChannel(3), "Ail L")
-    addMix(ailCH2, MIXSRC_FIRST_INPUT+defaultChannel(3), "Ail R", -100)
+    addMix(ailCH1, MIXSRC_FIRST_INPUT+defaultChannel(3), "AilL")
+    addMix(ailCH2, MIXSRC_FIRST_INPUT+defaultChannel(3), "AilR", -100)
   end
   if flapsMode == 1 then
     addMix(flapsCH1, MIXSRC_SA, "Flaps")
   elseif flapsMode == 2 then
-    addMix(flapsCH1, MIXSRC_SA, "Flap L")
-    addMix(flapsCH2, MIXSRC_SA, "Flap R")
+    addMix(flapsCH1, MIXSRC_SA, "FlapL")
+    addMix(flapsCH2, MIXSRC_SA, "FlapR")
   end
   if brakesMode == 1 then
     addMix(brakesCH1, MIXSRC_SE, "Brakes")
   elseif brakesMode == 2 then
-    addMix(brakesCH1, MIXSRC_SE, "Brake L")
-    addMix(brakesCH2, MIXSRC_SE, "Brake R")
+    addMix(brakesCH1, MIXSRC_SE, "BrakeL")
+    addMix(brakesCH2, MIXSRC_SE, "BrakeR")
   end
   if tailMode == 3 then
-    addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(1), "V-Ele L", 50)
-    addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(0), "V-Rud L", 50, 1)
-    addMix(eleCH2, MIXSRC_FIRST_INPUT+defaultChannel(1), "V-Ele R", 50)
-    addMix(eleCH2, MIXSRC_FIRST_INPUT+defaultChannel(0), "V-Rud R", -50, 1)
+    addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(1), "V-EleL", 50)
+    addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(0), "V-RudL", 50, 1)
+    addMix(eleCH2, MIXSRC_FIRST_INPUT+defaultChannel(1), "V-EleR", 50)
+    addMix(eleCH2, MIXSRC_FIRST_INPUT+defaultChannel(0), "V-RudR", -50, 1)
   else
     if tailMode > 0 then
       addMix(rudCH1, MIXSRC_FIRST_INPUT+defaultChannel(0), "Rudder")
     end
     if tailMode == 1 then
-      addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(1), "Elevator")
+      addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(1), "Elev")
     elseif tailMode == 2 then
-      addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(1), "Elev L")
-      addMix(eleCH2, MIXSRC_FIRST_INPUT+defaultChannel(1), "Elev R")
+      addMix(eleCH1, MIXSRC_FIRST_INPUT+defaultChannel(1), "ElevL")
+      addMix(eleCH2, MIXSRC_FIRST_INPUT+defaultChannel(1), "ElevR")
     end
   end
 end

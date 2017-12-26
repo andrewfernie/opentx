@@ -135,27 +135,41 @@ void per10ms()
 #if defined(ROTARY_ENCODER_NAVIGATION)
   if (IS_ROTARY_ENCODER_NAVIGATION_ENABLE()) {
     static rotenc_t rePreviousValue;
+    static bool cw = false;
     rotenc_t reNewValue = (ROTARY_ENCODER_NAVIGATION_VALUE / ROTARY_ENCODER_GRANULARITY);
-    int8_t scrollRE = reNewValue - rePreviousValue;
+    rotenc_t scrollRE = reNewValue - rePreviousValue;
     if (scrollRE) {
+      static uint32_t lastEvent;
       rePreviousValue = reNewValue;
-      putEvent(scrollRE < 0 ? EVT_ROTARY_LEFT : EVT_ROTARY_RIGHT);
-    }
+
+      bool new_cw = (scrollRE < 0) ? false : true;
+      if ((g_tmr10ms - lastEvent >= 10) || (cw == new_cw)) { // 100ms
+
+        putEvent(new_cw ? EVT_ROTARY_RIGHT : EVT_ROTARY_LEFT);
+
 #if defined(CPUARM)
-    // rotary encoder navigation speed (acceleration) detection/calculation
-    if (scrollRE) {
-      static uint32_t lastTick = 0;
-      static uint32_t delay = 0;
-      delay = (((get_tmr10ms() - lastTick) << 3) + delay) >> 1;   // Modified moving average filter used for smoother change of speed
-      lastTick = get_tmr10ms();
-      if (delay < ROTENC_DELAY_HIGHSPEED)
-        rotencSpeed = ROTENC_HIGHSPEED;
-      else if (delay < ROTENC_DELAY_MIDSPEED)
-        rotencSpeed = ROTENC_MIDSPEED;
-      else
-        rotencSpeed = ROTENC_LOWSPEED;
-    }
+        // rotary encoder navigation speed (acceleration) detection/calculation
+        static uint32_t delay = 2*ROTENC_DELAY_MIDSPEED;
+
+        if (new_cw == cw) {
+          // Modified moving average filter used for smoother change of speed
+          delay = (((g_tmr10ms - lastEvent) << 3) + delay) >> 1;
+        }
+        else {
+          delay = 2*ROTENC_DELAY_MIDSPEED;
+        }
+
+        if (delay < ROTENC_DELAY_HIGHSPEED)
+          rotencSpeed = ROTENC_HIGHSPEED;
+        else if (delay < ROTENC_DELAY_MIDSPEED)
+          rotencSpeed = ROTENC_MIDSPEED;
+        else
+          rotencSpeed = ROTENC_LOWSPEED;
 #endif
+        cw = new_cw;
+        lastEvent = g_tmr10ms;
+      }
+    }
   }
 #endif
 
@@ -234,11 +248,7 @@ void generalDefault()
   g_eeGeneral.contrast = LCD_CONTRAST_DEFAULT;
 #endif
 
-#if defined(PCBFLAMENCO)
-  g_eeGeneral.vBatWarn = 33;
-  g_eeGeneral.vBatMin = -60; // 0 is 9.0V
-  g_eeGeneral.vBatMax = -78; // 0 is 12.0V
-#elif defined(PCBHORUS)
+#if defined(PCBHORUS)
   #if PCBREV >= 13
     g_eeGeneral.potsConfig = 0x1B;  // S1 = pot, 6P = multipos, S2 = pot with detent
   #else
@@ -259,16 +269,22 @@ void generalDefault()
   g_eeGeneral.switchConfig = 0x00007bff; // 6x3POS, 1x2POS, 1xTOGGLE
 #endif
 
-#if defined(PCBX9E)
+// vBatWarn is voltage in 100mV, vBatMin is in 100mV but with -9V offset, vBatMax has a -12V offset
+#if defined(PCBX9E) || defined(PCBX12S)
   // NI-MH 9.6V
   g_eeGeneral.vBatWarn = 87;
-  g_eeGeneral.vBatMin = -5;
-  g_eeGeneral.vBatMax = -5;
+  g_eeGeneral.vBatMin = -5;   //8,5V
+  g_eeGeneral.vBatMax = -5;   //11,5V
+#elif defined(PCBX10)
+  // Lipo 2V
+  g_eeGeneral.vBatWarn = 66;
+  g_eeGeneral.vBatMin = -28; // 6.2V
+  g_eeGeneral.vBatMax = -38;   // 8.2V
 #elif defined(PCBTARANIS)
-  // NI-MH 7.2V
+  // NI-MH 7.2V, X9D, X9D+ and X7
   g_eeGeneral.vBatWarn = 65;
-  g_eeGeneral.vBatMin = -30;
-  g_eeGeneral.vBatMax = -40;
+  g_eeGeneral.vBatMin = -30; //6V
+  g_eeGeneral.vBatMax = -40; //8V
 #else
   g_eeGeneral.vBatWarn = 90;
 #endif
@@ -277,15 +293,11 @@ void generalDefault()
   g_eeGeneral.stickMode = DEFAULT_MODE-1;
 #endif
 
-#if defined(PCBFLAMENCO)
-  g_eeGeneral.templateSetup = 21; /* AETR */
-#elif defined(PCBTARANIS)
+#if defined(PCBTARANIS)
   g_eeGeneral.templateSetup = 17; /* TAER */
 #endif
 
-#if defined(PCBFLAMENCO)
-  g_eeGeneral.inactivityTimer = 50;
-#elif !defined(CPUM64)
+#if !defined(CPUM64)
   g_eeGeneral.backlightMode = e_backlight_mode_all;
   g_eeGeneral.lightAutoOff = 2;
   g_eeGeneral.inactivityTimer = 10;
@@ -889,23 +901,9 @@ void checkBacklight()
   }
 }
 
-#if defined(PCBFLAMENCO)
-void checkUsbChip()
-{
-  uint8_t reg = i2cReadBQ24195(0x00);
-  if (reg & 0x80) {
-    i2cWriteBQ24195(0x00, reg & 0x7F);
-  }
-}
-#endif
-
 void doLoopCommonActions()
 {
   checkBacklight();
-
-#if defined(PCBFLAMENCO)
-  checkUsbChip();
-#endif
 }
 
 void backlightOn()
@@ -2655,7 +2653,7 @@ int main()
   bluetoothInit(BLUETOOTH_DEFAULT_BAUDRATE);   //BT is turn on for a brief period to differentiate X7 and X7S
 #endif
 
-#if defined(GUI) && !defined(PCBTARANIS) && !defined(PCBFLAMENCO) && !defined(PCBHORUS)
+#if defined(GUI) && !defined(PCBTARANIS) && !defined(PCBHORUS)
   // TODO remove this
   lcdInit();
 #endif
@@ -2720,10 +2718,6 @@ int main()
   opentxInit(mcusr);
 #if defined(CPUM2560)
   uint8_t shutdown_state = 0;
-#endif
-
-#if defined(PCBFLAMENCO)
-  // TODO not here it's an ARM board ... menuEntryTime = get_tmr10ms() - 200;
 #endif
 
   while (1) {
@@ -2809,24 +2803,9 @@ uint32_t pwrCheck()
       if (get_tmr10ms() - pwr_press_time > PWR_PRESS_SHUTDOWN_DELAY) {
 #if defined(SHUTDOWN_CONFIRMATION)
         while (1) {
-          lcdRefreshWait();
-          lcdClear();
-          POPUP_CONFIRMATION("Confirm Shutdown");
-          event_t evt = getEvent(false);
-          DISPLAY_WARNING(evt);
-          lcdRefresh();
-          if (warningResult == true) {
-            pwr_check_state = PWR_CHECK_OFF;
-            return e_power_off;
-          }
-          else if (!warningText) {
-            // shutdown has been cancelled
-            pwr_check_state = PWR_CHECK_PAUSED;
-            return e_power_on;
-          }
-        }
 #else
         while ((TELEMETRY_STREAMING() && !g_eeGeneral.disableRssiPoweroffAlarm)) {
+#endif
           lcdRefreshWait();
           lcdClear();
           POPUP_CONFIRMATION("Confirm Shutdown");
@@ -2846,7 +2825,6 @@ uint32_t pwrCheck()
         haptic.play(15, 3, PLAY_NOW);
         pwr_check_state = PWR_CHECK_OFF;
         return e_power_off;
-#endif
       }
       else {
         drawShutdownAnimation(pwrPressedDuration(), message);
@@ -2884,9 +2862,8 @@ uint32_t pwrCheck()
     if (TELEMETRY_STREAMING()) {
       RAISE_ALERT(STR_MODEL, STR_MODEL_STILL_POWERED, STR_PRESS_ENTER_TO_CONFIRM, AU_MODEL_STILL_POWERED);
       while (TELEMETRY_STREAMING()) {
-#if defined(CPUARM)
+        resetForcePowerOffRequest();
         CoTickDelay(10);
-#endif
         if (pwrPressed()) {
           return e_power_on;
         }

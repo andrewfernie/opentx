@@ -87,11 +87,11 @@
 #if defined(PCBHORUS)
   #define TR_VTRAINERMODES     TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_BATTERY TR_VTRAINER_BLUETOOTH
 #elif defined(PCBX9E)
-  #define TR_VTRAINERMODES   TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_SBUS_MODULE TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY TR_VTRAINER_BLUETOOTH
+  #define TR_VTRAINERMODES     TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_SBUS_MODULE TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY TR_VTRAINER_BLUETOOTH
 #elif defined(PCBTARANIS) && defined(BLUETOOTH)
-  #define TR_VTRAINERMODES   TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_SBUS_MODULE TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY TR_VTRAINER_BLUETOOTH
+  #define TR_VTRAINERMODES     TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_SBUS_MODULE TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY TR_VTRAINER_BLUETOOTH
 #elif defined(PCBTARANIS)
-  #define TR_VTRAINERMODES   TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_SBUS_MODULE TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY
+  #define TR_VTRAINERMODES     TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_SBUS_MODULE TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY
 #elif defined(CPUARM)
   #define TR_VTRAINERMODES     TR_VTRAINER_MASTER_JACK TR_VTRAINER_SLAVE_JACK TR_VTRAINER_MASTER_CPPM_MODULE TR_VTRAINER_MASTER_BATTERY
 #endif
@@ -219,10 +219,13 @@ extern const pm_char STR_OPEN9X[];
   #define OFS_VTRAINERMODES     (OFS_VFAILSAFE)
 #endif
 #if defined(CPUARM)
-  #define OFS_TARANIS_PROTOCOLS (OFS_VTRAINERMODES + sizeof(TR_VTRAINERMODES))
-  #define OFS_TELEMETRY_PROTOCOLS (OFS_TARANIS_PROTOCOLS + sizeof(TR_TARANIS_PROTOCOLS))
-  #define OFS_XJT_PROTOCOLS     (OFS_TELEMETRY_PROTOCOLS + sizeof(TR_TELEMETRY_PROTOCOLS))
-  #define OFS_DSM_PROTOCOLS     (OFS_XJT_PROTOCOLS + sizeof(TR_XJT_PROTOCOLS))
+  #define OFS_TARANIS_PROTOCOLS        (OFS_VTRAINERMODES + sizeof(TR_VTRAINERMODES))
+  #define OFS_R9M_MODES                (OFS_TARANIS_PROTOCOLS + sizeof(TR_TARANIS_PROTOCOLS))
+  #define OFS_R9M_FCC_POWER_VALUES     (OFS_R9M_MODES + sizeof(TR_R9M_MODES))
+  #define OFS_R9M_LBT_POWER_VALUES     (OFS_R9M_FCC_POWER_VALUES + sizeof(TR_R9M_FCC_POWER_VALUES))
+  #define OFS_TELEMETRY_PROTOCOLS      (OFS_R9M_LBT_POWER_VALUES + sizeof(TR_R9M_LBT_POWER_VALUES))
+  #define OFS_XJT_PROTOCOLS            (OFS_TELEMETRY_PROTOCOLS + sizeof(TR_TELEMETRY_PROTOCOLS))
+  #define OFS_DSM_PROTOCOLS            (OFS_XJT_PROTOCOLS + sizeof(TR_XJT_PROTOCOLS))
 #if defined(MULTIMODULE)
   #define OFS_MULTI_PROTOCOLS   (OFS_DSM_PROTOCOLS + sizeof(TR_DSM_PROTOCOLS))
   #define OFS_VOLTSRC           (OFS_MULTI_PROTOCOLS + sizeof(TR_MULTI_PROTOCOLS))
@@ -348,7 +351,10 @@ extern const pm_char STR_OPEN9X[];
 #if defined(CPUARM)
   #define STR_VTRAINERMODES     (STR_OPEN9X + OFS_VTRAINERMODES)
   #define STR_TARANIS_PROTOCOLS (STR_OPEN9X + OFS_TARANIS_PROTOCOLS)
-  #define STR_TELEMETRY_PROTOCOLS (STR_OPEN9X + OFS_TELEMETRY_PROTOCOLS)
+  #define STR_R9M_MODES         (STR_OPEN9X + OFS_R9M_MODES)
+  #define STR_R9M_FCC_POWER_VALUES     (STR_OPEN9X + OFS_R9M_FCC_POWER_VALUES)
+  #define STR_R9M_LBT_POWER_VALUES     (STR_OPEN9X + OFS_R9M_LBT_POWER_VALUES)
+  #define STR_TELEMETRY_PROTOCOLS      (STR_OPEN9X + OFS_TELEMETRY_PROTOCOLS)
   #define STR_XJT_PROTOCOLS     (STR_OPEN9X + OFS_XJT_PROTOCOLS)
   #define STR_DSM_PROTOCOLS     (STR_OPEN9X + OFS_DSM_PROTOCOLS)
 #if defined(MULTIMODULE)
@@ -364,6 +370,11 @@ extern const pm_char STR_OPEN9X[];
 
 #if defined(BLUETOOTH)
   extern const pm_char STR_BLUETOOTH[];
+extern const pm_char STR_BLUETOOTH_DISC[];
+extern const pm_char STR_BLUETOOTH_INIT[];
+extern const pm_char STR_BLUETOOTH_DIST_ADDR[];
+extern const pm_char STR_BLUETOOTH_LOCAL_ADDR[];
+  extern const pm_char STR_BLUETOOTH_PIN_CODE[];
   #define STR_BLUETOOTH_MODES   (STR_OPEN9X + OFS_BLUETOOTH_MODES)
 #endif
 
@@ -604,7 +615,6 @@ extern const pm_char STR_FAS_OFFSET[];
 extern const pm_char STR_MULTI_CUSTOM[];
 extern const pm_char STR_MULTI_OPTION[];
 extern const pm_char STR_MULTI_VIDFREQ[];
-extern const pm_char STR_MULTI_RFPOWER[];
 extern const pm_char STR_MULTI_RFTUNE[];
 extern const pm_char STR_MULTI_TELEMETRY[];
 extern const pm_char STR_MULTI_AUTOBIND[];
@@ -612,6 +622,7 @@ extern const pm_char STR_MULTI_DSM_AUTODTECT[];
 extern const pm_char STR_MULTI_LOWPOWER[];
 extern const pm_char STR_MODULE_NO_SERIAL_MODE[];
 extern const pm_char STR_MODULE_NO_INPUT[];
+extern const pm_char STR_MODULE_WAITFORBIND[];
 extern const pm_char STR_MODULE_NO_TELEMETRY[];
 extern const pm_char STR_MODULE_BINDING[];
 extern const pm_char STR_PROTOCOL_INVALID[];
@@ -631,7 +642,7 @@ extern const pm_char STR_RECEIVER[];
 extern const pm_char STR_SYNCMENU[];
 extern const pm_char STR_INTERNALRF[];
 extern const pm_char STR_EXTERNALRF[];
-extern const pm_char STR_SPORT_OUT[];
+extern const pm_char STR_MODULE_TELEMETRY[];
 extern const pm_char STR_FAILSAFE[];
 extern const pm_char STR_FAILSAFESET[];
 extern const pm_char STR_HOLD[];
@@ -779,6 +790,9 @@ extern const pm_char STR_SCRIPT_KILLED[];
 extern const pm_char STR_SCRIPT_ERROR[];
 extern const pm_char STR_PLAY_FILE[];
 extern const pm_char STR_ASSIGN_BITMAP[];
+#if defined(PCBHORUS)
+extern const pm_char STR_ASSIGN_SPLASH[];
+#endif
 extern const pm_char STR_EXECUTE_FILE[];
 extern const pm_char STR_DELETE_FILE[];
 extern const pm_char STR_COPY_FILE[];
@@ -843,6 +857,7 @@ extern const pm_char STR_BLCOLOR[];
   extern const LanguagePack skLanguagePack;
   extern const LanguagePack seLanguagePack;
   extern const LanguagePack huLanguagePack;
+  extern const LanguagePack ruLanguagePack;
   extern const LanguagePack * const languagePacks[];
   #if defined(LANGUAGE_PACKS_DEFINITION)
   const LanguagePack * const languagePacks[] = {
@@ -856,6 +871,7 @@ extern const pm_char STR_BLCOLOR[];
     &itLanguagePack,
     &plLanguagePack,
     &ptLanguagePack,
+    &ruLanguagePack,
     &seLanguagePack,
     &skLanguagePack,
     NULL
@@ -917,6 +933,11 @@ extern const pm_char STR_BLCOLOR[];
   extern const pm_char STR_BINDING_1_8_TELEM_OFF[];
   extern const pm_char STR_BINDING_9_16_TELEM_ON[];
   extern const pm_char STR_BINDING_9_16_TELEM_OFF[];
+  extern const pm_char STR_BINDING_25MW_CH1_8_TELEM_OFF[];
+  extern const pm_char STR_BINDING_25MW_CH1_8_TELEM_ON[];
+  extern const pm_char STR_BINDING_500MW_CH1_8_TELEM_OFF[];
+  extern const pm_char STR_BINDING_500MW_CH9_16_TELEM_OFF[];
+  extern const pm_char STR_BINDING_OPTION[];
   extern const pm_char STR_CHANNELRANGE[];
   extern const pm_char STR_ANTENNASELECTION[];
   extern const pm_char STR_ANTENNACONFIRM1[];
@@ -929,9 +950,9 @@ extern const pm_char STR_BLCOLOR[];
   extern const pm_char STR_RESET_SUBMENU[];
   extern const pm_char STR_LOWALARM[];
   extern const pm_char STR_CRITICALALARM[];
-extern const pm_char STR_RSSIALARM_WARN[];
-extern const pm_char STR_NO_RSSIALARM[];
-extern const pm_char STR_DISABLE_ALARM[];
+  extern const pm_char STR_RSSIALARM_WARN[];
+  extern const pm_char STR_NO_RSSIALARM[];
+  extern const pm_char STR_DISABLE_ALARM[];
   extern const pm_char STR_TELEMETRY_TYPE[];
   extern const pm_char STR_TELEMETRY_SENSORS[];
   extern const pm_char STR_VALUE[];
@@ -974,6 +995,7 @@ extern const pm_char STR_DISABLE_ALARM[];
   extern const pm_char STR_ADDMAINVIEW[];
   extern const pm_char STR_BACKGROUND_COLOR[];
   extern const pm_char STR_MAIN_COLOR[];
+  extern const pm_char STR_MULTI_RFPOWER[];
 #endif
 
 #if defined(CPUARM)

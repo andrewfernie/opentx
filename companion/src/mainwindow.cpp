@@ -59,18 +59,18 @@
 #ifdef __APPLE__
   #define COMPANION_STAMP                 "companion-macosx.stamp"
   #define COMPANION_INSTALLER             "macosx/opentx-companion-%1.dmg"
-  #define COMPANION_FILEMASK              tr("Diskimage (*.dmg)")
-  #define COMPANION_INSTALL_QUESTION      tr("Would you like to open the disk image to install the new version?")
+  #define COMPANION_FILEMASK              QT_TRANSLATE_NOOP("MainWindow", "Diskimage (*.dmg)")
+  #define COMPANION_INSTALL_QUESTION      QT_TRANSLATE_NOOP("MainWindow", "Would you like to open the disk image to install the new version?")
 #elif WIN32
   #define COMPANION_STAMP                 "companion-windows.stamp"
   #define COMPANION_INSTALLER             "windows/companion-windows-%1.exe"
-  #define COMPANION_FILEMASK              tr("Executable (*.exe)")
-  #define COMPANION_INSTALL_QUESTION      tr("Would you like to launch the installer?")
+  #define COMPANION_FILEMASK              QT_TRANSLATE_NOOP("MainWindow", "Executable (*.exe)")
+  #define COMPANION_INSTALL_QUESTION      QT_TRANSLATE_NOOP("MainWindow", "Would you like to launch the installer?")
 #else
   #define COMPANION_STAMP                 "companion-linux.stamp"
   #define COMPANION_INSTALLER             "" // no automated updates for linux
   #define COMPANION_FILEMASK              "*.*"
-  #define COMPANION_INSTALL_QUESTION      tr("Would you like to launch the installer?")
+  #define COMPANION_INSTALL_QUESTION      QT_TRANSLATE_NOOP("MainWindow", "Would you like to launch the installer?")
 #endif
 
 const char * const OPENTX_COMPANION_DOWNLOAD_URL[] = {
@@ -163,6 +163,9 @@ MainWindow::MainWindow():
           child->close();
         }
       }
+      else {
+        child->closeFile(true);
+      }
     }
   }
   if (printing) {
@@ -199,7 +202,7 @@ void MainWindow::displayWarnings()
   }
 
   QMessageBox msgBox(this);
-  msgBox.setWindowTitle(tr("Companion"));
+  msgBox.setWindowTitle(CPN_STR_APP_NAME);
   msgBox.setIcon(QMessageBox::Information);
   msgBox.setStandardButtons(QMessageBox::Ok);
   msgBox.setInformativeText(infoTxt);
@@ -288,7 +291,7 @@ void MainWindow::onUpdatesError()
 {
   checkForUpdatesState = 0;
   closeUpdatesWaitDialog();
-  QMessageBox::warning(this, "Companion", tr("Unable to check for updates."));
+  QMessageBox::warning(this, CPN_STR_APP_NAME, tr("Unable to check for updates."));
 }
 
 void MainWindow::closeUpdatesWaitDialog()
@@ -327,13 +330,13 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
 
   if (ownVersion < webVersion) {
 #if defined WIN32 || defined __APPLE__
-    int ret = QMessageBox::question(this, "Companion", tr("A new version of Companion is available (version %1)<br>"
+    int ret = QMessageBox::question(this, CPN_STR_APP_NAME, tr("A new version of Companion is available (version %1)<br>"
                                                         "Would you like to download it?").arg(version) ,
                                     QMessageBox::Yes | QMessageBox::No);
 
     if (ret == QMessageBox::Yes) {
       QDir dir(g.updatesDir());
-      QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), dir.absoluteFilePath(QString(COMPANION_INSTALLER).arg(version)), COMPANION_FILEMASK);
+      QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), dir.absoluteFilePath(QString(COMPANION_INSTALLER).arg(version)), tr(COMPANION_FILEMASK));
 
       if (!fileName.isEmpty()) {
         g.updatesDir(QFileInfo(fileName).dir().absolutePath());
@@ -349,7 +352,7 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
   }
   else {
     if (downloadDialog_forWait && checkForUpdatesState==0) {
-      QMessageBox::information(this, "Companion", tr("No updates available at this time."));
+      QMessageBox::information(this, CPN_STR_APP_NAME, tr("No updates available at this time."));
     }
   }
 
@@ -358,7 +361,7 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
 
 void MainWindow::updateDownloaded()
 {
-  int ret = QMessageBox::question(this, "Companion", COMPANION_INSTALL_QUESTION, QMessageBox::Yes | QMessageBox::No);
+  int ret = QMessageBox::question(this, CPN_STR_APP_NAME, tr(COMPANION_INSTALL_QUESTION), QMessageBox::Yes | QMessageBox::No);
   if (ret == QMessageBox::Yes) {
     if (QDesktopServices::openUrl(QUrl::fromLocalFile(installer_fileName)))
       QApplication::exit();
@@ -370,7 +373,7 @@ void MainWindow::firmwareDownloadAccepted()
   QString errormsg;
   QFile file(g.profile[g.id()].fwName());
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {  //reading HEX TEXT file
-    QMessageBox::critical(this, tr("Error"),
+    QMessageBox::critical(this, CPN_STR_TTL_ERROR,
         tr("Error opening file %1:\n%2.")
         .arg(g.profile[g.id()].fwName())
         .arg(file.errorString()));
@@ -409,13 +412,13 @@ void MainWindow::firmwareDownloadAccepted()
     }
     file.close();
     file.remove();
-    QMessageBox::critical(this, tr("Error"), errormsg);
+    QMessageBox::critical(this, CPN_STR_TTL_ERROR, errormsg);
     return;
   }
   file.close();
   g.fwRev.set(Firmware::getCurrentVariant()->getId(), version2index(firmwareVersionString));
   if (g.profile[g.id()].burnFirmware()) {
-    int ret = QMessageBox::question(this, "Companion", tr("Do you want to write the firmware to the radio now ?"), QMessageBox::Yes | QMessageBox::No);
+    int ret = QMessageBox::question(this, CPN_STR_APP_NAME, tr("Do you want to write the firmware to the radio now ?"), QMessageBox::Yes | QMessageBox::No);
     if (ret == QMessageBox::Yes) {
       writeFlash(g.profile[g.id()].fwName());
     }
@@ -448,7 +451,7 @@ void MainWindow::checkForFirmwareUpdateFinished(QNetworkReply * reply)
     QString currentVersionString = index2version(currentVersion);
 
     QMessageBox msgBox;
-    msgBox.setWindowTitle("Companion");
+    msgBox.setWindowTitle(CPN_STR_APP_NAME);
     QSpacerItem * horizontalSpacer = new QSpacerItem(500, 0, QSizePolicy::Minimum, QSizePolicy::Expanding);
     QGridLayout * layout = (QGridLayout*)msgBox.layout();
     layout->addItem(horizontalSpacer, layout->rowCount(), 0, 1, layout->columnCount());
@@ -469,7 +472,7 @@ void MainWindow::checkForFirmwareUpdateFinished(QNetworkReply * reply)
       if (msgBox.clickedButton() == rnButton) {
         ReleaseNotesFirmwareDialog * dialog = new ReleaseNotesFirmwareDialog(this, rn);
         dialog->exec();
-        int ret2 = QMessageBox::question(this, "Companion", tr("Do you want to download release %1 now ?").arg(fullVersionString), QMessageBox::Yes | QMessageBox::No);
+        int ret2 = QMessageBox::question(this, CPN_STR_APP_NAME, tr("Do you want to download release %1 now ?").arg(fullVersionString), QMessageBox::Yes | QMessageBox::No);
         if (ret2 == QMessageBox::Yes)
           download = true;
         else
@@ -498,7 +501,7 @@ void MainWindow::checkForFirmwareUpdateFinished(QNetworkReply * reply)
       if( msgBox.clickedButton() == rnButton ) {
         ReleaseNotesFirmwareDialog * dialog = new ReleaseNotesFirmwareDialog(this, rn);
         dialog->exec();
-        int ret2 = QMessageBox::question(this, "Companion", tr("Do you want to download release %1 now ?").arg(fullVersionString),
+        int ret2 = QMessageBox::question(this, CPN_STR_APP_NAME, tr("Do you want to download release %1 now ?").arg(fullVersionString),
               QMessageBox::Yes | QMessageBox::No);
         if (ret2 == QMessageBox::Yes) {
           download = true;
@@ -516,13 +519,13 @@ void MainWindow::checkForFirmwareUpdateFinished(QNetworkReply * reply)
     }
     else {
       if (downloadDialog_forWait && checkForUpdatesState==0) {
-        QMessageBox::information(this, "Companion", tr("No updates available at this time."));
+        QMessageBox::information(this, CPN_STR_APP_NAME, tr("No updates available at this time."));
       }
     }
   }
 
   if (ignore) {
-    int res = QMessageBox::question(this, "Companion", tr("Ignore this release %1?").arg(fullVersionString), QMessageBox::Yes | QMessageBox::No);
+    int res = QMessageBox::question(this, CPN_STR_APP_NAME, tr("Ignore this release %1?").arg(fullVersionString), QMessageBox::Yes | QMessageBox::No);
     if (res==QMessageBox::Yes)   {
       g.fwRev.set(Firmware::getCurrentVariant()->getId(), version);
     }
@@ -599,7 +602,7 @@ void MainWindow::onLanguageChanged(QAction * act)
 void  MainWindow::setTheme(int index)
 {
   g.theme(index);
-  QMessageBox::information(this, tr("Companion"), tr("The new theme will be loaded the next time you start Companion."));
+  QMessageBox::information(this, CPN_STR_APP_NAME, tr("The new theme will be loaded the next time you start Companion."));
 }
 
 void MainWindow::onThemeChanged(QAction * act)
@@ -685,6 +688,9 @@ void MainWindow::openFile(const QString & fileName, bool updateLastUsedDir)
       statusBar()->showMessage(tr("File loaded"), 2000);
       child->show();
     }
+    else {
+      child->closeFile(true);
+    }
   }
 }
 
@@ -708,6 +714,15 @@ void MainWindow::saveAs()
   }
 }
 
+void MainWindow::saveAll()
+{
+  foreach (QMdiSubWindow * window, mdiArea->subWindowList()) {
+    MdiChild * child;
+    if ((child = qobject_cast<MdiChild *>(window->widget())) && child->isWindowModified())
+      child->save();
+  }
+}
+
 void MainWindow::closeFile()
 {
   if (mdiArea->activeSubWindow())
@@ -723,16 +738,28 @@ void MainWindow::openRecentFile()
   }
 }
 
-void MainWindow::loadProfileId(const unsigned pid)  // TODO Load all variables - Also HW!
+bool MainWindow::loadProfileId(const unsigned pid)  // TODO Load all variables - Also HW!
 {
   if (pid >= MAX_PROFILES)
-    return;
+    return false;
+
+  Firmware * newFw = Firmware::getFirmwareForId(g.profile[pid].fwType());
+  // warn if we're switching between incompatible board types and any files have been modified
+  if (!Boards::isBoardCompatible(Firmware::getCurrentVariant()->getBoard(), newFw->getBoard()) && anyChildrenDirty()) {
+    if (QMessageBox::question(this, CPN_STR_APP_NAME,
+                              tr("There are unsaved file changes which you may lose when switching radio types.\n\nDo you wish to continue?"),
+                              (QMessageBox::Yes | QMessageBox::No), QMessageBox::No) != QMessageBox::Yes) {
+      updateProfilesActions();
+      return false;
+    }
+  }
 
   // Set the new profile number
   g.id(pid);
-  Firmware::setCurrentVariant(Firmware::getFirmwareForId(g.profile[pid].fwType()));
+  Firmware::setCurrentVariant(newFw);
   emit firmwareChanged();
   updateMenus();
+  return true;
 }
 
 void MainWindow::loadProfile()
@@ -749,6 +776,8 @@ void MainWindow::loadProfile()
 void MainWindow::appPrefs()
 {
   AppPreferencesDialog * dialog = new AppPreferencesDialog(this);
+  dialog->setMainWinHasDirtyChild(anyChildrenDirty());
+  connect(dialog, &AppPreferencesDialog::firmwareProfileAboutToChange, this, &MainWindow::saveAll);
   connect(dialog, &AppPreferencesDialog::firmwareProfileChanged, this, &MainWindow::loadProfileId);
   dialog->exec();
   dialog->deleteLater();
@@ -1020,17 +1049,10 @@ void MainWindow::sdsync()
 
 void MainWindow::changelog()
 {
-  ReleaseNotesDialog * dialog = new ReleaseNotesDialog(this);
-  dialog->exec();
-  dialog->deleteLater();
-}
-
-void MainWindow::fwchangelog()
-{
   Firmware * firmware = getCurrentFirmware();
   QString url = firmware->getReleaseNotesUrl();
   if (url.isEmpty()) {
-    QMessageBox::information(this, tr("Firmware updates"), tr("Current firmware does not provide release notes informations."));
+    QMessageBox::information(this, tr("Release notes"), tr("Cannot retrieve release notes from the server."));
   }
   else {
     ReleaseNotesFirmwareDialog * dialog = new ReleaseNotesFirmwareDialog(this, url);
@@ -1101,7 +1123,7 @@ bool MainWindow::readEepromFromRadio(const QString & filename)
 void MainWindow::writeBackup()
 {
   if (IS_HORUS(getCurrentBoard())) {
-    QMessageBox::information(this, "Companion", tr("This function is not yet implemented"));
+    QMessageBox::information(this, CPN_STR_APP_NAME, tr("This function is not yet implemented"));
     return;
     // TODO implementation
   }
@@ -1118,7 +1140,7 @@ void MainWindow::writeFlash(QString fileToFlash)
 void MainWindow::readBackup()
 {
   if (IS_HORUS(getCurrentBoard())) {
-    QMessageBox::information(this, "Companion", tr("This function is not yet implemented"));
+    QMessageBox::information(this, CPN_STR_APP_NAME, tr("This function is not yet implemented"));
     return;
     // TODO implementation
   }
@@ -1275,6 +1297,7 @@ MdiChild * MainWindow::createMdiChild()
   connect(child, &MdiChild::windowTitleChanged, this, &MainWindow::onSubwindowTitleChanged);
   connect(child, &MdiChild::modified, this, &MainWindow::onSubwindowModified);
   connect(child, &MdiChild::newStatusMessage, statusBar(), &QStatusBar::showMessage);
+  connect(child, &MdiChild::destroyed, win, &QMdiSubWindow::close);
   connect(win, &QMdiSubWindow::destroyed, this, &MainWindow::updateWindowActions);
 
   updateWindowActions();
@@ -1340,8 +1363,7 @@ void MainWindow::retranslateUi(bool showMsg)
   trAct(appPrefsAct,        tr("Settings..."),                tr("Edit Settings"));
   trAct(fwPrefsAct,         tr("Download..."),                tr("Download firmware and voice files"));
   trAct(checkForUpdatesAct, tr("Check for Updates..."),       tr("Check OpenTX and Companion updates"));
-  trAct(changelogAct,       tr("Companion Changes..."),       tr("Show Companion change log"));
-  trAct(fwchangelogAct,     tr("Firmware Changes..."),        tr("Show firmware change log"));
+  trAct(changelogAct,       tr("Release notes..."),           tr("Show release notes"));
   trAct(compareAct,         tr("Compare Models..."),          tr("Compare models"));
   trAct(editSplashAct,      tr("Edit Radio Splash Image..."), tr("Edit the splash image of your Radio"));
   trAct(burnListAct,        tr("List programmers..."),        tr("List available programmers"));
@@ -1384,7 +1406,7 @@ void MainWindow::retranslateUi(bool showMsg)
   showReadyStatus();
 
   if (showMsg)
-    QMessageBox::information(this, tr("Companion"), tr("Some text will not be translated until the next time you start Companion. Please note that some translations may not be complete."));
+    QMessageBox::information(this, CPN_STR_APP_NAME, tr("Some text will not be translated until the next time you start Companion. Please note that some translations may not be complete."));
 }
 
 void MainWindow::createActions()
@@ -1426,7 +1448,6 @@ void MainWindow::createActions()
   aboutAct =           addAct("information.png",    SLOT(about()));
   openDocURLAct =      addAct("changelog.png",      SLOT(openDocURL()));
   changelogAct =       addAct("changelog.png",      SLOT(changelog()));
-  fwchangelogAct =     addAct("changelog.png",      SLOT(fwchangelog()));
   contributorsAct =    addAct("contributors.png",   SLOT(contributors()));
 
   // these two get assigned menus in createMenus()
@@ -1440,7 +1461,6 @@ void MainWindow::createActions()
   openDocURLAct->setMenuRole(QAction::ApplicationSpecificRole);
   checkForUpdatesAct->setMenuRole(QAction::ApplicationSpecificRole);
   changelogAct->setMenuRole(QAction::ApplicationSpecificRole);
-  fwchangelogAct->setMenuRole(QAction::ApplicationSpecificRole);
 
   actTabbedWindows->setCheckable(true);
   compareAct->setEnabled(false);
@@ -1524,11 +1544,11 @@ void MainWindow::createMenus()
   helpMenu->addAction(openDocURLAct);
   helpMenu->addSeparator();
   helpMenu->addAction(changelogAct);
-  helpMenu->addAction(fwchangelogAct);
   helpMenu->addSeparator();
   helpMenu->addAction(contributorsAct);
 
   recentFilesMenu = new QMenu(this);
+  recentFilesMenu->setToolTipsVisible(true);
   for ( int i = 0; i < g.historySize(); ++i) {
     recentFileActs.append(recentFilesMenu->addAction(""));
     recentFileActs[i]->setVisible(false);
@@ -1648,23 +1668,29 @@ QMdiSubWindow *MainWindow::findMdiChild(const QString &fileName)
   return 0;
 }
 
+bool MainWindow::anyChildrenDirty()
+{
+  foreach (QMdiSubWindow * window, mdiArea->subWindowList()) {
+    MdiChild * child;
+    if ((child = qobject_cast<MdiChild *>(window->widget())) && child->isWindowModified())
+      return true;
+  }
+  return false;
+}
+
 void MainWindow::updateRecentFileActions()
 {
-  //  Hide all document slots
-  for (int i=0 ; i < qMin(recentFileActs.size(), g.historySize()); i++) {
-    recentFileActs[i]->setVisible(false);
-  }
-
-  // Fill slots with content and unhide them
   QStringList files = g.recentFiles();
-  int numRecentFiles = qMin(recentFileActs.size(), qMin(files.size(), g.historySize()));
-
-  for (int i=0; i < numRecentFiles; i++) {
-    QString text = strippedName(files[i]);
-    if (!text.trimmed().isEmpty()) {
-      recentFileActs[i]->setText(text);
-      recentFileActs[i]->setData(files[i]);
+  for (int i=0; i < recentFileActs.size(); i++) {
+    if (i < files.size() && !files.at(i).isEmpty()) {
+      recentFileActs[i]->setText(QFileInfo(files.at(i)).fileName());
+      recentFileActs[i]->setData(files.at(i));
+      recentFileActs[i]->setStatusTip(QDir::toNativeSeparators(files.at(i)));
+      recentFileActs[i]->setToolTip(recentFileActs[i]->statusTip());
       recentFileActs[i]->setVisible(true);
+    }
+    else {
+      recentFileActs[i]->setVisible(false);
     }
   }
 }
@@ -1769,9 +1795,8 @@ int MainWindow::newProfile(bool loadProfile)
   g.profile[i].name(tr("New Radio"));
 
   if (loadProfile) {
-    g.id(i);
-    loadProfileId(i);
-    appPrefs();
+    if (loadProfileId(i))
+      appPrefs();
   }
 
   return i;
@@ -1788,17 +1813,20 @@ void MainWindow::copyProfile()
 
   if (newId > -1) {
     g.profile[newId] = g.profile[g.id()];
-    g.id(newId);
     g.profile[newId].name(g.profile[newId].name() + tr(" - Copy"));
-    loadProfileId(newId);
-    appPrefs();
+    if (loadProfileId(newId))
+      appPrefs();
   }
 }
 
 void MainWindow::deleteProfile(const int pid)
 {
+  if (pid == g.id() && anyChildrenDirty()) {
+    QMessageBox::warning(this, tr("Companion :: Open files warning"), tr("Please save or close modified file(s) before deleting the active profile."));
+    return;
+  }
   if (pid == 0) {
-    QMessageBox::information(this, tr("Not possible to remove profile"), tr("The default profile can not be removed."));
+    QMessageBox::warning(this, tr("Not possible to remove profile"), tr("The default profile can not be removed."));
     return;
   }
   int ret = QMessageBox::question(this,
